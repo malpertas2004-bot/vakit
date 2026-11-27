@@ -2927,7 +2927,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     // Separate this metadata so it is never quoted as part of the hadith.
     const tekrarMatch = s.match(/\s*(?:Tekrar(?:lar)?|Tekrarr|Tekrâr)\s*:\s*([\s\S]*)$/i);
     if (tekrarMatch) {
-      tekrar = tekrarMatch[1].replace(/\s+/g, " ").trim();
+      tekrar = tekrarMatch[1].replace(/\s+/g, " ").trim().replace(/\s+(?:ve|ile|veya|yahut)\s*$/i, "");
       s = s.slice(0, tekrarMatch.index).trim();
     }
 
