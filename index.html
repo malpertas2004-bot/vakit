@@ -1856,6 +1856,32 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
+  async function fetchApiPayloadWithTimeout(url, { signal, timeoutMs = FETCH_TIMEOUT_MS } = {}) {
+    const timeoutCtrl = new AbortController();
+    const timer = setTimeout(() => timeoutCtrl.abort(new Error("Timeout")), timeoutMs);
+    const onExternalAbort = () => timeoutCtrl.abort(signal.reason || new Error("Aborted"));
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer);
+        throw new Error("Aborted");
+      }
+      signal.addEventListener("abort", onExternalAbort, { once: true });
+    }
+    const t0 = performance.now();
+    try {
+      const res = await fetch(url, { cache: "no-store", signal: timeoutCtrl.signal });
+      const ms = Math.round(performance.now() - t0);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const raw = await res.text();
+      let data = raw;
+      try { data = JSON.parse(raw); } catch (_) {}
+      return { data, status: res.status, ms, headers: res.headers };
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onExternalAbort);
+    }
+  }
+
   /* ==========================================================================
      7. TIMEZONE & ASTRONOMICAL DIYANET CALCULATION ENGINE (OFFLINE)
      ========================================================================== */
@@ -3255,10 +3281,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       box.style.display = "block";
     } else if (showMissing) {
       box.textContent = state.lang === "tr"
-        ? "Bu API kaydı için ayrıca hadis açıklaması veya şerh sağlanmamış."
+        ? "Bu API yanıtında ayrı açıklama alanı yok. Ana Türkçe metnin içine eklenmiş açıklama bölümleri yukarıda korunur."
         : state.lang === "nl"
-          ? "Deze API levert voor deze hadith geen aparte uitleg of commentaar."
-          : "This API record does not provide a separate hadith explanation or commentary.";
+          ? "Deze API levert geen afzonderlijk uitlegveld. Een toelichting in de hoofdtekst blijft hierboven zichtbaar."
+          : "This API record has no separate explanation field. Any explanatory passage included in the main hadith text is still shown above.";
       box.style.display = "block";
     } else {
       box.textContent = "";
@@ -3458,7 +3484,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
       if (state.selectedHadithApi !== "hadeethenc" && !(state.selectedHadithApi === "sunnetimiz" && selLang === "tr") && !(state.selectedHadithApi === "random_hadith_gen" && selLang === "en")) {
         try {
-          const selectedResponse = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
+          const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
           const selectedText = extractApiTextPayload(selectedResponse.data, selLang, "hadith");
           const selectedValid = cleanAndValidateHadithText(selectedText, selLang);
           if (selectedValid.isValid) {
@@ -3699,7 +3725,7 @@ const QURAN_DUA_REFS = [
 
       if (state.selectedDuaApi !== "fawaz_quran_cdn" && !(state.selectedDuaApi === "acikkuran_api" && selLang === "tr")) {
         try {
-          const selectedResponse = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
+          const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
           const selectedText = extractApiTextPayload(selectedResponse.data, selLang, "dua");
           const selectedReview = inspectReligiousText(selectedText, selLang);
           if (selectedText && !selectedReview.issues.length) {
