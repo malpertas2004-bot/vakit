@@ -558,7 +558,9 @@ details.nav-item > summary:hover{background:#163b30}
 
   /* Hadis ve dua kartlarında API durum ayrıntılarını gösterme. */
   #hadithCard .api-info,
-  #duaCard .api-info { display: none !important; }
+  #duaCard .api-info,
+  #hadithCard .quote-source,
+  #duaCard .quote-source { display: none !important; }
 </style>
 </head>
 <body>
@@ -3186,7 +3188,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const keys = targetLang === "tr"
         ? ["tr", "turkish", "tur", "meal", "turkce", "text", "translation", "content", "hadith", "hadeeth", "title", "name", "value"]
         : targetLang === "nl"
-          ? ["nl", "dutch", "nld", "nederlands", "en", "english", "eng", "text", "translation", "content", "hadith", "hadeeth", "title", "name", "value"]
+          ? ["nl", "dutch", "nld", "nederlands", "text", "translation", "content", "hadith", "hadeeth", "title", "name", "value"]
           : ["en", "english", "eng", "text", "translation", "content", "hadith", "hadeeth", "title", "name", "value"];
       for (const k of keys) {
         if (Object.prototype.hasOwnProperty.call(val, k) && val[k] != null) {
@@ -3533,14 +3535,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     }
 
-    if (selLang === "nl") {
-      try {
-        const nlClean = await fetchCleanFromHadeethEnc("nl", randNo, signal);
-        if (nlClean) return nlClean;
-      } catch (error) {
-        if (signal?.aborted) throw error;
-      }
-    }
+    if (selLang === "nl") throw new Error("Bu API için doğrulanmış Hollandaca hadis metni bulunamadı.");
 
     const editionPrefix = selLang === "tr" ? "tur" : "eng";
     const cdnHosts = [
@@ -3860,14 +3855,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return nodes;
   }
 
+  function isLikelyRequestedLanguage(text, lang) {
+    const value = String(text || "").toLocaleLowerCase(lang === "tr" ? "tr-TR" : lang === "nl" ? "nl-NL" : "en-US");
+    if (!value || /[\\u3400-\\u9fff\\u3040-\\u30ff\\uac00-\\ud7af]/u.test(value)) return false;
+    const words = value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").match(/[\\p{L}]+/gu) || [];
+    if (!words.length) return false;
+    const dictionaries = {
+      tr: new Set(["bir","ve","ile","icin","bu","su","o","da","de","ki","olan","olarak","her","kim","ben","sen","biz","siz","onlar","yok","var","ise","gibi","daha","cok","nasil","soyle","hadis","buyurdu"]),
+      nl: new Set(["de","het","een","van","en","is","te","dat","die","niet","op","voor","met","als","zijn","heeft","werd","door","aan","om","dit","er","maar","dan","ook","bij","naar","uit","was","mijn","uw","zich","gebed","allah"]),
+      en: new Set(["the","and","is","to","of","in","that","he","she","it","for","with","as","his","was","are","you","your","from","not","this","they","their","who","which","will","be","have","has"])
+    };
+    const set = dictionaries[lang] || dictionaries.en;
+    const hits = words.reduce((n, word) => n + (set.has(word) ? 1 : 0), 0);
+    if (lang === "tr" && /[çğıöşüÇĞİÖŞÜ]/u.test(text)) return true;
+    return words.length < 12 ? hits >= 1 : hits >= 2 && hits / words.length >= 0.025;
+  }
+
   function extractProviderApiText(providerId, payload, targetLang = state.lang, kind = "hadith") {
     const preferred = inspectApiTextPayload(payload, targetLang, kind);
-    if (preferred) return { ...preferred, record: payload, sourceLanguage: targetLang, languageFallback: false };
-    if (targetLang !== "en") {
-      const english = inspectApiTextPayload(payload, "en", kind);
-      if (english) return { ...english, record: payload, sourceLanguage: "en", languageFallback: true };
-    }
-    return null;
+    if (!preferred || !isLikelyRequestedLanguage(preferred.text, targetLang)) return null;
+    return { ...preferred, record: payload, sourceLanguage: targetLang, languageFallback: false };
   }
 
   const QURAN_DUA_REFS = [
@@ -3966,7 +3973,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     clearApiResponseDetails("duaMeta");
 
     try {
-      if (state.selectedDuaApi === "fitrahive_duadhikr" && (selLang === "en" || selLang === "nl")) {
+      if (state.selectedDuaApi === "fitrahive_duadhikr" && selLang === "en") {
         try {
           const fitrahiveHeaders = { "Accept-Language": "en" };
           const { data: listPayload } = await fetchApiPayloadWithTimeout(
