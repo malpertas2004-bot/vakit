@@ -3488,8 +3488,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const oneUrl = `https://hadeethenc.com/api/v1/hadeeths/one/?language=${hLang}&id=${pick.id}`;
         try {
           const { data: detail } = await fetchApiPayloadWithTimeout(oneUrl, { signal, timeoutMs: 5500 });
-          const textInfo = extractProviderApiText("hadeethenc", detail, hLang, "hadith");
-          const validated = cleanAndValidateHadithText(textInfo?.text || "", hLang);
+          const hadeethText = cleanApiTextValue(detail?.hadeeth || detail?.hadith || detail?.text || "");
+          const textInfo = hadeethText ? { text: hadeethText, path: "$.hadeeth", property: "hadeeth", record: detail, sourceLanguage: hLang, languageFallback: false } : null;
+          const validated = cleanAndValidateHadithText(hadeethText, hLang);
           if (!validated.isValid) continue;
           const attribution = extractCleanText(detail?.attribution, hLang) || "HadeethEnc";
           return {
