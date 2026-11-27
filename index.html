@@ -1985,33 +1985,85 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       .toLocaleLowerCase("und")
       .replace(/ı/g, "i")
       .replace(/[’']/g, "")
-      .replace(/[^\p{L}\p{N}]+/gu, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+      .replace(/[^\p{L}\p{N}]+/gu, "");
+  }
+
+  const NON_ADMINISTRATIVE_LOCATION_KEYS = new Set([
+    "atlanticocean", "atlantikokyanusu", "atlantischeoceaan", "oceanatlantique",
+    "pacificocean", "pasifikokyanusu", "pacifischeoceaan",
+    "indianocean", "hintokyanusu", "indischeoceaan",
+    "arcticocean", "arktikokyanusu", "noordelijkeijsoceaan",
+    "southernocean", "zuidelijkeoceaan", "antarctischeoceaan"
+  ]);
+
+  function isNonAdministrativeLocationName(...names) {
+    return names.some(name => NON_ADMINISTRATIVE_LOCATION_KEYS.has(locationNameIdentityKey(name)));
+  }
+
+  const COUNTRY_API_NAME_ALIASES = Object.freeze({
+    abd: "amerikabirlesikdevletleri",
+    usa: "amerikabirlesikdevletleri",
+    us: "amerikabirlesikdevletleri",
+    stlucia: "saintlucia",
+    sarabistan: "suudiarabistan",
+    kktc: "kuzeykibristurkcumhuriyeti",
+    kuzeykibris: "kuzeykibristurkcumhuriyeti",
+    moldavya: "moldova",
+    birlesikarapemirligi: "birlesikarapemirlikleri"
+  });
+
+  function countryApiNameKey(raw) {
+    const key = locationNameIdentityKey(raw);
+    return COUNTRY_API_NAME_ALIASES[key] || key;
+  }
+
+  function findCanonicalCountryFromApi(rawTurkishName, countries) {
+    const key = countryApiNameKey(rawTurkishName);
+    if (!key || NON_ADMINISTRATIVE_LOCATION_KEYS.has(key)) return null;
+
+    const matches = countries.filter(country =>
+      [country.nameTr, country.nameEn, country.nameNl]
+        .some(name => countryApiNameKey(name) === key)
+    );
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function findMatchingLocationRecord(mapById, cleanTr, cleanEn) {
     const trKey = locationNameIdentityKey(cleanTr);
     const enKey = locationNameIdentityKey(cleanEn);
-    if (!trKey && !enKey) return null;
+    if ((!trKey && !enKey) || isNonAdministrativeLocationName(cleanTr, cleanEn)) {
+      return { conflict: true };
+    }
 
-    for (const [candidateId, candidate] of mapById) {
-      const candidateTr = locationNameIdentityKey(candidate?.nameTr);
-      const candidateEn = locationNameIdentityKey(candidate?.nameEn);
-      const trMatch = !!trKey && !!candidateTr && trKey === candidateTr;
-      const enMatch = !!enKey && !!candidateEn && enKey === candidateEn;
+    const trMatches = new Set();
+    const enMatches = new Set();
+    for (const [candidateKey, candidate] of mapById) {
+      const candidateAliases = new Set([
+        candidate?.nameTr,
+        candidate?.nameEn,
+        candidate?.nameNl,
+        ...(Array.isArray(candidate?.nameAliases) ? candidate.nameAliases : [])
+      ].map(locationNameIdentityKey).filter(Boolean));
 
-      // Prefer a two-language match. A one-language match is accepted only
-      // when the other side has no value, to avoid merging genuine homonyms.
-      if (trMatch && enMatch) return [candidateId, candidate];
-      if (trMatch && (!enKey || !candidateEn)) return [candidateId, candidate];
-      if (enMatch && (!trKey || !candidateTr)) return [candidateId, candidate];
+      if (trKey && candidateAliases.has(trKey)) trMatches.add(candidateKey);
+      if (enKey && candidateAliases.has(enKey)) enMatches.add(candidateKey);
+    }
+
+    // Reject a record when its language fields point to different places.
+    const allMatches = new Set([...trMatches, ...enMatches]);
+    if (allMatches.size > 1 || trMatches.size > 1 || enMatches.size > 1) {
+      return { conflict: true };
+    }
+
+    if (allMatches.size === 1) {
+      const key = [...allMatches][0];
+      return { key, record: mapById.get(key), conflict: false };
     }
     return null;
   }
 
   function getLocationSourceId(location, source) {
-    return String(location?.sourceIds?.[source] || location?.id || "");
+    return String(location?.sourceIds?.[source] || "");
   }
 
   function mergeLocationRecord(mapById, id, rawTr, rawEn, extra = {}, source = "") {
@@ -2020,84 +2072,89 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     const cleanTr = formatTurkishName(rawTr || "");
     const cleanEn = formatLatinName(rawEn || "");
-    const directPrev = mapById.get(sourceId);
-    const matched = directPrev ? null : findMatchingLocationRecord(mapById, cleanTr, cleanEn);
-    const targetId = directPrev ? sourceId : (matched?.[0] || sourceId);
-    const prev = directPrev || matched?.[1];
+    if (isNonAdministrativeLocationName(cleanTr, cleanEn)) return;
 
-    let bestTr = prev?.nameTr || "";
-    if (cleanTr && (!bestTr || (!hasTurkishDiacritics(bestTr) && hasTurkishDiacritics(cleanTr)))) {
-      bestTr = cleanTr;
-    }
-    if (!bestTr) bestTr = cleanTr || cleanEn;
+    const sourceKey = source ? source + ":" + sourceId : sourceId;
+    const directPrev = mapById.get(sourceKey);
+    const matched = findMatchingLocationRecord(mapById, cleanTr, cleanEn);
+    if (matched?.conflict) return;
 
-    let bestEn = prev?.nameEn || "";
-    if (cleanEn && (!bestEn || hasTurkishDiacritics(bestEn))) {
-      bestEn = cleanEn;
-    }
-    if (!bestEn) bestEn = cleanEn || bestTr;
+    const targetKey = directPrev ? sourceKey : (matched?.key || sourceKey);
+    const prev = directPrev || matched?.record;
 
+    // Existing canonical/local names always win. Remote APIs attach source IDs
+    // and fill missing fields; they never overwrite known translations.
+    const bestTr = prev?.nameTr || cleanTr || cleanEn;
+    const bestEn = prev?.nameEn || cleanEn || cleanTr;
+    const bestNl = prev?.nameNl || formatLatinName(extra?.nameNl || bestEn || bestTr);
     const sourceIds = { ...(prev?.sourceIds || {}), ...(extra?.sourceIds || {}) };
     if (source) sourceIds[source] = sourceId;
-    const bestNl = formatLatinName(extra?.nameNl || prev?.nameNl || bestEn || bestTr);
 
-    mapById.set(targetId, {
+    const nameAliases = [...new Set([
+      ...(prev?.nameAliases || []),
+      ...(cleanTr ? [cleanTr] : []),
+      ...(cleanEn ? [cleanEn] : [])
+    ])].slice(0, 12);
+
+    mapById.set(targetKey, {
       ...prev,
       ...extra,
-      id: targetId,
+      id: prev?.id || sourceId,
       nameTr: bestTr,
       nameEn: bestEn,
       nameNl: bestNl,
+      nameAliases,
       sourceIds
     });
   }
 
   async function loadCountries() {
     const sel = $("countrySelect");
-    sel.innerHTML = `<option value="" disabled selected>${escapeHtml(t("loadingList"))}</option>`;
-    const mapById = new Map();
+    sel.innerHTML = \`<option value="" disabled selected>\${escapeHtml(t("loadingList"))}</option>\`;
 
-    // Seed from embedded official Diyanet dataset first (instant & zero-latency)
-    for (const c of DIYANET_ALL_LOCATIONS) {
-      mergeLocationRecord(mapById, c.id, c.nameTr, c.nameEn, {
-        nameNl: c.nameNl || "",
-        tz: c.tz,
-        fallbackStates: c.states
-      }, "diyanet");
-    }
-    state.countries = Array.from(mapById.values());
+    // The embedded dataset is the single source of truth for country names.
+    // Live country APIs only map their own IDs to canonical countries; their
+    // translated names are never appended to the visible country list.
+    const countries = DIYANET_ALL_LOCATIONS.map(country => ({
+      ...country,
+      sourceIds: { ...(country.sourceIds || {}), diyanet: String(country.id) }
+    }));
+    state.countries = countries;
     renderCountrySelect();
 
-    // Enrich asynchronously with live upstream countries
     const [r1, r2] = await Promise.allSettled([
       fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/locations/countries", { timeoutMs: 6000 }),
       fetchJsonWithTimeout("https://ezanvakti.emushaf.net/ulkeler", { timeoutMs: 6000 })
     ]);
 
-    let updated = false;
     if (r1.status === "fulfilled") {
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
-        const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", {}, "imsakiyem");
-        updated = true;
+        const sourceId = String(item?._id || item?.id || "").trim();
+        const rawTr = item?.name_tr || item?.name || "";
+        const canonical = findCanonicalCountryFromApi(rawTr, countries);
+        if (!canonical || !sourceId) continue;
+        canonical.sourceIds = { ...(canonical.sourceIds || {}), imsakiyem: sourceId };
       }
     }
+
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
-        const id = String(item?.UlkeID || "").trim();
-        mergeLocationRecord(mapById, id, item?.UlkeAdi || "", item?.UlkeAdiEn || "", {}, "emushaf");
-        updated = true;
+        const sourceId = String(item?.UlkeID || "").trim();
+        const rawTr = item?.UlkeAdi || "";
+        const canonical = findCanonicalCountryFromApi(rawTr, countries);
+        if (!canonical || !sourceId) continue;
+        canonical.sourceIds = { ...(canonical.sourceIds || {}), emushaf: sourceId };
       }
     }
-    if (updated) {
-      state.countries = Array.from(mapById.values());
-      if (state.selectedCountry) {
-        state.selectedCountry = state.countries.find(c => c.id === state.selectedCountry.id) || state.selectedCountry;
-      }
-      renderCountrySelect();
+
+    if (state.selectedCountry) {
+      state.selectedCountry = countries.find(country => country.id === state.selectedCountry.id) || state.selectedCountry;
     }
+    state.countries = countries;
+    renderCountrySelect();
   }
+
 
   function renderCountrySelect() {
     const sel = $("countrySelect");
@@ -2137,9 +2194,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     }
 
+    const imsakiyemCountryId = getLocationSourceId(countryObj, "imsakiyem");
+    const emushafCountryId = getLocationSourceId(countryObj, "emushaf");
     const [r1, r2] = await Promise.allSettled([
-      fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states?countryId=${encodeURIComponent(getLocationSourceId(countryObj, "imsakiyem"))}`, { timeoutMs: 6500 }),
-      fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/sehirler/${encodeURIComponent(getLocationSourceId(countryObj, "emushaf"))}`, { timeoutMs: 6500 })
+      imsakiyemCountryId
+        ? fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states?countryId=${encodeURIComponent(imsakiyemCountryId)}`, { timeoutMs: 6500 })
+        : Promise.reject(new Error("No verified Imsakiyem country ID")),
+      emushafCountryId
+        ? fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/sehirler/${encodeURIComponent(emushafCountryId)}`, { timeoutMs: 6500 })
+        : Promise.reject(new Error("No verified Emushaf country ID"))
     ]);
 
     if (r1.status === "fulfilled") {
@@ -2192,9 +2255,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     }
 
+    const imsakiyemStateId = getLocationSourceId(stateObj, "imsakiyem");
+    const emushafStateId = getLocationSourceId(stateObj, "emushaf");
     const [r1, r2] = await Promise.allSettled([
-      fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(getLocationSourceId(stateObj, "imsakiyem"))}`, { timeoutMs: 6500 }),
-      fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(getLocationSourceId(stateObj, "emushaf"))}`, { timeoutMs: 6500 })
+      imsakiyemStateId
+        ? fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(imsakiyemStateId)}`, { timeoutMs: 6500 })
+        : Promise.reject(new Error("No verified Imsakiyem state ID")),
+      emushafStateId
+        ? fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(emushafStateId)}`, { timeoutMs: 6500 })
+        : Promise.reject(new Error("No verified Emushaf state ID"))
     ]);
 
     if (r1.status === "fulfilled") {
