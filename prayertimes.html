@@ -1704,6 +1704,34 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return requestedId;
   }
 
+  const UAE_LOCATION_NAMES = Object.freeze({
+    abudhabi: { tr: "Abu Dabi", en: "Abu Dhabi", nl: "Abu Dhabi" },
+    ajman: { tr: "Ajman", en: "Ajman", nl: "Ajman" },
+    alain: { tr: "Al Ain", en: "Al Ain", nl: "Al Ain" },
+    dubai: { tr: "Dubai", en: "Dubai", nl: "Dubai" },
+    rasalkhaimah: { tr: "Ras Al Khaimah", en: "Ras Al Khaimah", nl: "Ras Al Khaimah" },
+    sharjah: { tr: "Sharjah", en: "Sharjah", nl: "Sharjah" },
+    fujairah: { tr: "Fujairah", en: "Fujairah", nl: "Fujairah" },
+    ummalquwain: { tr: "Umm Al Quwain", en: "Umm Al Quwain", nl: "Umm Al Quwain" }
+  });
+  const UAE_LOCATION_ALIASES = Object.freeze({
+    abudabi: "abudhabi",
+    dubayi: "dubai",
+    alayn: "alain"
+  });
+
+  function getUaeCanonicalName(obj, lang) {
+    const keys = [
+      obj?.nameEn, obj?.nameNl, obj?.nameTr,
+      ...(Array.isArray(obj?.nameAliases) ? obj.nameAliases : [])
+    ].map(locationNameIdentityKey).filter(Boolean);
+    for (const rawKey of keys) {
+      const key = UAE_LOCATION_ALIASES[rawKey] || rawKey;
+      if (UAE_LOCATION_NAMES[key]) return UAE_LOCATION_NAMES[key][lang] || UAE_LOCATION_NAMES[key].en;
+    }
+    return "";
+  }
+
   function findEmbeddedLocalizedLocation(obj, type, countryId) {
     if (type !== "state" && type !== "district") return null;
     const country = DIYANET_ALL_LOCATIONS.find(item => String(item.id) === String(countryId));
@@ -1755,6 +1783,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       state.selectedCountry
     );
     const canonicalPlace = findEmbeddedLocalizedLocation(obj, kind, countryId);
+    if (countryId === "184") {
+      const uaeName = getUaeCanonicalName(canonicalPlace || obj, state.lang);
+      if (uaeName) return state.lang === "tr"
+        ? formatTurkishForeignLocationName(uaeName)
+        : formatLatinName(uaeName);
+    }
 
     if (state.lang === "nl") {
       return formatLatinName(canonicalPlace?.nameNl || obj.nameNl || canonicalPlace?.nameEn || obj.nameEn || fallbackName);
@@ -2202,10 +2236,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   // Require both explicit language fields to identify that exact parent;
   // this preserves genuine capitals whose Turkish name resembles the country.
   function isCountryNameReturnedAsState(rawTr, rawEn, countryObj) {
+    // Providers sometimes return a single generic "name" field.
     const suppliedKeys = [rawTr, rawEn]
       .filter(value => String(value || "").trim())
       .map(countryApiNameKey);
-    if (suppliedKeys.length < 2) return false;
+    if (!suppliedKeys.length) return false;
 
     const parentKeys = new Set([
       countryObj?.nameTr,
@@ -2374,6 +2409,126 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
+  function getParentStateChildrenPayload(payload) {
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.results)) return payload.results;
+    return [];
+  }
+
+  function buildParentStateChildRecord(item, source, countryId) {
+    const id = String(
+      source === "imsakiyem"
+        ? (item?._id || item?.id || "")
+        : (item?.IlceID || item?._id || item?.id || "")
+    ).trim();
+    const fallbackName = source === "imsakiyem"
+      ? (item?.name || "")
+      : (item?.IlceAdi || "");
+    const rawTr = source === "imsakiyem"
+      ? (item?.name_tr || item?.nameTr || fallbackName)
+      : (item?.IlceAdi || fallbackName);
+    const rawEn = source === "imsakiyem"
+      ? (item?.name_en || item?.nameEn || fallbackName)
+      : (item?.IlceAdiEn || fallbackName);
+    if (!id || (!String(rawTr || "").trim() && !String(rawEn || "").trim())) return null;
+
+    const cleanTr = String(countryId) === "2"
+      ? formatTurkishName(rawTr || rawEn)
+      : formatTurkishForeignLocationName(rawTr || rawEn);
+    const cleanEn = formatLatinName(rawEn || rawTr);
+    if (isNonAdministrativeLocationName(cleanTr, cleanEn)) return null;
+
+    return {
+      id,
+      countryId: String(countryId),
+      nameTr: cleanTr || cleanEn,
+      nameEn: cleanEn || cleanTr,
+      nameNl: formatLatinName(item?.name_nl || item?.nameNl || cleanEn || cleanTr),
+      nameAliases: [...new Set([cleanTr, cleanEn].filter(Boolean))],
+      sourceIds: { [source]: id }
+    };
+  }
+
+  function addParentStateChildAsRegion(mapById, childRecord, countryObj) {
+    const matched = findMatchingLocationRecord(mapById, childRecord.nameTr, childRecord.nameEn);
+    if (matched?.conflict) return;
+
+    const regionKey = locationNameIdentityKey(childRecord.nameEn || childRecord.nameTr);
+    if (!regionKey) return;
+
+    let region;
+    if (matched?.record) {
+      region = matched.record;
+    } else {
+      const storageKey = `parent-region:${countryObj.id}:${regionKey}`;
+      region = mapById.get(storageKey);
+      if (!region) {
+        region = {
+          id: `region-${countryObj.id}-${regionKey}`,
+          countryId: String(countryObj.id),
+          nameTr: childRecord.nameTr,
+          nameEn: childRecord.nameEn,
+          nameNl: childRecord.nameNl || childRecord.nameEn,
+          nameAliases: childRecord.nameAliases || [],
+          fallbackDistricts: [],
+          synthetic: true
+        };
+        mapById.set(storageKey, region);
+      }
+    }
+
+    region.countryId = String(countryObj.id);
+    const districts = Array.isArray(region.fallbackDistricts) ? [...region.fallbackDistricts] : [];
+    const childKeys = new Set([
+      childRecord.nameTr,
+      childRecord.nameEn,
+      childRecord.nameNl,
+      ...(childRecord.nameAliases || [])
+    ].map(canonicalLocationNameKey).filter(Boolean));
+    const existingIndex = districts.findIndex(district =>
+      [
+        district.nameTr,
+        district.nameEn,
+        district.nameNl,
+        ...(Array.isArray(district.nameAliases) ? district.nameAliases : [])
+      ].map(canonicalLocationNameKey).some(key => childKeys.has(key))
+    );
+
+    if (existingIndex >= 0) {
+      const existing = districts[existingIndex];
+      districts[existingIndex] = {
+        ...existing,
+        sourceIds: { ...(existing.sourceIds || {}), ...(childRecord.sourceIds || {}) },
+        nameAliases: [...new Set([
+          ...(existing.nameAliases || []),
+          ...(childRecord.nameAliases || [])
+        ])].slice(0, 12)
+      };
+    } else {
+      districts.push(childRecord);
+    }
+    region.fallbackDistricts = districts;
+  }
+
+  async function expandCountryLevelState(mapById, parentState, countryObj) {
+    const source = parentState.source;
+    const url = source === "imsakiyem"
+      ? `https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(parentState.id)}`
+      : `https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(parentState.id)}`;
+
+    try {
+      const response = await fetchJsonWithTimeout(url, { timeoutMs: 6500 });
+      const children = getParentStateChildrenPayload(response.data);
+      for (const item of children) {
+        const childRecord = buildParentStateChildRecord(item, source, countryObj.id);
+        if (childRecord) addParentStateChildAsRegion(mapById, childRecord, countryObj);
+      }
+    } catch (_) {
+      // Keep canonical fallback states if the provider's nested endpoint is unavailable.
+    }
+  }
+
   async function loadStatesForCountry(countryObj, preselectStateId = "") {
     const stateSel = $("stateSelect");
     const distSel = $("districtSelect");
@@ -2388,6 +2543,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     distSel.innerHTML = `<option value="" disabled selected>${escapeHtml(t("selectDistrictOption"))}</option>`;
 
     const mapById = new Map();
+    const parentStateRecords = [];
     const fb = FALLBACK_LOCATIONS.find(c => c.id === countryObj.id);
     if (fb) {
       for (const s of fb.states) {
@@ -2414,20 +2570,34 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        const rawTr = item?.name_tr || item?.nameTr || "";
-        const rawEn = item?.name_en || item?.nameEn || "";
-        if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) continue;
-        mergeLocationRecord(mapById, id, rawTr || item?.name || "", rawEn || item?.name || "", { countryId: String(countryObj.id) }, "imsakiyem");
+        const fallbackName = item?.name || "";
+        const rawTr = item?.name_tr || item?.nameTr || fallbackName;
+        const rawEn = item?.name_en || item?.nameEn || fallbackName;
+        if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
+          if (id) parentStateRecords.push({ id, source: "imsakiyem" });
+          continue;
+        }
+        mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "imsakiyem");
       }
     }
+
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.SehirID || "").trim();
-        const rawTr = item?.SehirAdi || "";
-        const rawEn = item?.SehirAdiEn || "";
-        if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) continue;
+        const fallbackName = item?.SehirAdi || "";
+        const rawTr = item?.SehirAdi || fallbackName;
+        const rawEn = item?.SehirAdiEn || fallbackName;
+        if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
+          if (id) parentStateRecords.push({ id, source: "emushaf" });
+          continue;
+        }
         mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "emushaf");
       }
+    }
+
+    // Re-parent the child cities from a fake country-named state into regions.
+    for (const parentState of parentStateRecords) {
+      await expandCountryLevelState(mapById, parentState, countryObj);
     }
 
     state.states = Array.from(mapById.values());
@@ -2450,7 +2620,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       getLocalizedLocationName(a, "state").localeCompare(getLocalizedLocationName(b, "state"), I18N[state.lang].locale, { sensitivity: "base" })
     );
     sel.innerHTML = `<option value="" disabled ${!curId ? "selected" : ""}>${escapeHtml(t("selectStateOption"))}</option>` +
-      sorted.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(s, "state"))} (#${escapeHtml(s.id)})</option>`).join("");
+      sorted.map(s => {
+        const idLabel = s.synthetic ? "" : ` (#${escapeHtml(s.id)})`;
+        return `<option value="${escapeHtml(s.id)}" ${s.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(s, "state"))}${idLabel}</option>`;
+      }).join("");
     sel.classList.toggle("prompt-select", !curId);
     if (state.districts.length === 0 && state.states.length > 0) {
       $("cityCountBadge").textContent = t("statesCount", { n: state.states.length });
