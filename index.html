@@ -3857,8 +3857,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   function isLikelyRequestedLanguage(text, lang) {
     const value = String(text || "").toLocaleLowerCase(lang === "tr" ? "tr-TR" : lang === "nl" ? "nl-NL" : "en-US");
-    if (!value || /[\\u3400-\\u9fff\\u3040-\\u30ff\\uac00-\\ud7af]/u.test(value)) return false;
-    const words = value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").match(/[\\p{L}]+/gu) || [];
+    if (!value || /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(value)) return false;
+    const words = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[\p{L}]+/gu) || [];
     if (!words.length) return false;
     const dictionaries = {
       tr: new Set(["bir","ve","ile","icin","bu","su","o","da","de","ki","olan","olarak","her","kim","ben","sen","biz","siz","onlar","yok","var","ise","gibi","daha","cok","nasil","soyle","hadis","buyurdu"]),
