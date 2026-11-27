@@ -313,6 +313,16 @@ select:disabled{opacity:.55;cursor:not-allowed}
   text-align:right;
   line-height:1.45;
 }
+.quote-meta{margin-top:10px;padding-top:9px;border-top:1px solid rgba(49,86,75,.55);display:grid;gap:5px;font-size:12px;line-height:1.5}
+.quote-meta-row{display:flex;flex-wrap:wrap;gap:5px 8px;align-items:baseline}
+.quote-meta-label{color:var(--muted);font-weight:650}
+.quote-meta-value{color:var(--white);overflow-wrap:anywhere}
+.quote-meta-links{display:flex;flex-wrap:wrap;gap:7px;margin-top:3px}
+.quote-meta-link{color:var(--gold);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.quote-meta-link:hover{color:var(--gold-bright)}
+.quote-meta details{margin-top:5px}
+.quote-meta summary{cursor:pointer;color:var(--gold);font-weight:650}
+.quote-meta-arabic{direction:rtl;text-align:right;font-size:18px;line-height:2;margin:8px 0 0;white-space:pre-wrap}
 
 /* API Telemetry Box */
 .api-info{
@@ -709,6 +719,7 @@ details.nav-item > summary:hover{background:#163b30}
     <div class="quote-box" aria-live="polite">
       <p class="quote-text" id="hadithText">L&uuml;tfen yukar&#305;daki listeden 20 Hadis API kayna&#287;&#305;ndan birini se&ccedil;iniz.</p>
       <div class="quote-commentary" id="hadithCommentary" style="display:none"></div>
+      <div class="quote-meta" id="hadithMeta" style="display:none"></div>
       <div class="quote-source" id="hadithSource">-</div>
     </div>
 
@@ -779,6 +790,7 @@ details.nav-item > summary:hover{background:#163b30}
     <div class="quote-box" aria-live="polite">
       <p class="quote-text" id="duaText">L&uuml;tfen yukar&#305;daki listeden 20 Dua API kayna&#287;&#305;ndan birini se&ccedil;iniz.</p>
       <div class="quote-commentary" id="duaCommentary" style="display:none"></div>
+      <div class="quote-meta" id="duaMeta" style="display:none"></div>
       <div class="quote-source" id="duaSource">-</div>
     </div>
 
@@ -2918,8 +2930,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     s = s
       .replace(/\s*Öneri\s*:\s*.*$/i, "")
       .replace(/\s*[İI]zah[’']?[ıi]\s+okuduktan\s+sonra.*$/i, "")
+      .replace(/\s*BU\s+HAD[İI]S[’']?İN[\s\S]*?BURAYA\s+T[İI]KLA\.?\s*$/i, "")
       .replace(/[^\n.!?"]*?[ŞS]ERH[İI]\s+[İI][ÇC][İI]N\s+buraya\s+t[ıi]klay[ıi]n\.?/gi, "")
-      .replace(/\bburaya\s+t[ıi]klay[ıi]n[ıi]?z?\.?/gi, "")
+      .replace(/\bburaya\s+t[ıi]kl(?:a|ay[ıi]n[ıi]?z?)\.?/gi, "")
       .trim();
 
     let tahric = "";
@@ -3056,37 +3069,150 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     };
   }
 
-  function extractApiTextPayload(payload, targetLang = state.lang, depth = 0) {
-    if (payload == null || depth > 7) return "";
+  function cleanApiTextValue(raw) {
+    if (typeof raw !== "string") return "";
+    return fixTurkishText(raw).replace(/<br\s*\/?\s*>/gi, "\n")
+      .replace(/<\/(?:p|div|li|h[1-6])\s*>/gi, "\n").replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function primaryTextKeys(kind, lang) {
+    if (kind === "hadith") {
+      if (lang === "tr") return ["turkish","tur","tr","meal","hadith_text","hadithText","text","hadith","hadeeth","narration","matn","translation","content","body"];
+      if (lang === "nl") return ["dutch","nld","nl","hadith_text","hadithText","text","hadith","hadeeth","narration","translation","content","body"];
+      return ["english","eng","en","hadith_text","hadithText","text","hadith","hadeeth","narration","translation","content","body"];
+    }
+    if (lang === "tr") return ["translation","turkish","tur","tr","meal","dua","text","content","body","description","verse","ayah","result"];
+    if (lang === "nl") return ["translation","dutch","nld","nl","dua","text","content","body","description","verse","ayah","result"];
+    return ["translation","english","eng","en","dua","text","content","body","description","verse","ayah","result"];
+  }
+  function extractApiTextPayload(payload, targetLang = state.lang, kind = "hadith", depth = 0) {
+    if (payload == null || depth > 8) return "";
     if (typeof payload === "string") {
-      const value = fixTurkishText(payload).replace(/\s+/g, " ").trim();
-      return value.length >= 12 ? value : "";
+      const clean = cleanApiTextValue(payload);
+      return clean.length >= 5 ? clean : "";
     }
     if (Array.isArray(payload)) {
-      for (const item of payload) {
-        const value = extractApiTextPayload(item, targetLang, depth + 1);
-        if (value) return value;
-      }
-      return "";
+      const candidates = payload.map(item => extractApiTextPayload(item,targetLang,kind,depth+1)).filter(Boolean);
+      return candidates.length ? candidates[Math.floor(Math.random()*candidates.length)] : "";
     }
     if (typeof payload !== "object") return "";
-    const keys = targetLang === "tr"
-      ? ["hadith", "hadeeth", "hadithText", "turkish", "tur", "meal", "translation", "text", "matn", "content", "body", "result", "data", "verse", "ayah"]
-      : targetLang === "nl"
-        ? ["hadith", "hadeeth", "hadithText", "dutch", "nld", "translation", "text", "content", "body", "result", "data", "verse", "ayah"]
-        : ["hadith", "hadeeth", "hadithText", "english", "eng", "translation", "text", "content", "body", "result", "data", "verse", "ayah"];
-    for (const key of keys) {
-      if (Object.prototype.hasOwnProperty.call(payload, key)) {
-        const value = extractApiTextPayload(payload[key], targetLang, depth + 1);
-        if (value) return value;
+    for (const key of primaryTextKeys(kind,targetLang)) {
+      if (Object.prototype.hasOwnProperty.call(payload,key)) {
+        const found=extractApiTextPayload(payload[key],targetLang,kind,depth+1);
+        if(found)return found;
       }
     }
-    for (const [key, value] of Object.entries(payload)) {
-      if (/^(?:id|_id|number|url|href|slug|source|book|author|attribution|explanation|commentary|arabic|ar)$/i.test(key)) continue;
-      const found = extractApiTextPayload(value, targetLang, depth + 1);
-      if (found) return found;
+    for (const key of ["data","result","response","item","record","items","results","hadiths","duas","verses","ayahs"]) {
+      if (Object.prototype.hasOwnProperty.call(payload,key)) {
+        const found=extractApiTextPayload(payload[key],targetLang,kind,depth+1);
+        if(found)return found;
+      }
+    }
+    for (const [key,value] of Object.entries(payload)) {
+      if (/^(?:id|_id|number|ref|reference|url|href|link|docs|slug|source|book|kitab|bab|chapter|author|attribution|explanation|commentary|sharh|arabic|ar|grade|grade_source|meta|metadata|title|name|category)$/i.test(key)) continue;
+      const found=extractApiTextPayload(value,targetLang,kind,depth+1);
+      if(found)return found;
     }
     return "";
+  }
+  function collectApiObjects(payload,out=[],depth=0) {
+    if(payload==null||depth>7)return out;
+    if(Array.isArray(payload))payload.forEach(item=>collectApiObjects(item,out,depth+1));
+    else if(typeof payload==="object"){out.push(payload);Object.values(payload).forEach(value=>collectApiObjects(value,out,depth+1));}
+    return out;
+  }
+  function getApiPathValue(objects,paths) {
+    for(const object of objects)for(const path of paths){
+      const value=path.split(".").reduce((v,key)=>v==null?undefined:v[key],object);
+      if(value!=null&&value!=="")return value;
+    }
+    return "";
+  }
+  function apiDisplayValue(value) {
+    if(value==null||value==="")return "";
+    if(typeof value==="string"||typeof value==="number")return String(value);
+    if(typeof value==="boolean")return value?"Evet":"Hayır";
+    if(Array.isArray(value))return value.map(apiDisplayValue).filter(Boolean).join(", ");
+    if(typeof value==="object")for(const key of ["label","title","name","text","value","grader","by"]){
+      if(value[key]!=null&&value[key]!==""){const result=apiDisplayValue(value[key]);if(result)return result;}
+    }
+    return "";
+  }
+  function collectApiResponseLinks(payload,fallbackUrl="") {
+    const found=[],seen=new Set();
+    const add=(raw,key="")=>{
+      if(typeof raw!=="string")return;
+      const matches=raw.match(/https?:\/\/[^\s"'<>]+/gi)||[];
+      if(!matches.length&&/^(?:https?:)?\/\//i.test(raw.trim()))matches.push(raw.trim());
+      for(let url of matches){
+        url=url.replace(/[),.;\]}]+$/g,"");
+        try{
+          const parsed=new URL(url,location.href);
+          if(!["http:","https:"].includes(parsed.protocol))continue;
+          if(seen.has(parsed.href))continue;
+          seen.add(parsed.href);
+          const label=/doc/i.test(key)?"API belgeleri":/hadith|dua|record|item/i.test(key)?"Kayıt bağlantısı":/source|attribution/i.test(key)?"Kaynak bağlantısı":/api/i.test(key)?"API adresi":"Kaynak bağlantısı";
+          found.push({url:parsed.href,label});
+        }catch(_){}
+      }
+    };
+    const walk=(value,key="",depth=0)=>{
+      if(value==null||depth>8)return;
+      if(typeof value==="string"){if(/url|href|link|docs|source|website|uri/i.test(key)||/https?:\/\//i.test(value))add(value,key);}
+      else if(Array.isArray(value))value.forEach(item=>walk(item,key,depth+1));
+      else if(typeof value==="object")Object.entries(value).forEach(([childKey,child])=>walk(child,childKey,depth+1));
+    };
+    walk(payload);
+    if(fallbackUrl)add(fallbackUrl,"api");
+    return found;
+  }
+  function renderApiResponseDetails(containerId,payload,kind,fallbackUrl="") {
+    const box=$(containerId);if(!box)return;
+    box.replaceChildren();
+    const objects=collectApiObjects(payload);
+    const rows=kind==="hadith"?[
+      ["Kitap",["book.name","book_name","collection.name","collection"]],
+      ["Kitap bölümü",["kitab.title","chapter.title","chapter.name","kitab.name"]],
+      ["Bab",["bab.title","bab.title_ar","section.title","bab.name"]],
+      ["Bab numarası",["bab.number","chapter.number","section.number"]],
+      ["Hadis numarası",["number","hadith_no","hadithNumber","reference","ref"]],
+      ["Hadis derecesi",["grade.label","grade.grade","grade_source.grade","grading.label"]],
+      ["Derecelendiren",["grade.by","grade_source.grader","grading.by"]],
+      ["Kaynak",["meta.attribution","attribution","meta.source","source"]]
+    ]:[
+      ["Başlık",["title","name","dua.title","item.title"]],
+      ["Kategori",["category.title","category.name","category"]],
+      ["Kaynak",["meta.attribution","attribution","source","meta.source","book.name"]],
+      ["Referans",["reference","ref","number","verse_key","ayah","id"]],
+      ["Tekrar sayısı",["count","repeat","repetitions","repeat_count"]]
+    ];
+    let visible=false;
+    for(const [label,paths] of rows){
+      const value=apiDisplayValue(getApiPathValue(objects,paths));if(!value)continue;
+      const row=document.createElement("div");row.className="quote-meta-row";
+      const title=document.createElement("span");title.className="quote-meta-label";title.textContent=label+":";
+      const val=document.createElement("span");val.className="quote-meta-value";val.textContent=value;
+      row.append(title,val);box.appendChild(row);visible=true;
+    }
+    const arabic=apiDisplayValue(getApiPathValue(objects,["arabic","ar","text_ar","hadith_ar","dua_ar","arabic_text"]));
+    if(arabic){
+      const details=document.createElement("details"),summary=document.createElement("summary"),text=document.createElement("p");
+      summary.textContent="Arapça metni göster";text.className="quote-meta-arabic";text.dir="rtl";text.lang="ar";text.textContent=arabic;
+      details.append(summary,text);box.appendChild(details);visible=true;
+    }
+    const links=collectApiResponseLinks(payload,fallbackUrl);
+    if(links.length){
+      const group=document.createElement("div");group.className="quote-meta-links";
+      for(const link of links){
+        const anchor=document.createElement("a");anchor.className="quote-meta-link";anchor.href=link.url;
+        anchor.target="_blank";anchor.rel="noopener noreferrer";anchor.textContent=link.label;group.appendChild(anchor);
+      }
+      box.appendChild(group);visible=true;
+    }
+    box.style.display=visible?"grid":"none";
+  }
+  function clearApiResponseDetails(containerId) {
+    const box=$(containerId);if(!box)return;box.replaceChildren();box.style.display="none";
   }
 
   function extractHadithExplanation(payload, depth = 0) {
