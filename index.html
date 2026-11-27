@@ -1990,9 +1990,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   const NON_ADMINISTRATIVE_LOCATION_KEYS = new Set([
     "atlanticocean", "atlantikokyanusu", "atlantischeoceaan", "oceanatlantique",
-    "pacificocean", "pasifikokyanusu", "pacifischeoceaan",
+    "pacificocean", "pasifikokyanusu", "pacifischeoceaan", "groteoceaan",
     "indianocean", "hintokyanusu", "indischeoceaan",
-    "arcticocean", "arktikokyanusu", "noordelijkeijsoceaan",
+    "arcticocean", "arktikokyanusu", "arktischeoceaan", "noordelijkeijsoceaan", "noordelijkeijszee",
     "southernocean", "zuidelijkeoceaan", "antarctischeoceaan"
   ]);
 
@@ -2118,10 +2118,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     // The embedded dataset is the single source of truth for country names.
     // Live country APIs only map their own IDs to canonical countries; their
     // translated names are never appended to the visible country list.
-    const countries = DIYANET_ALL_LOCATIONS.map(country => ({
-      ...country,
-      sourceIds: { ...(country.sourceIds || {}), diyanet: String(country.id) }
-    }));
+    const countries = DIYANET_ALL_LOCATIONS
+      .filter(country => !isNonAdministrativeLocationName(country.nameTr, country.nameEn, country.nameNl))
+      .map(country => ({
+        ...country,
+        sourceIds: { ...(country.sourceIds || {}), diyanet: String(country.id) }
+      }));
     state.countries = countries;
     renderCountrySelect();
 
