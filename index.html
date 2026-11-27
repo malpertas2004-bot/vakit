@@ -1668,20 +1668,20 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   function getLocalizedLocationName(obj) {
     if (!obj) return "";
+    const turkishName = String(obj.nameTr || "").trim();
     const fallbackName = state.lang === "tr"
-      ? (obj.nameTr || obj.nameEn || obj.nameNl || "")
+      ? (turkishName || obj.nameEn || obj.nameNl || "")
       : (state.lang === "nl" ? (obj.nameNl || obj.nameEn || "") : (obj.nameEn || obj.nameNl || ""));
     if (!fallbackName) return "";
 
     if (state.lang !== "tr") return formatLatinName(fallbackName);
+    // Keep an explicit Turkish translation in Turkish casing, including dotted İ.
+    // Do not send nameTr through the English-style foreign-name formatter.
+    if (turkishName) return formatTurkishName(turkishName);
 
     const isCountryRecord = Array.isArray(obj.states) || state.countries.some(country => country.id === obj.id);
     if (isCountryRecord) return formatTurkishName(fallbackName);
-
-    const countryId = String(obj.countryId || state.selectedCountry?.id || "");
-    return countryId === "2"
-      ? formatTurkishName(fallbackName)
-      : formatTurkishForeignLocationName(fallbackName);
+    return formatTurkishForeignLocationName(fallbackName);
   }
 
   const getApiQueryEn = obj => fixTurkishText(obj?.nameEn || obj?.nameTr || "");
@@ -1859,7 +1859,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
-  async function fetchApiPayloadWithTimeout(url, { signal, timeoutMs = FETCH_TIMEOUT_MS } = {}) {
+  async function fetchApiPayloadWithTimeout(url, { signal, timeoutMs = FETCH_TIMEOUT_MS, headers } = {}) {
     const timeoutCtrl = new AbortController();
     const timer = setTimeout(() => timeoutCtrl.abort(new Error("Timeout")), timeoutMs);
     const onExternalAbort = () => timeoutCtrl.abort(signal.reason || new Error("Aborted"));
@@ -1872,7 +1872,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
     const t0 = performance.now();
     try {
-      const res = await fetch(url, { cache: "no-store", signal: timeoutCtrl.signal });
+      const fetchOptions = { cache: "no-store", signal: timeoutCtrl.signal };
+      if (headers) fetchOptions.headers = headers;
+      const res = await fetch(url, fetchOptions);
       const ms = Math.round(performance.now() - t0);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = await res.text();
@@ -3366,10 +3368,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if(fallbackUrl)add(fallbackUrl,"api");
     return found;
   }
-  function renderApiResponseDetails(containerId,payload,kind,fallbackUrl="") {
+  function renderApiResponseDetails(containerId,payload,kind,fallbackUrl="",selectedFieldOverride=null) {
     const box=$(containerId);if(!box)return;
     box.replaceChildren();
-    const selectedField = inspectApiTextPayload(payload, state.lang, kind);
+    const selectedField = selectedFieldOverride || inspectApiTextPayload(payload, state.lang, kind);
     const objects=collectApiObjects(payload);
     const rows=kind==="hadith"?[
       ["Kitap",["book.name","book_name","collection.name","collection"]],
@@ -3530,12 +3532,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const oneUrl = `https://hadeethenc.com/api/v1/hadeeths/one/?language=${hLang}&id=${pick.id}`;
         try {
           const { data: detail } = await fetchApiPayloadWithTimeout(oneUrl, { signal, timeoutMs: 5500 });
-          const inspected = inspectApiTextPayload(detail, hLang, "hadith");
-          const validated = cleanAndValidateHadithText(inspected?.text || "", hLang);
+          const textInfo = extractProviderApiText("hadeethenc", detail, hLang, "hadith");
+          const validated = cleanAndValidateHadithText(textInfo?.text || "", hLang);
           if (!validated.isValid) continue;
           const attribution = extractCleanText(detail?.attribution, hLang) || "HadeethEnc";
           return {
             text: validated.text,
+            textInfo,
             commentary: extractHadithExplanation(detail) || extractHadithExplanation(detail?.data),
             raw: detail,
             source: validated.tahric ? `${attribution} (#${pick.id}) — ${validated.tahric}` : `${attribution} (#${pick.id})`,
@@ -3557,13 +3560,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       try {
         const { data: payload } = await fetchApiPayloadWithTimeout("https://sunnetimiz.com/api/v1/random", { signal, timeoutMs: 5500 });
         const item = payload?.hadith || payload?.data || payload;
-        const inspected = inspectApiTextPayload(item, "tr", "hadith");
-        const validated = cleanAndValidateHadithText(inspected?.text || "", "tr");
+        const textInfo = extractProviderApiText("sunnetimiz", item, "tr", "hadith");
+        const validated = cleanAndValidateHadithText(textInfo?.text || "", "tr");
         if (validated.isValid) {
           const bookName = extractCleanText(item?.book?.name || item?.book_name || "Sünnetimiz", "tr");
           const ref = extractCleanText(item?.ref || item?.number || item?.hadith_no, "tr");
           return {
             text: validated.text,
+            textInfo,
             commentary: extractHadithExplanation(payload) || extractHadithExplanation(item),
             raw: payload,
             source: [bookName, ref ? `(${ref})` : "", validated.tahric].filter(Boolean).join(" — "),
@@ -3599,18 +3603,20 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       try {
         const { data: payload } = await fetchApiPayloadWithTimeout(cdnUrl, { signal, timeoutMs: 5000 });
         const hObj = Array.isArray(payload?.hadiths) ? payload.hadiths[0] : (payload?.hadith || payload);
-        const inspected = inspectApiTextPayload(hObj, selLang, "hadith") || inspectApiTextPayload(payload, selLang, "hadith");
-        const validated = cleanAndValidateHadithText(inspected?.text || "", selLang);
+        const textInfo = extractProviderApiText("fawaz_hadith", payload, selLang, "hadith");
+        const validated = cleanAndValidateHadithText(textInfo?.text || "", selLang);
         if (!validated.isValid) continue;
         const bookTitle = extractCleanText(payload?.metadata?.name, selLang) || tryBook.toUpperCase();
         return {
           text: validated.text,
+          textInfo,
           commentary: extractHadithExplanation(payload) || extractHadithExplanation(hObj),
           raw: payload,
           source: validated.tahric ? `${bookTitle} #${tryNo} — ${validated.tahric}` : `${bookTitle} #${tryNo}`,
           ref: `${editionPrefix}-${tryBook} #${tryNo}`,
           liveUrl: cdnUrl,
-          provider: "FawazAhmed0 Hadith CDN"
+          provider: "FawazAhmed0 Hadith CDN",
+          languageFallback: selLang === "nl"
         };
       } catch (error) {
         if (signal?.aborted) throw error;
@@ -3652,15 +3658,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           const ctype = (headers.get("content-type") || "").toLowerCase();
           if (ctype.includes("json")) {
             const item = j?.hadith || j?.data || j;
-            const rawTxt = extractApiTextPayload(item, "tr", "hadith");
-            const validated = cleanAndValidateHadithText(rawTxt, "tr");
+            const textInfo = extractProviderApiText("sunnetimiz", item, "tr", "hadith");
+            const validated = cleanAndValidateHadithText(textInfo?.text || "", "tr");
             if (validated.isValid && !validated.text.startsWith("<")) {
               const bookName = extractCleanText(item?.book?.name || item?.book_name || item?.book, "tr") || "Hadis";
               const refVal = extractCleanText(item?.ref || item?.reference || item?.number || item?.hadith_no, "tr");
               const baseSource = refVal ? `${bookName} (${refVal})` : bookName;
               $("hadithText").textContent = `“${validated.text}”`;
               renderHadithCommentary(extractHadithExplanation(j) || extractHadithExplanation(item), true);
-              renderApiResponseDetails("hadithMeta", j, "hadith", item?.url || "https://sunnetimiz.com/api/v1/random");
+              renderApiResponseDetails("hadithMeta", j, "hadith", item?.url || "https://sunnetimiz.com/api/v1/random", textInfo);
               const sourceParts = [baseSource, validated.tahric, validated.tekrar ? `Tekrar: ${validated.tekrar}` : ""].filter(Boolean);
               $("hadithSource").textContent = sourceParts.join(" — ");
               $("hadithApiProvider").textContent = providerLabel;
@@ -3706,7 +3712,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             ? "HadeethEnc ondersteunt geen Nederlands; de Engelse tekst wordt als terugvaltaal getoond."
             : "HadeethEnc does not provide Dutch; the English text is shown as a fallback."].filter(Boolean).join("\n\n")
           : cleanItem.commentary, true);
-        renderApiResponseDetails("hadithMeta", cleanItem.raw || {}, "hadith", cleanItem.liveUrl);
+        renderApiResponseDetails("hadithMeta", cleanItem.raw || {}, "hadith", cleanItem.liveUrl, cleanItem.textInfo);
         $("hadithSource").textContent = cleanItem.source;
         $("hadithApiProvider").textContent = cleanItem.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
         $("hadithApiStatus").textContent = cleanItem.languageFallback ? `English fallback · ${ms} ms` : `200 OK · ${ms} ms`;
@@ -3717,7 +3723,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         return;
       }
 
-      if (state.selectedHadithApi === "random_hadith_gen" && selLang === "en") {
+      if (state.selectedHadithApi === "random_hadith_gen" && selLang === "en" && API_TEXT_SCHEMAS.hadith.random_hadith_gen?.verified) {
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
           const item = j?.data || j;
@@ -3743,24 +3749,27 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      if (state.selectedHadithApi !== "hadeethenc" && !(state.selectedHadithApi === "sunnetimiz" && selLang === "tr") && !(state.selectedHadithApi === "random_hadith_gen" && selLang === "en")) {
+      const selectedHadithSchema = API_TEXT_SCHEMAS.hadith[state.selectedHadithApi];
+      if (state.selectedHadithApi !== "hadeethenc" &&
+          !(state.selectedHadithApi === "sunnetimiz" && selLang === "tr") &&
+          selectedHadithSchema?.verified && selectedHadithSchema.languages?.[selLang]) {
         try {
           const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
-          const selectedText = extractApiTextPayload(selectedResponse.data, selLang, "hadith");
-          const selectedValid = cleanAndValidateHadithText(selectedText, selLang);
+          const selectedTextInfo = extractProviderApiText(state.selectedHadithApi, selectedResponse.data, selLang, "hadith");
+          const selectedValid = cleanAndValidateHadithText(selectedTextInfo?.text || "", selLang);
           if (selectedValid.isValid) {
-            const record = selectedResponse.data?.data || selectedResponse.data?.hadith || selectedResponse.data;
-            const bookTitle = extractCleanText(record?.book?.name || record?.book || record?.collection || record?.source, selLang);
-            const refNo = extractCleanText(record?.reference || record?.number || record?.hadith_no || record?.id, selLang);
+            const record = selectedTextInfo.record || selectedResponse.data?.data || selectedResponse.data?.hadith || selectedResponse.data;
+            const bookTitle = extractCleanText(record?.book?.name || record?.book || record?.collection_name || record?.collection || record?.source, selLang);
+            const refNo = extractCleanText(record?.reference || record?.hadithnumber || record?.number || record?.hadith_no || record?.id, selLang);
             const selectedSource = [bookTitle || providerLabel, refNo ? `#${refNo}` : ""].filter(Boolean).join(" ");
             const selectedCommentary = extractHadithExplanation(selectedResponse.data) || extractHadithExplanation(record);
             $("hadithText").textContent = `“${selectedValid.text}”`;
             renderHadithCommentary(selectedCommentary, true);
-            renderApiResponseDetails("hadithMeta", selectedResponse.data, "hadith", endpointUrl);
+            renderApiResponseDetails("hadithMeta", selectedResponse.data, "hadith", endpointUrl, selectedTextInfo);
             $("hadithSource").textContent = [selectedSource, selectedValid.tahric, selectedValid.tekrar ? `Tekrar: ${selectedValid.tekrar}` : ""].filter(Boolean).join(" — ");
-            $("hadithApiProvider").textContent = providerLabel;
-            $("hadithApiStatus").textContent = `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
-            $("hadithApiStatus").className = "api-val ok";
+            $("hadithApiProvider").textContent = selectedTextInfo.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
+            $("hadithApiStatus").textContent = selectedTextInfo.languageFallback ? `English fallback · ${selectedResponse.ms} ms` : `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
+            $("hadithApiStatus").className = selectedTextInfo.languageFallback ? "api-val warn" : "api-val ok";
             $("hadithApiRef").textContent = `${refNo || selectedSource} · ${langLabel}`;
             $("hadithApiUpdated").textContent = formatClock();
             $("hadithApiUrl").textContent = endpointUrl;
@@ -3777,7 +3786,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
       $("hadithText").textContent = `“${live.text}”`;
       renderHadithCommentary(live.commentary || "", true);
-      renderApiResponseDetails("hadithMeta", live.raw || {}, "hadith", live.liveUrl || endpointUrl);
+      renderApiResponseDetails("hadithMeta", live.raw || {}, "hadith", live.liveUrl || endpointUrl, live.textInfo);
       $("hadithSource").textContent = live.source;
       const hadithUsesSelectedFallback = state.selectedHadithApi === "fawaz_hadith" || (state.selectedHadithApi === "sunnetimiz" && selLang !== "tr");
       const fallbackProvider = live.provider || (live.ref.toLowerCase().includes("hadeethenc") ? "HadeethEnc" : "FawazAhmed0 Hadith CDN");
@@ -3869,7 +3878,148 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     alquran_pages: { name: "Al-Quran Pages REST API", buildUrl: (selLang, ayahNo) => `https://api.alquran.cloud/v1/ayah/${ayahNo}/${getQuranEditionForLang(selLang)}` }
   };
 
-const QURAN_DUA_REFS = [
+
+  /* Exact provider response schemas. A source without a verified field/language is not guessed. */
+  const API_TEXT_SCHEMAS = Object.freeze({
+    hadith: Object.freeze({
+      sunnetimiz: { verified: true, languages: {
+        tr: { paths: ["turkish"], sourceLanguage: "tr" },
+        en: { paths: ["hadiths.0.text"], sourceLanguage: "en" },
+        nl: { paths: ["hadiths.0.text"], sourceLanguage: "en" }
+      }},
+      fawaz_hadith: { verified: true, languages: {
+        tr: { paths: ["hadiths.0.text"], sourceLanguage: "tr" },
+        en: { paths: ["hadiths.0.text"], sourceLanguage: "en" },
+        nl: { paths: ["hadiths.0.text"], sourceLanguage: "en" }
+      }},
+      hadeethenc: { verified: true, languages: {
+        tr: { paths: ["hadeeth"], sourceLanguage: "tr" },
+        en: { paths: ["hadeeth"], sourceLanguage: "en" },
+        nl: { paths: ["hadeeth"], sourceLanguage: "en" }
+      }},
+      ummahapi_hadith: { verified: true, languages: {
+        en: { paths: ["data.english"], sourceLanguage: "en" },
+        nl: { paths: ["data.english"], sourceLanguage: "en" }
+      }},
+      hadith_gading: { verified: false, reason: "Indonesian-language response; no verified Turkish, Dutch or English translation field." },
+      random_hadith_gen: { verified: false, reason: "A stable response schema and language-specific text field could not be verified." },
+      dorar_hadith: { verified: false, reason: "The documented search response contains Arabic hadith text, not the requested translated text." },
+      sunnah_com: { verified: false, reason: "The public API requires credentials not configured in this browser app." },
+      islamic_network_hadith: { verified: false, reason: "The exact endpoint response schema and translation fields could not be verified." },
+      thaqalayn_api: { verified: true, languages: {
+        en: { paths: ["englishText"], sourceLanguage: "en" },
+        nl: { paths: ["englishText"], sourceLanguage: "en" }
+      }},
+      haditssoft_api: { verified: false, reason: "The documented endpoint differs from the configured URL and its data is Indonesian, not Turkish/Dutch/English." },
+      sunnahsource_hadith: { verified: false, reason: "The documented full API requires provider access credentials not configured here." },
+      ahmedbaset_hadith: { verified: true, languages: {
+        en: { paths: ["*.english.text", "hadiths.*.english.text", "data.*.english.text"], sourceLanguage: "en" },
+        nl: { paths: ["*.english.text", "hadiths.*.english.text", "data.*.english.text"], sourceLanguage: "en" }
+      }},
+      islamhouse_hadith: { verified: false, reason: "The configured response shape and requested translation fields could not be verified." },
+      diyanet_hadis: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
+      islamic_content_hadith: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
+      muslimapi_hadith: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
+      quran_nlp_hadith: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
+      alhadith_api: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
+      hadithapi_com: { verified: false, reason: "The documented public endpoint requires an API key not configured here." }
+    }),
+    dua: Object.freeze({
+      alquran_cloud: { verified: true, languages: {
+        tr: { paths: ["data.text"], sourceLanguage: "tr" },
+        nl: { paths: ["data.text"], sourceLanguage: "nl" },
+        en: { paths: ["data.text"], sourceLanguage: "en" }
+      }},
+      fawaz_quran_cdn: { verified: true, languages: {
+        tr: { paths: ["text"], sourceLanguage: "tr" },
+        nl: { paths: ["text"], sourceLanguage: "nl" },
+        en: { paths: ["text"], sourceLanguage: "en" }
+      }},
+      acikkuran_api: { verified: false, reason: "The documented REST API requires a Bearer token and cannot be called unauthenticated from this page." },
+      quran_com_v4: { verified: false, reason: "The current Quran Foundation endpoint requires OAuth credentials not configured here." },
+      ummahapi_duas: { verified: true, languages: {
+        en: { paths: ["data.translation"], sourceLanguage: "en" },
+        nl: { paths: ["data.translation"], sourceLanguage: "en" }
+      }},
+      fitrahive_duadhikr: { verified: true, languages: {
+        en: { paths: ["data.translation"], sourceLanguage: "en" },
+        nl: { paths: ["data.translation"], sourceLanguage: "en" }
+      }},
+      hisnul_workers: { verified: false, reason: "The documented translation is Bengali, not Turkish, Dutch or English." },
+      islamic_network_pray_dua: { verified: false, reason: "The exact endpoint response schema and translated text field could not be verified." },
+      quranenc_tr: { verified: true, languages: {
+        tr: { paths: ["result.translation"], sourceLanguage: "tr" },
+        nl: { paths: ["result.translation"], sourceLanguage: "nl" },
+        en: { paths: ["result.translation"], sourceLanguage: "en" }
+      }},
+      tanzil_api: { verified: false, reason: "The configured translation identifiers and returned content format could not be verified." },
+      quran_foundation: { verified: false, reason: "The current Quran Foundation endpoint requires OAuth credentials not configured here." },
+      sunnahsource_duas: { verified: false, reason: "The documented full API requires provider access credentials not configured here." },
+      quranify_dua: { verified: false, reason: "A stable public response schema and language-specific translation field could not be verified." },
+      kind_unes_adhkar: { verified: false, reason: "The configured public data URL could not be verified as an accessible current source." },
+      azkar_db: { verified: false, reason: "The configured public data URL could not be verified as an accessible current source." },
+      hisn_muslim_json: { verified: false, reason: "The configured public data URL could not be verified as an accessible current source." },
+      islamhouse_dua: { verified: false, reason: "The configured endpoint requests fatwa content, not a dua response." },
+      diyanet_kuran: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
+      global_quran: { verified: false, reason: "The documented endpoint requires an API key and a different URL structure." },
+      alquran_pages: { verified: true, languages: {
+        tr: { paths: ["data.text"], sourceLanguage: "tr" },
+        nl: { paths: ["data.text"], sourceLanguage: "nl" },
+        en: { paths: ["data.text"], sourceLanguage: "en" }
+      }}
+    })
+  });
+
+  function resolveProviderTextPath(payload, path) {
+    if (path === "$") return [{ value: payload, path: "$", parent: null }];
+    const parts = path.split(".");
+    let nodes = [{ value: payload, path: "$", parent: null }];
+    for (const part of parts) {
+      const next = [];
+      for (const node of nodes) {
+        const value = node.value;
+        if (part === "*" && Array.isArray(value)) {
+          value.forEach((item, index) => next.push({ value: item, path: node.path + "[" + index + "]", parent: value }));
+        } else if (Array.isArray(value) && /^\\d+$/.test(part)) {
+          const index = Number(part);
+          if (index < value.length) next.push({ value: value[index], path: node.path + "[" + index + "]", parent: value });
+        } else if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, part)) {
+          next.push({ value: value[part], path: node.path + "." + part, parent: value });
+        }
+      }
+      nodes = next;
+      if (!nodes.length) return [];
+    }
+    return nodes;
+  }
+
+  function extractProviderApiText(providerId, payload, targetLang = state.lang, kind = "hadith") {
+    const providerSchema = API_TEXT_SCHEMAS[kind]?.[providerId];
+    if (!providerSchema?.verified) return null;
+    const languageRule = providerSchema.languages?.[targetLang];
+    if (!languageRule) return null;
+    for (const schemaPath of languageRule.paths || []) {
+      const candidates = resolveProviderTextPath(payload, schemaPath)
+        .map(node => {
+          const text = isUsableApiText(node.value, kind);
+          return text ? { ...node, text } : null;
+        })
+        .filter(Boolean);
+      if (!candidates.length) continue;
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      return {
+        text: chosen.text,
+        path: chosen.path,
+        property: chosen.path.split(".").pop() || "$",
+        record: chosen.parent,
+        sourceLanguage: languageRule.sourceLanguage || targetLang,
+        languageFallback: (languageRule.sourceLanguage || targetLang) !== targetLang
+      };
+    }
+    return null;
+  }
+
+  const QURAN_DUA_REFS = [
   { ayah: 262, surah: 2, verse: 255, surahTr: "Bakara", surahEn: "Al-Baqarah", surahNl: "Al-Baqara" },
   { ayah: 293, surah: 2, verse: 286, surahTr: "Bakara", surahEn: "Al-Baqarah", surahNl: "Al-Baqara" },
   { ayah: 257, surah: 2, verse: 250, surahTr: "Bakara", surahEn: "Al-Baqarah", surahNl: "Al-Baqara" },
@@ -3905,10 +4055,11 @@ const QURAN_DUA_REFS = [
     const alquranUrl = `https://api.alquran.cloud/v1/ayah/${refObj.ayah}/${getQuranEditionForLang(selLang)}`;
     try {
       const { data: payload } = await fetchApiPayloadWithTimeout(alquranUrl, { signal, timeoutMs: 5500 });
-      const inspected = inspectApiTextPayload(payload, selLang, "dua");
-      if (inspected?.text) {
+      const textInfo = extractProviderApiText("alquran_cloud", payload, selLang, "dua");
+      if (textInfo?.text) {
         return {
-          text: inspected.text,
+          text: textInfo.text,
+          textInfo,
           source: t("surahFormat", { surah: surahTitle, no: `${refObj.surah}:${refObj.verse}` }),
           liveUrl: alquranUrl,
           raw: payload,
@@ -3923,10 +4074,11 @@ const QURAN_DUA_REFS = [
     const quranEncUrl = `https://quranenc.com/api/v1/translation/aya/${edition}/${refObj.surah}/${refObj.verse}`;
     try {
       const { data: payload } = await fetchApiPayloadWithTimeout(quranEncUrl, { signal, timeoutMs: 5500 });
-      const inspected = inspectApiTextPayload(payload, selLang, "dua");
-      if (inspected?.text) {
+      const textInfo = extractProviderApiText("quranenc_tr", payload, selLang, "dua");
+      if (textInfo?.text) {
         return {
-          text: inspected.text,
+          text: textInfo.text,
+          textInfo,
           source: t("surahFormat", { surah: surahTitle, no: `${refObj.surah}:${refObj.verse}` }),
           liveUrl: quranEncUrl,
           raw: payload,
@@ -3963,38 +4115,52 @@ const QURAN_DUA_REFS = [
     clearApiResponseDetails("duaMeta");
 
     try {
-      if (state.selectedDuaApi === "acikkuran_api" && selLang === "tr") {
+      if (state.selectedDuaApi === "fitrahive_duadhikr" && (selLang === "en" || selLang === "nl")) {
         try {
-          const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
-          const v = j?.data || j;
-          const txt = extractApiTextPayload(j, selLang, "dua");
-          if (txt) {
-            const sName = fixTurkishText(v?.surah?.name || refObj.surahTr);
-            $("duaText").textContent = `“${txt}”`;
-            renderDuaCommentary(inspectReligiousText(txt, selLang).note);
-            renderApiResponseDetails("duaMeta", j, "dua", endpointUrl);
-            $("duaSource").textContent = t("surahFormat", { surah: sName, no: `${refObj.surah}:${refObj.verse}` });
-            $("duaApiProvider").textContent = providerLabel;
-            $("duaApiStatus").textContent = `${status} OK · ${ms} ms`;
-            $("duaApiStatus").className = "api-val ok";
-            $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
-            $("duaApiUpdated").textContent = formatClock();
-            $("duaApiUrl").textContent = endpointUrl;
-            return;
+          const fitrahiveHeaders = { "Accept-Language": "en" };
+          const { data: listPayload } = await fetchApiPayloadWithTimeout(
+            "https://dua-dhikr.vercel.app/categories/daily-dua",
+            { signal, timeoutMs: 5500, headers: fitrahiveHeaders }
+          );
+          const items = Array.isArray(listPayload?.data) ? listPayload.data : [];
+          if (items.length) {
+            const pick = items[Math.floor(Math.random() * items.length)];
+            const detailUrl = "https://dua-dhikr.vercel.app/categories/daily-dua/" + encodeURIComponent(pick.id);
+            const { data: detailPayload, status, ms } = await fetchApiPayloadWithTimeout(
+              detailUrl, { signal, timeoutMs: 5500, headers: fitrahiveHeaders }
+            );
+            const textInfo = extractProviderApiText("fitrahive_duadhikr", detailPayload, "en", "dua");
+            const txt = textInfo?.text || "";
+            const review = inspectReligiousText(txt, "en");
+            if (txt && !review.issues.length) {
+              const detail = detailPayload?.data || detailPayload;
+              $("duaText").textContent = "“" + txt + "”";
+              renderDuaCommentary(review.note);
+              renderApiResponseDetails("duaMeta", detailPayload, "dua", detailUrl, textInfo);
+              $("duaSource").textContent = extractCleanText(detail?.source || detail?.title || detail?.categoryName, "en") || "Fitrahive";
+              $("duaApiProvider").textContent = textInfo.languageFallback ? providerLabel + " → English fallback" : providerLabel;
+              $("duaApiStatus").textContent = textInfo.languageFallback ? "English fallback · " + ms + " ms" : status + " OK · " + ms + " ms";
+              $("duaApiStatus").className = textInfo.languageFallback ? "api-val warn" : "api-val ok";
+              $("duaApiRef").textContent = String(detail?.id || pick.id) + " · " + langLabel;
+              $("duaApiUpdated").textContent = formatClock();
+              $("duaApiUrl").textContent = detailUrl;
+              return;
+            }
           }
-        } catch (err) {
-          if (signal.aborted) throw err;
+        } catch (fitrahiveError) {
+          if (signal.aborted) throw fitrahiveError;
         }
       }
 
       if (state.selectedDuaApi === "fawaz_quran_cdn") {
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
-          const txt = extractApiTextPayload(j, selLang, "dua");
+          const textInfo = extractProviderApiText("fawaz_quran_cdn", j, selLang, "dua");
+          const txt = textInfo?.text || "";
           if (txt) {
             $("duaText").textContent = `“${txt}”`;
             renderDuaCommentary(inspectReligiousText(txt, selLang).note);
-            renderApiResponseDetails("duaMeta", j, "dua", endpointUrl);
+            renderApiResponseDetails("duaMeta", j, "dua", endpointUrl, textInfo);
             $("duaSource").textContent = formatSurahRef(refObj, selLang);
             $("duaApiProvider").textContent = providerLabel;
             $("duaApiStatus").textContent = `${status} OK · ${ms} ms`;
@@ -4009,21 +4175,25 @@ const QURAN_DUA_REFS = [
         }
       }
 
-      if (state.selectedDuaApi !== "fawaz_quran_cdn" && !(state.selectedDuaApi === "acikkuran_api" && selLang === "tr")) {
+      const selectedDuaSchema = API_TEXT_SCHEMAS.dua[state.selectedDuaApi];
+      if (state.selectedDuaApi !== "fawaz_quran_cdn" &&
+          state.selectedDuaApi !== "fitrahive_duadhikr" &&
+          selectedDuaSchema?.verified && selectedDuaSchema.languages?.[selLang]) {
         try {
           const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
-          const selectedText = extractApiTextPayload(selectedResponse.data, selLang, "dua");
+          const selectedTextInfo = extractProviderApiText(state.selectedDuaApi, selectedResponse.data, selLang, "dua");
+          const selectedText = selectedTextInfo?.text || "";
           const selectedReview = inspectReligiousText(selectedText, selLang);
           if (selectedText && !selectedReview.issues.length) {
-            const payload = selectedResponse.data?.data || selectedResponse.data?.result || selectedResponse.data;
+            const payload = selectedTextInfo.record || selectedResponse.data?.data || selectedResponse.data?.result || selectedResponse.data;
             const sourceLabel = extractCleanText(payload?.source || payload?.book || payload?.surah?.name, selLang) || formatSurahRef(refObj, selLang);
             $("duaText").textContent = `“${selectedText}”`;
             renderDuaCommentary(selectedReview.note);
-            renderApiResponseDetails("duaMeta", selectedResponse.data, "dua", endpointUrl);
+            renderApiResponseDetails("duaMeta", selectedResponse.data, "dua", endpointUrl, selectedTextInfo);
             $("duaSource").textContent = sourceLabel;
-            $("duaApiProvider").textContent = providerLabel;
-            $("duaApiStatus").textContent = `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
-            $("duaApiStatus").className = "api-val ok";
+            $("duaApiProvider").textContent = selectedTextInfo.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
+            $("duaApiStatus").textContent = selectedTextInfo.languageFallback ? `English fallback · ${selectedResponse.ms} ms` : `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
+            $("duaApiStatus").className = selectedTextInfo.languageFallback ? "api-val warn" : "api-val ok";
             $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
             $("duaApiUpdated").textContent = formatClock();
             $("duaApiUrl").textContent = endpointUrl;
@@ -4042,7 +4212,7 @@ const QURAN_DUA_REFS = [
       if (duaReview.issues.length) throw new Error(duaReview.note);
       $("duaText").textContent = `“${live.text}”`;
       renderDuaCommentary(duaReview.note);
-      renderApiResponseDetails("duaMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl);
+      renderApiResponseDetails("duaMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl, live.textInfo);
       $("duaSource").textContent = live.source;
       const duaUsesSelectedFallback = live.provider === providerLabel;
       $("duaApiProvider").textContent = duaUsesSelectedFallback ? providerLabel : `${providerLabel} → ${live.provider || "Yedek kaynak"}`;
