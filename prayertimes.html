@@ -1650,8 +1650,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   function getLocalizedLocationName(obj) {
     if (!obj) return "";
-    const localizedName = state.lang === "nl" ? obj.nameNl : (state.lang === "en" ? obj.nameEn : obj.nameTr);
-    const fallbackName = localizedName || obj.nameTr || obj.nameEn || obj.nameNl || "";
+    const fallbackName = state.lang === "tr"
+      ? (obj.nameTr || obj.nameEn || obj.nameNl || "")
+      : (state.lang === "nl" ? (obj.nameNl || obj.nameEn || "") : (obj.nameEn || obj.nameNl || ""));
+    if (!fallbackName) return "";
     return state.lang === "tr" ? formatTurkishName(fallbackName) : formatLatinName(fallbackName);
   }
 
@@ -2088,8 +2090,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     // Existing canonical/local names always win. Remote APIs attach source IDs
     // and fill missing fields; they never overwrite known translations.
     const bestTr = prev?.nameTr || cleanTr || cleanEn;
-    const bestEn = prev?.nameEn || cleanEn || cleanTr;
-    const bestNl = prev?.nameNl || formatLatinName(extra?.nameNl || bestEn || bestTr);
+    const bestEn = prev?.nameEn || cleanEn || "";
+    // Do not publish a new untranslated Turkish-only record in EN/NL lists.
+    if (!prev && !bestEn) return;
+    const bestNl = prev?.nameNl || formatLatinName(extra?.nameNl || bestEn);
     const sourceIds = { ...(prev?.sourceIds || {}), ...(extra?.sourceIds || {}) };
     if (source) sourceIds[source] = sourceId;
 
