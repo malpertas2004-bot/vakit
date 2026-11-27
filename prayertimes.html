@@ -1651,7 +1651,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function getLocalizedLocationName(obj) {
     if (!obj) return "";
     const localizedName = state.lang === "nl" ? obj.nameNl : (state.lang === "en" ? obj.nameEn : obj.nameTr);
-    return fixTurkishText(localizedName || obj.nameTr || obj.nameEn || obj.nameNl || "");
+    const fallbackName = localizedName || obj.nameTr || obj.nameEn || obj.nameNl || "";
+    return state.lang === "tr" ? formatTurkishName(fallbackName) : formatLatinName(fallbackName);
   }
 
   const getApiQueryEn = obj => fixTurkishText(obj?.nameEn || obj?.nameTr || "");
@@ -1968,17 +1969,66 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   /* ==========================================================================
      8. LOCATION LOADERS & DIYANET ID VERIFICATION
      ========================================================================== */
-  function mergeLocationRecord(mapById, id, rawTr, rawEn, extra = {}) {
-    if (!id) return;
-    const cleanTr = fixTurkishText(rawTr || "");
-    const cleanEn = fixTurkishText(rawEn || "");
-    const prev = mapById.get(id);
+  function formatTurkishName(raw) {
+    const s = fixTurkishText(raw).replace(/\\s+/g, " ").trim();
+    if (!s) return "";
+    const lower = s.toLocaleLowerCase("tr-TR");
+    return lower.replace(/(^|[\\s\\-(./])([\\p{L}])/gu, (match, separator, letter) =>
+      separator + letter.toLocaleUpperCase("tr-TR")
+    );
+  }
+
+  function locationNameIdentityKey(raw) {
+    return fixTurkishText(raw)
+      .normalize("NFD")
+      .replace(/[\\u0300-\\u036f]/g, "")
+      .toLocaleLowerCase("und")
+      .replace(/[’'\\x60]/g, "")
+      .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+      .replace(/\\s+/g, " ")
+      .trim();
+  }
+
+  function findMatchingLocationRecord(mapById, cleanTr, cleanEn) {
+    const trKey = locationNameIdentityKey(cleanTr);
+    const enKey = locationNameIdentityKey(cleanEn);
+    if (!trKey && !enKey) return null;
+
+    for (const [candidateId, candidate] of mapById) {
+      const candidateTr = locationNameIdentityKey(candidate?.nameTr);
+      const candidateEn = locationNameIdentityKey(candidate?.nameEn);
+      const trMatch = !!trKey && !!candidateTr && trKey === candidateTr;
+      const enMatch = !!enKey && !!candidateEn && enKey === candidateEn;
+
+      // Prefer a two-language match. A one-language match is accepted only
+      // when the other side has no value, to avoid merging genuine homonyms.
+      if (trMatch && enMatch) return [candidateId, candidate];
+      if (trMatch && (!enKey || !candidateEn)) return [candidateId, candidate];
+      if (enMatch && (!trKey || !candidateTr)) return [candidateId, candidate];
+    }
+    return null;
+  }
+
+  function getLocationSourceId(location, source) {
+    return String(location?.sourceIds?.[source] || location?.id || "");
+  }
+
+  function mergeLocationRecord(mapById, id, rawTr, rawEn, extra = {}, source = "") {
+    const sourceId = String(id || "").trim();
+    if (!sourceId) return;
+
+    const cleanTr = formatTurkishName(rawTr || "");
+    const cleanEn = formatLatinName(rawEn || "");
+    const directPrev = mapById.get(sourceId);
+    const matched = directPrev ? null : findMatchingLocationRecord(mapById, cleanTr, cleanEn);
+    const targetId = directPrev ? sourceId : (matched?.[0] || sourceId);
+    const prev = directPrev || matched?.[1];
 
     let bestTr = prev?.nameTr || "";
     if (cleanTr && (!bestTr || (!hasTurkishDiacritics(bestTr) && hasTurkishDiacritics(cleanTr)))) {
       bestTr = cleanTr;
     }
-    if (!bestTr) bestTr = fixTurkishText(cleanEn);
+    if (!bestTr) bestTr = cleanTr || cleanEn;
 
     let bestEn = prev?.nameEn || "";
     if (cleanEn && (!bestEn || hasTurkishDiacritics(bestEn))) {
@@ -1986,7 +2036,19 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
     if (!bestEn) bestEn = cleanEn || bestTr;
 
-    mapById.set(id, { ...prev, ...extra, id, nameTr: bestTr, nameEn: bestEn });
+    const sourceIds = { ...(prev?.sourceIds || {}), ...(extra?.sourceIds || {}) };
+    if (source) sourceIds[source] = sourceId;
+    const bestNl = formatLatinName(extra?.nameNl || prev?.nameNl || bestEn || bestTr);
+
+    mapById.set(targetId, {
+      ...prev,
+      ...extra,
+      id: targetId,
+      nameTr: bestTr,
+      nameEn: bestEn,
+      nameNl: bestNl,
+      sourceIds
+    });
   }
 
   async function loadCountries() {
@@ -2000,7 +2062,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         nameNl: c.nameNl || "",
         tz: c.tz,
         fallbackStates: c.states
-      });
+      }, "diyanet");
     }
     state.countries = Array.from(mapById.values());
     renderCountrySelect();
@@ -2016,14 +2078,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "");
+        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", {}, "imsakiyem");
         updated = true;
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.UlkeID || "").trim();
-        mergeLocationRecord(mapById, id, item?.UlkeAdi || "", item?.UlkeAdiEn || "");
+        mergeLocationRecord(mapById, id, item?.UlkeAdi || "", item?.UlkeAdiEn || "", {}, "emushaf");
         updated = true;
       }
     }
@@ -2067,26 +2129,29 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const fb = FALLBACK_LOCATIONS.find(c => c.id === countryObj.id);
     if (fb) {
       for (const s of fb.states) {
-        mapById.set(s.id, { ...s, fallbackDistricts: s.districts });
+        mergeLocationRecord(mapById, s.id, s.nameTr, s.nameEn, {
+          ...s,
+          fallbackDistricts: s.districts
+        }, "diyanet");
       }
     }
 
     const [r1, r2] = await Promise.allSettled([
-      fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states?countryId=${encodeURIComponent(countryObj.id)}`, { timeoutMs: 6500 }),
-      fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/sehirler/${encodeURIComponent(countryObj.id)}`, { timeoutMs: 6500 })
+      fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states?countryId=${encodeURIComponent(getLocationSourceId(countryObj, "imsakiyem"))}`, { timeoutMs: 6500 }),
+      fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/sehirler/${encodeURIComponent(getLocationSourceId(countryObj, "emushaf"))}`, { timeoutMs: 6500 })
     ]);
 
     if (r1.status === "fulfilled") {
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "");
+        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", {}, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.SehirID || "").trim();
-        mergeLocationRecord(mapById, id, item?.SehirAdi || "", item?.SehirAdiEn || "");
+        mergeLocationRecord(mapById, id, item?.SehirAdi || "", item?.SehirAdiEn || "", {}, "emushaf");
       }
     }
 
@@ -2122,26 +2187,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const mapById = new Map();
     if (Array.isArray(stateObj.fallbackDistricts)) {
       for (const d of stateObj.fallbackDistricts) {
-        mapById.set(d.id, { ...d });
+        mergeLocationRecord(mapById, d.id, d.nameTr, d.nameEn, { ...d }, "diyanet");
       }
     }
 
     const [r1, r2] = await Promise.allSettled([
-      fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(stateObj.id)}`, { timeoutMs: 6500 }),
-      fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(stateObj.id)}`, { timeoutMs: 6500 })
+      fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(getLocationSourceId(stateObj, "imsakiyem"))}`, { timeoutMs: 6500 }),
+      fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(getLocationSourceId(stateObj, "emushaf"))}`, { timeoutMs: 6500 })
     ]);
 
     if (r1.status === "fulfilled") {
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "");
+        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", {}, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.IlceID || "").trim();
-        mergeLocationRecord(mapById, id, item?.IlceAdi || "", item?.IlceAdiEn || "");
+        mergeLocationRecord(mapById, id, item?.IlceAdi || "", item?.IlceAdiEn || "", {}, "emushaf");
       }
     }
 
