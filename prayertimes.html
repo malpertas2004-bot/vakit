@@ -3167,7 +3167,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const validated = cleanAndValidateHadithText(rawTxt, selLang);
         if (validated.isValid) {
           const attr = extractCleanText(dj?.attribution, selLang) || "HadeethEnc";
-          const explanation = extractCleanText(dj?.explanation, selLang);
+          const explanation = extractHadithExplanation(dj) || extractHadithExplanation(dj?.data);
           return {
             text: validated.text,
             commentary: explanation,
@@ -3215,7 +3215,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const bookTitle = extractCleanText(j?.metadata?.name, selLang) || tryBook.toUpperCase();
         return {
           text: validated.text,
-          commentary: "",
+          commentary: extractHadithExplanation(j) || extractHadithExplanation(hObj),
           source: validated.tahric ? `${bookTitle} #${tryNo} — ${validated.tahric}` : `${bookTitle} #${tryNo}`,
           ref: `${editionPrefix}-${tryBook} #${tryNo}`,
           liveUrl: cdnUrl
