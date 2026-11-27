@@ -1656,7 +1656,16 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       ? (obj.nameTr || obj.nameEn || obj.nameNl || "")
       : (state.lang === "nl" ? (obj.nameNl || obj.nameEn || "") : (obj.nameEn || obj.nameNl || ""));
     if (!fallbackName) return "";
-    return state.lang === "tr" ? formatTurkishName(fallbackName) : formatLatinName(fallbackName);
+
+    if (state.lang !== "tr") return formatLatinName(fallbackName);
+
+    const isCountryRecord = Array.isArray(obj.states) || state.countries.some(country => country.id === obj.id);
+    if (isCountryRecord) return formatTurkishName(fallbackName);
+
+    const countryId = String(obj.countryId || state.selectedCountry?.id || "");
+    return countryId === "2"
+      ? formatTurkishName(fallbackName)
+      : formatTurkishForeignLocationName(fallbackName);
   }
 
   const getApiQueryEn = obj => fixTurkishText(obj?.nameEn || obj?.nameTr || "");
@@ -1982,6 +1991,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     );
   }
 
+  function formatTurkishForeignLocationName(raw) {
+    // Foreign place names use Latin I/i, not Turkish dotless ı.
+    // Preserve letters such as ş, ç, ö and ü, but normalize stray dotless ı.
+    const s = fixTurkishText(raw).replace(/ı/g, "i").replace(/\s+/g, " ").trim();
+    if (!s) return "";
+    const lower = s.toLocaleLowerCase("en-US");
+    return lower.replace(/(^|[\s\-(./])('s-)?([\p{L}]+)/gu, (match, separator, sPrefix, word, offset) => {
+      const prefix = sPrefix || "";
+      let formattedWord;
+      if (!prefix && offset > 0 && LOWER_PARTICLES.has(word)) {
+        formattedWord = word;
+      } else if (word.startsWith("ij") && word.length > 2) {
+        formattedWord = "IJ" + word.slice(2);
+      } else {
+        formattedWord = word.charAt(0).toLocaleUpperCase("en-US") + word.slice(1);
+      }
+      return separator + prefix + formattedWord;
+    }).normalize("NFC");
+  }
+
   function locationNameIdentityKey(raw) {
     return fixTurkishText(raw)
       .normalize("NFD")
@@ -2077,7 +2106,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const sourceId = String(id || "").trim();
     if (!sourceId) return;
 
-    const cleanTr = formatTurkishName(rawTr || "");
+    const countryId = String(extra?.countryId || "");
+    const cleanTr = countryId && countryId !== "2"
+      ? formatTurkishForeignLocationName(rawTr || "")
+      : formatTurkishName(rawTr || "");
     const cleanEn = formatLatinName(rawEn || "");
     if (isNonAdministrativeLocationName(cleanTr, cleanEn)) return;
 
@@ -2200,6 +2232,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       for (const s of fb.states) {
         mergeLocationRecord(mapById, s.id, s.nameTr, s.nameEn, {
           ...s,
+          countryId: String(countryObj.id),
           fallbackDistricts: s.districts
         }, "diyanet");
       }
@@ -2220,13 +2253,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", {}, "imsakiyem");
+        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", { countryId: String(countryObj.id) }, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.SehirID || "").trim();
-        mergeLocationRecord(mapById, id, item?.SehirAdi || "", item?.SehirAdiEn || "", {}, "emushaf");
+        mergeLocationRecord(mapById, id, item?.SehirAdi || "", item?.SehirAdiEn || "", { countryId: String(countryObj.id) }, "emushaf");
       }
     }
 
@@ -2262,7 +2295,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const mapById = new Map();
     if (Array.isArray(stateObj.fallbackDistricts)) {
       for (const d of stateObj.fallbackDistricts) {
-        mergeLocationRecord(mapById, d.id, d.nameTr, d.nameEn, { ...d }, "diyanet");
+        mergeLocationRecord(mapById, d.id, d.nameTr, d.nameEn, {
+          ...d,
+          countryId: String(stateObj.countryId || state.selectedCountry?.id || "")
+        }, "diyanet");
       }
     }
 
@@ -2281,13 +2317,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", {}, "imsakiyem");
+        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", { countryId: String(stateObj.countryId || state.selectedCountry?.id || "") }, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.IlceID || "").trim();
-        mergeLocationRecord(mapById, id, item?.IlceAdi || "", item?.IlceAdiEn || "", {}, "emushaf");
+        mergeLocationRecord(mapById, id, item?.IlceAdi || "", item?.IlceAdiEn || "", { countryId: String(stateObj.countryId || state.selectedCountry?.id || "") }, "emushaf");
       }
     }
 
