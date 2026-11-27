@@ -3372,7 +3372,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function renderApiResponseDetails(containerId,payload,kind,fallbackUrl="",selectedFieldOverride=null) {
     const box=$(containerId);if(!box)return;
     box.replaceChildren();
-    const selectedField = selectedFieldOverride || inspectApiTextPayload(payload, state.lang, kind);
+    const selectedField = selectedFieldOverride || null;
     const objects=collectApiObjects(payload);
     const rows=kind==="hadith"?[
       ["Kitap",["book.name","book_name","collection.name","collection"]],
@@ -3692,7 +3692,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           const fallbackMs = Math.round(performance.now() - t0);
           $("hadithText").textContent = `“${fallback.text}”`;
           renderHadithCommentary(fallback.commentary || "", true);
-          renderApiResponseDetails("hadithMeta", fallback.raw || {}, "hadith", fallback.liveUrl || endpointUrl);
+          renderApiResponseDetails("hadithMeta", fallback.raw || {}, "hadith", fallback.liveUrl || endpointUrl, fallback.textInfo);
           $("hadithSource").textContent = fallback.source;
           $("hadithApiProvider").textContent = `${providerLabel} → ${fallback.provider || "Yedek kaynak"}`;
           $("hadithApiStatus").textContent = `Yedek kaynak · ${fallbackMs} ms`;
@@ -3728,14 +3728,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
           const item = j?.data || j;
-          const rawTxt = extractApiTextPayload(item, "en", "hadith");
-          const validated = cleanAndValidateHadithText(rawTxt, "en");
+          const textInfo = extractProviderApiText("random_hadith_gen", j, "en", "hadith");
+          const validated = cleanAndValidateHadithText(textInfo?.text || "", "en");
           if (validated.isValid) {
             const bName = extractCleanText(item?.book, "en") || book;
             const rNo = extractCleanText(item?.refno || item?.id, "en");
             $("hadithText").textContent = `“${validated.text}”`;
             renderHadithCommentary(extractHadithExplanation(j) || extractHadithExplanation(item), true);
-            renderApiResponseDetails("hadithMeta", j, "hadith", item?.url || endpointUrl);
+            renderApiResponseDetails("hadithMeta", j, "hadith", item?.url || endpointUrl, textInfo);
             $("hadithSource").textContent = rNo ? `${bName} (${rNo})` : bName;
             $("hadithApiProvider").textContent = providerLabel;
             $("hadithApiStatus").textContent = `${status} OK · ${ms} ms`;
