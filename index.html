@@ -3440,8 +3440,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchCleanFromHadeethEnc(selLang, seedNo, signal) {
-    if (selLang === "nl") return null;
-    const hLang = selLang === "tr" ? "tr" : "en";
+    const hLang = selLang === "tr" ? "tr" : selLang === "nl" ? "nl" : "en";
     const languageFallback = false;
     let categories = [];
     try {
@@ -3538,7 +3537,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     }
 
-    if (selLang === "nl") throw new Error("Bu API için doğrulanmış Hollandaca hadis metni bulunamadı.");
+    if (selLang === "nl") {
+      const dutchHadith = await fetchCleanFromHadeethEnc("nl", randNo, signal);
+      if (dutchHadith) return dutchHadith;
+      throw new Error("HadeethEnc API returned no verified Dutch hadith text. English fallback is disabled.");
+    }
 
     const editionPrefix = selLang === "tr" ? "tur" : "eng";
     const cdnHosts = [
