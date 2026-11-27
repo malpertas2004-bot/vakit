@@ -1970,10 +1970,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
      8. LOCATION LOADERS & DIYANET ID VERIFICATION
      ========================================================================== */
   function formatTurkishName(raw) {
-    const s = fixTurkishText(raw).replace(/\\s+/g, " ").trim();
+    const s = fixTurkishText(raw).replace(/\s+/g, " ").trim();
     if (!s) return "";
     const lower = s.toLocaleLowerCase("tr-TR");
-    return lower.replace(/(^|[\\s\\-(./])([\\p{L}])/gu, (match, separator, letter) =>
+    return lower.replace(/(^|[\s\-(./])([\p{L}])/gu, (match, separator, letter) =>
       separator + letter.toLocaleUpperCase("tr-TR")
     );
   }
@@ -1981,11 +1981,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function locationNameIdentityKey(raw) {
     return fixTurkishText(raw)
       .normalize("NFD")
-      .replace(/[\\u0300-\\u036f]/g, "")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLocaleLowerCase("und")
-      .replace(/[’'\\x60]/g, "")
-      .replace(/[^\\p{L}\\p{N}]+/gu, " ")
-      .replace(/\\s+/g, " ")
+      .replace(/ı/g, "i")
+      .replace(/[’']/g, "")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .replace(/\s+/g, " ")
       .trim();
   }
 
