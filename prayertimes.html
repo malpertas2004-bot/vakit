@@ -4379,7 +4379,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   function applyLanguageUI(reloadQuotes = false) {
-    document.documentElement.lang = state.lang;\n    document.documentElement.dir = state.lang === "ar" ? "rtl" : "ltr";
+    document.documentElement.lang = state.lang;\n    document.documentElement.dir = state.lang === "ar" ? "rtl" : "ltr";\n    window.__vakitLanguage = state.lang;
     document.querySelectorAll(".lang-btn").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.lang === state.lang);
     });
@@ -4607,10 +4607,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       btn.addEventListener("click", () => {
         const nextLang = btn.dataset.lang;
         if (!nextLang || !I18N[nextLang] || nextLang === state.lang) return;
+        const wasGoogleTranslated = ["de", "fr", "ar"].includes(state.lang);
         state.lang = nextLang;
         Persistence.savePrefs();
         setGoogleTranslateLanguage(nextLang);
-        location.reload();
+        if (wasGoogleTranslated || ["de", "fr", "ar"].includes(nextLang)) {
+          location.reload();
+        } else {
+          applyLanguageUI(true);
+        }
       });
     });
 
@@ -4851,6 +4856,18 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       includedLanguages: "de,fr,ar",
       autoDisplay: false
     }, "google_translate_element");
+    let attempts = 0;
+    const activateTranslation = window.setInterval(function () {
+      const combo = document.querySelector(".goog-te-combo");
+      const target = window.__vakitLanguage;
+      if (combo && ["de", "fr", "ar"].includes(target)) {
+        combo.value = target;
+        combo.dispatchEvent(new Event("change"));
+        window.clearInterval(activateTranslation);
+      } else if (++attempts >= 40) {
+        window.clearInterval(activateTranslation);
+      }
+    }, 150);
   };
 </script>
 <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
