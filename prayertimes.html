@@ -1675,13 +1675,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (!fallbackName) return "";
 
     if (state.lang !== "tr") return formatLatinName(fallbackName);
-    // Keep an explicit Turkish translation in Turkish casing, including dotted İ.
-    // Do not send nameTr through the English-style foreign-name formatter.
-    if (turkishName) return formatTurkishName(turkishName);
-
+    // Country names and Turkish domestic places use Turkish casing. Foreign
+    // regions/cities keep Latin i: İtalya -> İtalya, Mılano -> Milano.
     const isCountryRecord = Array.isArray(obj.states) || state.countries.some(country => country.id === obj.id);
-    if (isCountryRecord) return formatTurkishName(fallbackName);
-    return formatTurkishForeignLocationName(fallbackName);
+    if (isCountryRecord) return formatTurkishName(turkishName || fallbackName);
+    const countryId = String(obj.countryId || state.selectedCountry?.id || "");
+    return countryId === "2"
+      ? formatTurkishName(turkishName || fallbackName)
+      : formatTurkishForeignLocationName(turkishName || fallbackName);
   }
 
   const getApiQueryEn = obj => fixTurkishText(obj?.nameEn || obj?.nameTr || "");
@@ -2038,7 +2039,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function formatTurkishForeignLocationName(raw) {
     // Foreign place names use Latin I/i, not Turkish dotless ı.
     // Preserve letters such as ş, ç, ö and ü, but normalize stray dotless ı.
-    const s = fixTurkishText(raw).replace(/ı/g, "i").replace(/\s+/g, " ").trim();
+    const s = fixTurkishText(raw).replace(/[İı]/g, "i").replace(/\s+/g, " ").trim();
     if (!s) return "";
     const lower = s.toLocaleLowerCase("en-US");
     return lower.replace(/(^|[\s\-(./])('s-)?([\p{L}]+)/gu, (match, separator, sPrefix, word, offset) => {
@@ -2049,7 +2050,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       } else if (word.startsWith("ij") && word.length > 2) {
         formattedWord = "IJ" + word.slice(2);
       } else {
-        formattedWord = word.charAt(0).toLocaleUpperCase("en-US") + word.slice(1);
+        formattedWord = word.charAt(0).toLocaleUpperCase("tr-TR") + word.slice(1);
       }
       return separator + prefix + formattedWord;
     }).normalize("NFC");
