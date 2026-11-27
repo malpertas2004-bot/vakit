@@ -3438,8 +3438,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchCleanFromHadeethEnc(selLang, seedNo, signal) {
+    if (selLang === "nl") return null;
     const hLang = selLang === "tr" ? "tr" : "en";
-    const languageFallback = selLang === "nl";
+    const languageFallback = false;
     let categories = [];
     try {
       const { data: categoryPayload } = await fetchApiPayloadWithTimeout(
