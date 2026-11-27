@@ -260,29 +260,6 @@ select.prompt-select{border-color:var(--gold)}
 select:disabled{opacity:.55;cursor:not-allowed}
 .field-label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600}
 
-/* ID Verification Bar */
-.id-verify-box{
-  background:#091d17;
-  border:1px solid #26483e;
-  border-radius:var(--radius-md);
-  padding:10px 12px;
-}
-.id-verify-row{display:flex;gap:8px;align-items:center}
-.id-verify-row input{
-  flex:1;
-  padding:8px 11px;
-  font-size:13px;
-  font-variant-numeric:tabular-nums;
-}
-.id-verify-result{
-  margin-top:7px;
-  font-size:11.5px;
-  color:var(--muted);
-  line-height:1.45;
-}
-.id-verify-result.ok{color:var(--ok)}
-.id-verify-result.warn{color:var(--warn)}
-
 /* Quote Box (Hadith & Dua) */
 .quote-box{
   margin-top:10px;
@@ -619,15 +596,6 @@ details.nav-item > summary:hover{background:#163b30}
           <label class="field-label" for="districtSelect" id="districtSelectLabel">&#304;l&ccedil;e / &#350;ehir:</label>
           <select id="districtSelect" class="prompt-select" aria-label="&#304;l&ccedil;e veya &#350;ehir Se&ccedil;imi" disabled></select>
         </div>
-      </div>
-
-      <div class="id-verify-box">
-        <label class="field-label" for="diyanetIdInput" id="diyanetIdLabel">Diyanet &#304;l&ccedil;e ID ile Do&#287;rulama / Do&#287;rudan Se&ccedil;im (&ouml;rn. 9541, 13883, 17926):</label>
-        <div class="id-verify-row">
-          <input type="text" id="diyanetIdInput" inputmode="numeric" placeholder="Diyanet ID (&ouml;rn. 13883)">
-          <button type="button" class="small-btn" id="verifyIdBtn">ID Kontrol Et</button>
-        </div>
-        <div class="id-verify-result" id="idVerifyResult">namazvakitleri.diyanet.gov.tr &uuml;zerindeki t&uuml;m &uuml;lke, eyalet ve &#351;ehir kay&#305;tlar&#305; ID numaras&#305;na g&ouml;re e&#351;le&#351;tirilir.</div>
       </div>
 
       <div>
@@ -1536,18 +1504,6 @@ const DIYANET_ALL_LOCATIONS = [{"id":"2","nameTr":"Türkiye","nameEn":"Turkey","
 const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   /* O(1) Local Index for Instant Diyanet District ID Lookup */
-  const LOCAL_DISTRICT_INDEX = new Map();
-  for (const c of DIYANET_ALL_LOCATIONS) {
-    for (const s of (c.states || [])) {
-      for (const d of (s.districts || [])) {
-        const id = String(d.id);
-        const candidates = LOCAL_DISTRICT_INDEX.get(id) || [];
-        candidates.push({ country: c, state: s, district: d });
-        LOCAL_DISTRICT_INDEX.set(id, candidates);
-      }
-    }
-  }
-
   /* Application Reactive State */
   const state = {
     lang: "tr",
@@ -2402,7 +2358,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       getLocalizedLocationName(a, "country").localeCompare(getLocalizedLocationName(b, "country"), I18N[state.lang].locale, { sensitivity: "base" })
     );
     sel.innerHTML = `<option value="" disabled ${!curId ? "selected" : ""}>${escapeHtml(t("selectCountryOption"))}</option>` +
-      sorted.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(c, "country"))} (#${escapeHtml(c.id)})</option>`).join("");
+      sorted.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(c, "country"))}</option>`).join("");
     sel.classList.toggle("prompt-select", !curId);
     if (state.districts.length === 0 && state.states.length === 0 && state.countries.length > 0) {
       $("cityCountBadge").textContent = t("countriesCount", { n: state.countries.length });
@@ -2544,8 +2500,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     const mapById = new Map();
     const parentStateRecords = [];
+    const isUaeCountry = String(countryObj.id) === "184";
     const fb = FALLBACK_LOCATIONS.find(c => c.id === countryObj.id);
-    if (fb) {
+
+    // The local fallback contains only an incomplete Abu Dhabi entry for the UAE.
+    // Keep it as a fallback city, not as a separate state.
+    if (fb && !isUaeCountry) {
       for (const s of fb.states) {
         mergeLocationRecord(mapById, s.id, s.nameTr, s.nameEn, {
           ...s,
@@ -2595,20 +2555,42 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     }
 
-    // Re-parent the child cities from a fake country-named state into regions.
-    for (const parentState of parentStateRecords) {
-      await expandCountryLevelState(mapById, parentState, countryObj);
+    if (isUaeCountry) {
+      const sourceIds = {};
+      for (const record of parentStateRecords) sourceIds[record.source] = record.id;
+      const fallbackDistricts = (fb?.states || []).flatMap(region =>
+        (region.districts || []).map(district => ({ ...district, countryId: "184" }))
+      );
+
+      // UAE is represented by one state. Its emirates are listed as cities
+      // beneath it by loadDistrictsForState() using the provider's parent ID.
+      state.states = [{
+        id: "uae-emirates",
+        countryId: "184",
+        nameTr: "Birleşik Arap Emirlikleri",
+        nameEn: "United Arab Emirates",
+        nameNl: "Verenigde Arabische Emiraten",
+        sourceIds,
+        fallbackDistricts,
+        isCountryLevelParent: true
+      }];
+      state.selectedState = state.states[0];
+    } else {
+      // Preserve the existing region grouping for all other countries.
+      for (const parentState of parentStateRecords) {
+        await expandCountryLevelState(mapById, parentState, countryObj);
+      }
+      state.states = Array.from(mapById.values());
+      if (preselectStateId) {
+        const requestedId = String(preselectStateId);
+        state.selectedState = state.states.find(s =>
+          s.id === requestedId ||
+          s.sourceIds?.imsakiyem === requestedId ||
+          s.sourceIds?.emushaf === requestedId
+        ) || null;
+      }
     }
 
-    state.states = Array.from(mapById.values());
-    if (preselectStateId) {
-      const requestedId = String(preselectStateId);
-      state.selectedState = state.states.find(s =>
-        s.id === requestedId ||
-        s.sourceIds?.imsakiyem === requestedId ||
-        s.sourceIds?.emushaf === requestedId
-      ) || null;
-    }
     renderStateSelect();
   }
 
@@ -2620,10 +2602,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       getLocalizedLocationName(a, "state").localeCompare(getLocalizedLocationName(b, "state"), I18N[state.lang].locale, { sensitivity: "base" })
     );
     sel.innerHTML = `<option value="" disabled ${!curId ? "selected" : ""}>${escapeHtml(t("selectStateOption"))}</option>` +
-      sorted.map(s => {
-        const idLabel = s.synthetic ? "" : ` (#${escapeHtml(s.id)})`;
-        return `<option value="${escapeHtml(s.id)}" ${s.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(s, "state"))}${idLabel}</option>`;
-      }).join("");
+      sorted.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(s, "state"))}</option>`).join("");
     sel.classList.toggle("prompt-select", !curId);
     if (state.districts.length === 0 && state.states.length > 0) {
       $("cityCountBadge").textContent = t("statesCount", { n: state.states.length });
@@ -2694,285 +2673,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       getLocalizedLocationName(a, "district").localeCompare(getLocalizedLocationName(b, "district"), I18N[state.lang].locale, { sensitivity: "base" })
     );
     sel.innerHTML = `<option value="" disabled ${!curId ? "selected" : ""}>${escapeHtml(t("selectDistrictOption"))}</option>` +
-      sorted.map(d => `<option value="${escapeHtml(d.id)}" ${d.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(d, "district"))} (#${escapeHtml(d.id)})</option>`).join("");
+      sorted.map(d => `<option value="${escapeHtml(d.id)}" ${d.id === curId ? "selected" : ""}>${escapeHtml(getLocalizedLocationName(d, "district"))}</option>`).join("");
     sel.classList.toggle("prompt-select", !curId);
     $("cityCountBadge").textContent = state.districts.length > 0
       ? t("districtsCount", { n: state.districts.length })
       : (state.states.length > 0 ? t("statesCount", { n: state.states.length }) : "Diyanet");
-  }
-
-  async function verifyAndSelectByDiyanetId(rawInput) {
-    const cleanId = String(rawInput || "").replace(/\D+/g, "").trim();
-    const resEl = $("idVerifyResult");
-    if (!cleanId) {
-      resEl.textContent = t("idVerifyInvalid");
-      resEl.className = "id-verify-result warn";
-      return;
-    }
-
-    // Keep every matching local record; don't silently select whichever reused ID was inserted last.
-    const localCandidates = LOCAL_DISTRICT_INDEX.get(cleanId) || [];
-    let localHit = localCandidates.length === 1 ? localCandidates[0] : null;
-
-    if (localCandidates.length > 1) {
-      try {
-        const { data: lookup } = await fetchJsonWithTimeout(
-          `https://ezanvakti.imsakiyem.com/api/locations/districts/${encodeURIComponent(cleanId)}`,
-          { timeoutMs: 4500 }
-        );
-        const remote = lookup?.data || lookup;
-        const districtKeys = [remote?.name_tr, remote?.name, remote?.name_en, remote?.nameEn]
-          .map(canonicalLocationNameKey).filter(Boolean);
-        const remoteState = remote?.state || remote?.stateId || remote?.state_id;
-        const remoteCountry = remote?.country || remote?.countryId || remote?.country_id;
-        const stateKeys = (typeof remoteState === "object"
-          ? [remoteState?.name_tr, remoteState?.name, remoteState?.name_en, remoteState?.nameEn]
-          : []).map(canonicalLocationNameKey).filter(Boolean);
-        const countryKeys = (typeof remoteCountry === "object"
-          ? [remoteCountry?.name_tr, remoteCountry?.name, remoteCountry?.name_en, remoteCountry?.nameEn]
-          : []).map(countryApiNameKey).filter(Boolean);
-
-        let candidates = localCandidates.filter(hit =>
-          !districtKeys.length || [hit.district.nameTr, hit.district.nameEn, hit.district.nameNl]
-            .some(name => districtKeys.includes(canonicalLocationNameKey(name)))
-        );
-        if (stateKeys.length) candidates = candidates.filter(hit =>
-          [hit.state.nameTr, hit.state.nameEn, hit.state.nameNl]
-            .some(name => stateKeys.includes(canonicalLocationNameKey(name)))
-        );
-        if (countryKeys.length) candidates = candidates.filter(hit =>
-          [hit.country.nameTr, hit.country.nameEn, hit.country.nameNl]
-            .some(name => countryKeys.includes(countryApiNameKey(name)))
-        );
-        if (candidates.length === 1) localHit = candidates[0];
-      } catch (_) {}
-    }
-
-    if (localCandidates.length > 1 && !localHit) {
-      resEl.textContent = state.lang === "tr"
-        ? `#${cleanId} numarası birden fazla konumda bulunuyor. Yanlış seçim yapılmaması için ülke, eyalet/il ve ilçeyi listelerden seçin.`
-        : state.lang === "nl"
-          ? `Nummer #${cleanId} komt bij meerdere locaties voor. Kies land, provincie en plaats via de lijsten.`
-          : `ID #${cleanId} matches multiple locations. Select the country, state and district from the lists.`;
-      resEl.className = "id-verify-result warn";
-      return;
-    }
-
-    if (localHit) {
-      state.selectedCountry = state.countries.find(x => x.id === localHit.country.id) || localHit.country;
-      state.zone = detectTimezoneForCountry(state.selectedCountry);
-      renderCountrySelect();
-      await loadStatesForCountry(state.selectedCountry, localHit.state.id);
-
-      if (!state.selectedState) {
-        const stateNames = [localHit.state.nameTr, localHit.state.nameEn, localHit.state.nameNl]
-          .map(canonicalLocationNameKey).filter(Boolean);
-        const matches = state.states.filter(candidate =>
-          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
-            .some(name => stateNames.includes(canonicalLocationNameKey(name)))
-        );
-        if (matches.length === 1) {
-          state.selectedState = matches[0];
-        } else if (matches.length === 0) {
-          state.selectedState = {
-            ...localHit.state,
-            countryId: String(state.selectedCountry.id),
-            fallbackDistricts: localHit.state.districts || []
-          };
-          state.states.push(state.selectedState);
-          renderStateSelect();
-        } else {
-          throw new Error("Local state ID is ambiguous");
-        }
-      }
-
-      await loadDistrictsForState(state.selectedState, localHit.district.id);
-      if (!state.selectedDistrict) {
-        const districtNames = [localHit.district.nameTr, localHit.district.nameEn, localHit.district.nameNl]
-          .map(canonicalLocationNameKey).filter(Boolean);
-        const matches = state.districts.filter(candidate =>
-          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
-            .some(name => districtNames.includes(canonicalLocationNameKey(name)))
-        );
-        if (matches.length === 1) {
-          state.selectedDistrict = matches[0];
-        } else if (matches.length === 0) {
-          state.selectedDistrict = { ...localHit.district, countryId: String(state.selectedCountry.id) };
-          state.districts.push(state.selectedDistrict);
-          renderDistrictSelect();
-        } else {
-          throw new Error("Local district ID is ambiguous in the selected state");
-        }
-      }
-
-      state.todayData = null;
-      Persistence.savePrefs();
-      updateCityHeaderAndFooter();
-
-      resEl.textContent = t("idVerifyOk", {
-        country: getLocalizedLocationName(state.selectedCountry, "country"),
-        cid: state.selectedCountry.id,
-        state: getLocalizedLocationName(state.selectedState, "state"),
-        sid: state.selectedState.id,
-        district: getLocalizedLocationName(state.selectedDistrict, "district"),
-        did: state.selectedDistrict.id
-      });
-      resEl.className = "id-verify-result ok";
-
-      if (state.selectedApiMode) {
-        loadTimes({ silentHourly: false });
-      } else {
-        updateMissingSelectionStatus();
-        renderEmptyPrayerPlaceholder(true);
-      }
-      return;
-    }
-
-    // 2. Fallback to live Imsakiyem API for any district ID not in local index
-    resEl.textContent = t("idVerifying", { id: cleanId });
-    resEl.className = "id-verify-result";
-
-    try {
-      const { data: j } = await fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts/${encodeURIComponent(cleanId)}`);
-      const dist = j?.data || j;
-      const distId = String(dist?._id || dist?.id || "").trim();
-      if (!distId) throw new Error("Not found");
-
-      const stateObjRaw = dist?.state || dist?.stateId || dist?.state_id;
-      const countryObjRaw = dist?.country || dist?.countryId || dist?.country_id;
-      const stateId = String(typeof stateObjRaw === "object" ? (stateObjRaw?._id || stateObjRaw?.id || "") : (stateObjRaw || "")).trim();
-      const countryId = String(typeof countryObjRaw === "object" ? (countryObjRaw?._id || countryObjRaw?.id || "") : (countryObjRaw || "")).trim();
-
-      const embeddedNames = typeof countryObjRaw === "object"
-        ? [countryObjRaw?.name_tr, countryObjRaw?.name, countryObjRaw?.name_en, countryObjRaw?.nameEn]
-        : [];
-      let cObj = findCanonicalCountryFromApi(embeddedNames, state.countries);
-      let remoteCountry = null;
-      if (!cObj && countryId) {
-        const { data: countryResponse } = await fetchJsonWithTimeout(
-          `https://ezanvakti.imsakiyem.com/api/locations/countries/${encodeURIComponent(countryId)}`
-        );
-        remoteCountry = countryResponse?.data || countryResponse;
-        cObj = findCanonicalCountryFromApi([
-          remoteCountry?.name_tr, remoteCountry?.name, remoteCountry?.name_en, remoteCountry?.nameEn
-        ], state.countries);
-      }
-
-      // External service IDs belong to sourceIds, never to the canonical country ID.
-      if (!cObj && countryId) {
-        const sourceMatches = state.countries.filter(country =>
-          getLocationSourceId(country, "imsakiyem") === countryId
-        );
-        if (sourceMatches.length === 1) cObj = sourceMatches[0];
-      }
-      if (!cObj) throw new Error("Country could not be mapped to one canonical country");
-      cObj.sourceIds = { ...(cObj.sourceIds || {}), imsakiyem: countryId };
-
-      state.selectedCountry = cObj;
-      state.zone = detectTimezoneForCountry(state.selectedCountry);
-      renderCountrySelect();
-      await loadStatesForCountry(state.selectedCountry, stateId);
-
-      // When a provider uses the country itself as a parent-state container,
-      // the requested city ID now belongs to one of the re-parented regions.
-      if (!state.selectedState && distId) {
-        const regionMatches = state.states.filter(candidate =>
-          (candidate.fallbackDistricts || []).some(district =>
-            String(district.id) === distId ||
-            Object.values(district.sourceIds || {}).some(sourceId => String(sourceId) === distId)
-          )
-        );
-        if (regionMatches.length === 1) {
-          state.selectedState = regionMatches[0];
-        } else if (regionMatches.length > 1) {
-          throw new Error("District ID maps to multiple re-parented regions");
-        }
-      }
-
-      if (!state.selectedState && stateId) {
-        const { data: sj } = await fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states/${encodeURIComponent(stateId)}`);
-        const sd = sj?.data || sj;
-        const stateTr = sd?.name_tr || sd?.nameTr || "";
-        const stateEn = sd?.name_en || sd?.nameEn || "";
-        if (isCountryNameReturnedAsState(stateTr, stateEn, cObj)) {
-          throw new Error("The returned state record is the parent country.");
-        }
-        const stateNames = [stateTr, sd?.name, stateEn]
-          .map(canonicalLocationNameKey).filter(Boolean);
-        const stateMatches = state.states.filter(candidate =>
-          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
-            .some(name => stateNames.includes(canonicalLocationNameKey(name)))
-        );
-        if (stateMatches.length === 1) {
-          state.selectedState = stateMatches[0];
-          state.selectedState.sourceIds = { ...(state.selectedState.sourceIds || {}), imsakiyem: stateId };
-        } else if (stateMatches.length > 1) {
-          throw new Error("State name is ambiguous in the selected country");
-        } else {
-          state.selectedState = {
-            id: stateId,
-            nameTr: fixTurkishText(stateTr || sd?.name || ""),
-            nameEn: fixTurkishText(stateEn || sd?.name || ""),
-            sourceIds: { imsakiyem: stateId }
-          };
-          state.states.push(state.selectedState);
-          renderStateSelect();
-        }
-      }
-
-      if (state.selectedState) {
-        await loadDistrictsForState(state.selectedState, distId);
-      }
-
-      if (!state.selectedDistrict) {
-        const districtTr = fixTurkishText(dist?.name_tr || dist?.name || "");
-        const districtEn = fixTurkishText(dist?.name_en || dist?.nameEn || dist?.name || "");
-        const districtKeys = [districtTr, districtEn].map(canonicalLocationNameKey).filter(Boolean);
-        const districtMatches = state.districts.filter(candidate =>
-          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
-            .some(name => districtKeys.includes(canonicalLocationNameKey(name)))
-        );
-        if (districtMatches.length === 1) {
-          state.selectedDistrict = districtMatches[0];
-          state.selectedDistrict.sourceIds = { ...(state.selectedDistrict.sourceIds || {}), imsakiyem: distId };
-        } else if (districtMatches.length > 1) {
-          throw new Error("District name is ambiguous in the selected state");
-        } else {
-          state.selectedDistrict = {
-            id: distId,
-            nameTr: districtTr,
-            nameEn: districtEn,
-            sourceIds: { imsakiyem: distId }
-          };
-          state.districts.push(state.selectedDistrict);
-          renderDistrictSelect();
-        }
-      }
-
-      state.todayData = null;
-      Persistence.savePrefs();
-      updateCityHeaderAndFooter();
-
-      resEl.textContent = t("idVerifyOk", {
-        country: getLocalizedLocationName(state.selectedCountry, "country"),
-        cid: state.selectedCountry.id,
-        state: state.selectedState ? getLocalizedLocationName(state.selectedState, "state") : "-",
-        sid: state.selectedState?.id || "-",
-        district: getLocalizedLocationName(state.selectedDistrict, "district"),
-        did: state.selectedDistrict.id
-      });
-      resEl.className = "id-verify-result ok";
-
-      if (state.selectedApiMode) {
-        loadTimes({ silentHourly: false });
-      } else {
-        updateMissingSelectionStatus();
-        renderEmptyPrayerPlaceholder(true);
-      }
-    } catch (_) {
-      resEl.textContent = t("idVerifyNotFound", { id: cleanId });
-      resEl.className = "id-verify-result warn";
-    }
   }
 
   /* ==========================================================================
@@ -4571,9 +4276,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const dName = getLocalizedLocationName(state.selectedDistrict, "district");
     const sName = state.selectedState ? getLocalizedLocationName(state.selectedState, "state") : "";
     const cName = state.selectedCountry ? getLocalizedLocationName(state.selectedCountry, "country") : "";
-    return `${dName} (#${state.selectedDistrict.id})` +
-      (sName ? ` · ${sName} (#${state.selectedState.id})` : "") +
-      (cName ? ` · ${cName} (#${state.selectedCountry.id})` : "");
+    return [dName, sName, cName].filter(Boolean).join(" · ");
   }
 
   function updateMissingSelectionStatus() {
@@ -4605,11 +4308,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const distName = getLocalizedLocationName(state.selectedDistrict, "district");
       const stateName = state.selectedState ? getLocalizedLocationName(state.selectedState, "state") : "";
       const countryName = state.selectedCountry ? getLocalizedLocationName(state.selectedCountry, "country") : "";
-      const fullLoc = [
-        `${distName} (#${state.selectedDistrict.id})`,
-        stateName ? `${stateName} (#${state.selectedState.id})` : "",
-        countryName ? `${countryName} (#${state.selectedCountry.id})` : ""
-      ].filter(Boolean).join(", ");
+      const fullLoc = [distName, stateName, countryName].filter(Boolean).join(", ");
 
       titleEl.textContent = distName;
       titleEl.classList.remove("unselected");
@@ -4626,7 +4325,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           ? "https://namazvakitleri.diyanet.gov.tr/tr-TR"
           : "https://namazvakitleri.diyanet.gov.tr/en-US";
       }
-      $("diyanetLink").textContent = `${t("diyanetOrg")} (#${state.selectedDistrict.id})`;
+      $("diyanetLink").textContent = t("diyanetOrg");
     }
 
     if (!state.todayData) {
@@ -4659,22 +4358,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("countrySelectLabel").textContent = t("countrySelectLabel");
     $("stateSelectLabel").textContent = t("stateSelectLabel");
     $("districtSelectLabel").textContent = t("districtSelectLabel");
-    $("diyanetIdLabel").textContent = t("diyanetIdLabel");
-    $("diyanetIdInput").placeholder = t("diyanetIdPlaceholder");
-    $("verifyIdBtn").textContent = t("verifyIdBtn");
-
-    if (!$("idVerifyResult").classList.contains("ok") && !$("idVerifyResult").classList.contains("warn")) {
-      $("idVerifyResult").textContent = t("idVerifyDefault");
-    } else if ($("idVerifyResult").classList.contains("ok") && state.selectedCountry && state.selectedDistrict) {
-      $("idVerifyResult").textContent = t("idVerifyOk", {
-        country: getLocalizedLocationName(state.selectedCountry, "country"),
-        cid: state.selectedCountry.id,
-        state: state.selectedState ? getLocalizedLocationName(state.selectedState, "state") : "-",
-        sid: state.selectedState?.id || "-",
-        district: getLocalizedLocationName(state.selectedDistrict, "district"),
-        did: state.selectedDistrict.id
-      });
-    }
     $("apiSelectLabel").textContent = t("apiSelectLabel");
 
     if (state.countries.length > 0) renderCountrySelect();
@@ -4876,6 +4559,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       updateMissingSelectionStatus();
       renderEmptyPrayerPlaceholder(true);
       await loadStatesForCountry(state.selectedCountry);
+      if (state.selectedCountry.id === "184" && state.selectedState) {
+        await loadDistrictsForState(state.selectedState);
+      }
     });
 
     $("stateSelect").addEventListener("change", async e => {
@@ -4895,7 +4581,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const dObj = state.districts.find(d => d.id === e.target.value);
       if (!dObj) return;
       state.selectedDistrict = dObj;
-      $("diyanetIdInput").value = dObj.id;
       state.todayData = null;
       $("liveDot").classList.remove("synced");
       Persistence.savePrefs();
@@ -4905,14 +4590,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       } else {
         updateMissingSelectionStatus();
         renderEmptyPrayerPlaceholder(true);
-      }
-    });
-
-    $("verifyIdBtn").addEventListener("click", () => verifyAndSelectByDiyanetId($("diyanetIdInput").value));
-    $("diyanetIdInput").addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        verifyAndSelectByDiyanetId($("diyanetIdInput").value);
       }
     });
 
@@ -5055,7 +4732,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         if (state.selectedState) {
           await loadDistrictsForState(state.selectedState, saved.districtId || "");
           if (state.selectedDistrict) {
-            $("diyanetIdInput").value = state.selectedDistrict.id;
           }
         }
       }
