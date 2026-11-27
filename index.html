@@ -3768,9 +3768,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             renderHadithCommentary(selectedCommentary, true);
             renderApiResponseDetails("hadithMeta", selectedResponse.data, "hadith", endpointUrl, selectedTextInfo);
             $("hadithSource").textContent = [selectedSource, selectedValid.tahric, selectedValid.tekrar ? `Tekrar: ${selectedValid.tekrar}` : ""].filter(Boolean).join(" — ");
-            $("hadithApiProvider").textContent = selectedTextInfo.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
-            $("hadithApiStatus").textContent = selectedTextInfo.languageFallback ? `English fallback · ${selectedResponse.ms} ms` : `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
-            $("hadithApiStatus").className = selectedTextInfo.languageFallback ? "api-val warn" : "api-val ok";
+            const usesFawazForSunnetimiz = state.selectedHadithApi === "sunnetimiz" && selLang !== "tr";
+            const displayedHadithProvider = usesFawazForSunnetimiz
+              ? `${providerLabel} → FawazAhmed0 Hadith CDN${selectedTextInfo.languageFallback ? " → English fallback" : ""}`
+              : (selectedTextInfo.languageFallback ? `${providerLabel} → English fallback` : providerLabel);
+            $("hadithApiProvider").textContent = displayedHadithProvider;
+            $("hadithApiStatus").textContent = usesFawazForSunnetimiz
+              ? `Yedek kaynak · ${selectedResponse.ms} ms`
+              : (selectedTextInfo.languageFallback ? `English fallback · ${selectedResponse.ms} ms` : `${selectedResponse.status} OK · ${selectedResponse.ms} ms`);
+            $("hadithApiStatus").className = (usesFawazForSunnetimiz || selectedTextInfo.languageFallback) ? "api-val warn" : "api-val ok";
             $("hadithApiRef").textContent = `${refNo || selectedSource} · ${langLabel}`;
             $("hadithApiUpdated").textContent = formatClock();
             $("hadithApiUrl").textContent = endpointUrl;
@@ -4130,7 +4136,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             const { data: detailPayload, status, ms } = await fetchApiPayloadWithTimeout(
               detailUrl, { signal, timeoutMs: 5500, headers: fitrahiveHeaders }
             );
-            const textInfo = extractProviderApiText("fitrahive_duadhikr", detailPayload, "en", "dua");
+            const textInfo = extractProviderApiText("fitrahive_duadhikr", detailPayload, selLang, "dua");
             const txt = textInfo?.text || "";
             const review = inspectReligiousText(txt, "en");
             if (txt && !review.issues.length) {
