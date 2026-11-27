@@ -4864,7 +4864,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         combo.value = target;
         combo.dispatchEvent(new Event("change"));
         window.clearInterval(activateTranslation);
-      } else if (++attempts >= 40) {
+      } else if (++attempts >= 100) {
         window.clearInterval(activateTranslation);
       }
     }, 150);
