@@ -506,33 +506,27 @@ details.nav-item > summary:hover{background:#163b30}
   margin-bottom:8px;
 }
 .lang-group{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-  width:100%;
-  gap:10px;
+  display:inline-flex;
+  background:var(--panel-alt);
+  border:1px solid var(--line);
+  border-radius:999px;
   padding:4px;
+  gap:4px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25);
 }
 .lang-btn{
-  flex:1 1 125px;
-  min-width:110px;
-  border:2px solid var(--line);
-  background:var(--panel-alt);
-  color:var(--white);
-  padding:12px 16px;
-  border-radius:12px;
-  font-size:clamp(14px,1.5vw,17px);
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  padding:7px 15px;
+  border-radius:999px;
+  font-size:13px;
   font-weight:700;
   cursor:pointer;
   transition:all .18s ease;
 }
-.lang-btn:hover,.lang-btn:focus-visible,.lang-btn.active{
-  background:#2563eb;
-  border-color:#fff;
-  color:#fff;
-  outline:none;
-  transform:scale(1.02);
-}
+.lang-btn:hover{color:var(--white)}
+.lang-btn.active{background:var(--gold);color:#13261f}
 
 .foot{
   text-align:center;
@@ -977,9 +971,9 @@ details.nav-item > summary:hover{background:#163b30}
   <!-- Language Switcher -->
   <nav class="lang-bar" aria-label="Language selector">
     <div class="lang-group" role="group" aria-label="Dil / Language / Taal">
-      <button type="button" class="lang-btn active" data-lang="tr">🇹🇷 Türkçe</button>
-      <button type="button" class="lang-btn" data-lang="en">🇬🇧 English</button>
-      <button type="button" class="lang-btn" data-lang="nl">🇳🇱 Nederlands</button>
+      <button type="button" class="lang-btn active" data-lang="tr">T&uuml;rk&ccedil;e</button>
+      <button type="button" class="lang-btn" data-lang="en">English</button>
+      <button type="button" class="lang-btn" data-lang="nl">Nederlands</button>
     </div>
   </nav>
 
@@ -1532,7 +1526,7 @@ details.nav-item > summary:hover{background:#163b30}
       soundPermOk: "Geluidsmachtiging ingeschakeld. Uw bestand of beltoon speelt bij gebedstijd.",
       soundPermFail: "Browser heeft geluid geblokkeerd. Tik nogmaals op de knop."
     }
-  };\n
+  };
 
   /* ==========================================================================
      3. EMBEDDED DIYANET LOCATIONS DATASET & LINGUISTIC NORMALIZATION MAPS
@@ -2296,14 +2290,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
-  function isCountryNameReturnedAsState(rawNames, countryObj) {
-    const parentNames = [countryObj?.nameTr, countryObj?.nameEn, countryObj?.nameNl]
-      .filter(Boolean).map(countryApiNameKey);
-    const parentKeys = new Set(parentNames);
-    return (Array.isArray(rawNames) ? rawNames : [rawNames])
-      .filter(Boolean).some(name => parentKeys.has(countryApiNameKey(name)));
-  }
-
   async function loadStatesForCountry(countryObj, preselectStateId = "") {
     const stateSel = $("stateSelect");
     const distSel = $("districtSelect");
@@ -2344,19 +2330,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        const rawTr = item?.name || item?.name_tr || "";
-        const rawEn = item?.name_en || item?.nameEn || "";
-        if (isCountryNameReturnedAsState([rawTr, rawEn], countryObj)) continue;
-        mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "imsakiyem");
+        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", { countryId: String(countryObj.id) }, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.SehirID || "").trim();
-        const rawTr = item?.SehirAdi || "";
-        const rawEn = item?.SehirAdiEn || "";
-        if (isCountryNameReturnedAsState([rawTr, rawEn], countryObj)) continue;
-        mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "emushaf");
+        mergeLocationRecord(mapById, id, item?.SehirAdi || "", item?.SehirAdiEn || "", { countryId: String(countryObj.id) }, "emushaf");
       }
     }
 
@@ -4589,7 +4569,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     document.querySelectorAll(".lang-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const nextLang = btn.dataset.lang;
-        if (!nextLang || !I18N[nextLang] || nextLang === state.lang) return;
+        if (!nextLang || nextLang === state.lang) return;
         state.lang = nextLang;
         Persistence.savePrefs();
         applyLanguageUI(true);
