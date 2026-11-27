@@ -1675,11 +1675,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (!fallbackName) return "";
 
     if (state.lang !== "tr") return formatLatinName(fallbackName);
-    // Country names and Turkish domestic places use Turkish casing. Foreign
-    // regions/cities keep Latin i: İtalya -> İtalya, Mılano -> Milano.
-    const isCountryRecord = Array.isArray(obj.states) || state.countries.some(country => country.id === obj.id);
-    if (isCountryRecord) return formatTurkishName(turkishName || fallbackName);
+
+    const isCountryRecord = Array.isArray(obj.states) ||
+      state.countries.some(country => String(country.id) === String(obj.id));
+    if (isCountryRecord) {
+      // Prefer the canonical country dataset's Turkish endonym, not a provider's
+      // lossy "nameTr" value (for example "Italya" instead of "İtalya").
+      const canonicalCountry = DIYANET_ALL_LOCATIONS.find(country =>
+        String(country.id) === String(obj.id) ||
+        (obj.nameEn && asciiFoldKey(country.nameEn) === asciiFoldKey(obj.nameEn))
+      );
+      return formatTurkishName(canonicalCountry?.nameTr || turkishName || fallbackName);
+    }
+
     const countryId = String(obj.countryId || state.selectedCountry?.id || "");
+    // A foreign city/state name may have been put in nameTr by a provider.
+    // Always normalize foreign i/ı independently of the selected UI language.
     return countryId === "2"
       ? formatTurkishName(turkishName || fallbackName)
       : formatTurkishForeignLocationName(turkishName || fallbackName);
