@@ -3289,7 +3289,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      if (!["fawaz_hadith", "sunnetimiz", "hadeethenc", "random_hadith_gen"].includes(state.selectedHadithApi)) {
+      if (!["fawaz_hadith", "sunnetimiz", "hadeethenc"].includes(state.selectedHadithApi) && !(state.selectedHadithApi === "random_hadith_gen" && selLang === "en")) {
         try {
           const selectedResponse = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
           const selectedText = extractApiTextPayload(selectedResponse.data, selLang);
