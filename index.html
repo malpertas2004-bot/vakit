@@ -3122,8 +3122,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     },
     hadeethenc: {
       name: "HadeethEnc.com API v1",
-      buildUrl: (selLang, book, randNo) =>
-        `https://hadeethenc.com/api/v1/hadeeths/list/?language=${selLang}&category_id=1&page=${(randNo % 15) + 1}&per_page=20`
+      buildUrl: selLang =>
+        `https://hadeethenc.com/api/v1/categories/roots/?language=${selLang === "tr" ? "tr" : "en"}`
     },
     ummahapi_hadith: { name: "UmmahAPI Hadith Service", buildUrl: () => "https://ummahapi.com/api/hadith/random" },
     hadith_gading: { name: "Hadith Gading REST API", buildUrl: (selLang, book, randNo) => `https://api.hadith.gading.dev/books/${book}/${randNo}` },
