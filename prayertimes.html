@@ -1534,7 +1534,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   for (const c of DIYANET_ALL_LOCATIONS) {
     for (const s of (c.states || [])) {
       for (const d of (s.districts || [])) {
-        LOCAL_DISTRICT_INDEX.set(String(d.id), { country: c, state: s, district: d });
+        const id = String(d.id);
+        const candidates = LOCAL_DISTRICT_INDEX.get(id) || [];
+        candidates.push({ country: c, state: s, district: d });
+        LOCAL_DISTRICT_INDEX.set(id, candidates);
       }
     }
   }
@@ -2084,7 +2087,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     kktc: "kuzeykibristurkcumhuriyeti",
     kuzeykibris: "kuzeykibristurkcumhuriyeti",
     moldavya: "moldova",
-    birlesikarapemirligi: "birlesikarapemirlikleri"
+    birlesikarapemirligi: "birlesikarapemirlikleri",
+    birlesikarapemirlik: "birlesikarapemirlikleri",
+    unitedarabemirates: "birlesikarapemirlikleri",
+    uae: "birlesikarapemirlikleri",
+    bae: "birlesikarapemirlikleri"
   });
 
   function countryApiNameKey(raw) {
@@ -2092,20 +2099,25 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return COUNTRY_API_NAME_ALIASES[key] || key;
   }
 
-  function findCanonicalCountryFromApi(rawTurkishName, countries) {
-    const key = countryApiNameKey(rawTurkishName);
-    if (!key || NON_ADMINISTRATIVE_LOCATION_KEYS.has(key)) return null;
+  function canonicalLocationNameKey(raw) {
+    return countryApiNameKey(raw);
+  }
+
+  function findCanonicalCountryFromApi(rawNames, countries) {
+    const names = Array.isArray(rawNames) ? rawNames : [rawNames];
+    const queryKeys = new Set(names.map(countryApiNameKey).filter(Boolean));
+    if (!queryKeys.size || [...queryKeys].some(key => NON_ADMINISTRATIVE_LOCATION_KEYS.has(key))) return null;
 
     const matches = countries.filter(country =>
       [country.nameTr, country.nameEn, country.nameNl]
-        .some(name => countryApiNameKey(name) === key)
+        .some(name => queryKeys.has(countryApiNameKey(name)))
     );
     return matches.length === 1 ? matches[0] : null;
   }
 
   function findMatchingLocationRecord(mapById, cleanTr, cleanEn) {
-    const trKey = locationNameIdentityKey(cleanTr);
-    const enKey = locationNameIdentityKey(cleanEn);
+    const trKey = canonicalLocationNameKey(cleanTr);
+    const enKey = canonicalLocationNameKey(cleanEn);
     if ((!trKey && !enKey) || isNonAdministrativeLocationName(cleanTr, cleanEn)) {
       return { conflict: true };
     }
@@ -2118,13 +2130,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         candidate?.nameEn,
         candidate?.nameNl,
         ...(Array.isArray(candidate?.nameAliases) ? candidate.nameAliases : [])
-      ].map(locationNameIdentityKey).filter(Boolean));
+      ].map(canonicalLocationNameKey).filter(Boolean));
 
       if (trKey && candidateAliases.has(trKey)) trMatches.add(candidateKey);
       if (enKey && candidateAliases.has(enKey)) enMatches.add(candidateKey);
     }
 
-    // Reject a record when its language fields point to different places.
+    // Language variants must point to the same canonical location.
     const allMatches = new Set([...trMatches, ...enMatches]);
     if (allMatches.size > 1 || trMatches.size > 1 || enMatches.size > 1) {
       return { conflict: true };
@@ -2213,8 +2225,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const sourceId = String(item?._id || item?.id || "").trim();
-        const rawTr = item?.name_tr || item?.name || "";
-        const canonical = findCanonicalCountryFromApi(rawTr, countries);
+        const canonical = findCanonicalCountryFromApi([item?.name_tr, item?.name_en, item?.nameEn, item?.name], countries);
         if (!canonical || !sourceId) continue;
         canonical.sourceIds = { ...(canonical.sourceIds || {}), imsakiyem: sourceId };
       }
@@ -2223,8 +2234,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const sourceId = String(item?.UlkeID || "").trim();
-        const rawTr = item?.UlkeAdi || "";
-        const canonical = findCanonicalCountryFromApi(rawTr, countries);
+        const canonical = findCanonicalCountryFromApi([item?.UlkeAdi, item?.UlkeAdiEn, item?.UlkeAdiEN], countries);
         if (!canonical || !sourceId) continue;
         canonical.sourceIds = { ...(canonical.sourceIds || {}), emushaf: sourceId };
       }
@@ -2304,7 +2314,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     state.states = Array.from(mapById.values());
     if (preselectStateId) {
-      state.selectedState = state.states.find(s => s.id === String(preselectStateId)) || null;
+      const requestedId = String(preselectStateId);
+      state.selectedState = state.states.find(s =>
+        s.id === requestedId ||
+        s.sourceIds?.imsakiyem === requestedId ||
+        s.sourceIds?.emushaf === requestedId
+      ) || null;
     }
     renderStateSelect();
   }
@@ -2368,7 +2383,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     state.districts = Array.from(mapById.values());
     if (preselectDistrictId) {
-      state.selectedDistrict = state.districts.find(d => d.id === String(preselectDistrictId)) || null;
+      const requestedId = String(preselectDistrictId);
+      state.selectedDistrict = state.districts.find(d =>
+        d.id === requestedId ||
+        d.sourceIds?.imsakiyem === requestedId ||
+        d.sourceIds?.emushaf === requestedId
+      ) || null;
     }
     renderDistrictSelect();
   }
@@ -2397,8 +2417,54 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       return;
     }
 
-    // 1. Check O(1) Local Diyanet Index first (0ms instant response)
-    const localHit = LOCAL_DISTRICT_INDEX.get(cleanId);
+    // Keep every matching local record; don't silently select whichever reused ID was inserted last.
+    const localCandidates = LOCAL_DISTRICT_INDEX.get(cleanId) || [];
+    let localHit = localCandidates.length === 1 ? localCandidates[0] : null;
+
+    if (localCandidates.length > 1) {
+      try {
+        const { data: lookup } = await fetchJsonWithTimeout(
+          `https://ezanvakti.imsakiyem.com/api/locations/districts/${encodeURIComponent(cleanId)}`,
+          { timeoutMs: 4500 }
+        );
+        const remote = lookup?.data || lookup;
+        const districtKeys = [remote?.name_tr, remote?.name, remote?.name_en, remote?.nameEn]
+          .map(canonicalLocationNameKey).filter(Boolean);
+        const remoteState = remote?.state || remote?.stateId || remote?.state_id;
+        const remoteCountry = remote?.country || remote?.countryId || remote?.country_id;
+        const stateKeys = (typeof remoteState === "object"
+          ? [remoteState?.name_tr, remoteState?.name, remoteState?.name_en, remoteState?.nameEn]
+          : []).map(canonicalLocationNameKey).filter(Boolean);
+        const countryKeys = (typeof remoteCountry === "object"
+          ? [remoteCountry?.name_tr, remoteCountry?.name, remoteCountry?.name_en, remoteCountry?.nameEn]
+          : []).map(countryApiNameKey).filter(Boolean);
+
+        let candidates = localCandidates.filter(hit =>
+          !districtKeys.length || [hit.district.nameTr, hit.district.nameEn, hit.district.nameNl]
+            .some(name => districtKeys.includes(canonicalLocationNameKey(name)))
+        );
+        if (stateKeys.length) candidates = candidates.filter(hit =>
+          [hit.state.nameTr, hit.state.nameEn, hit.state.nameNl]
+            .some(name => stateKeys.includes(canonicalLocationNameKey(name)))
+        );
+        if (countryKeys.length) candidates = candidates.filter(hit =>
+          [hit.country.nameTr, hit.country.nameEn, hit.country.nameNl]
+            .some(name => countryKeys.includes(countryApiNameKey(name)))
+        );
+        if (candidates.length === 1) localHit = candidates[0];
+      } catch (_) {}
+    }
+
+    if (localCandidates.length > 1 && !localHit) {
+      resEl.textContent = state.lang === "tr"
+        ? `#${cleanId} numarası birden fazla konumda bulunuyor. Yanlış seçim yapılmaması için ülke, eyalet/il ve ilçeyi listelerden seçin.`
+        : state.lang === "nl"
+          ? `Nummer #${cleanId} komt bij meerdere locaties voor. Kies land, provincie en plaats via de lijsten.`
+          : `ID #${cleanId} matches multiple locations. Select the country, state and district from the lists.`;
+      resEl.className = "id-verify-result warn";
+      return;
+    }
+
     if (localHit) {
       state.selectedCountry = state.countries.find(x => x.id === localHit.country.id) || localHit.country;
       state.zone = detectTimezoneForCountry(state.selectedCountry);
@@ -2443,19 +2509,30 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const stateId = String(typeof stateObjRaw === "object" ? (stateObjRaw?._id || stateObjRaw?.id || "") : (stateObjRaw || "")).trim();
       const countryId = String(typeof countryObjRaw === "object" ? (countryObjRaw?._id || countryObjRaw?.id || "") : (countryObjRaw || "")).trim();
 
-      let cObj = state.countries.find(c => c.id === countryId) || null;
+      const embeddedNames = typeof countryObjRaw === "object"
+        ? [countryObjRaw?.name_tr, countryObjRaw?.name, countryObjRaw?.name_en, countryObjRaw?.nameEn]
+        : [];
+      let cObj = findCanonicalCountryFromApi(embeddedNames, state.countries);
+      let remoteCountry = null;
       if (!cObj && countryId) {
-        const { data: cj } = await fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/countries/${encodeURIComponent(countryId)}`);
-        const cd = cj?.data || cj;
-        cObj = {
-          id: countryId,
-          nameTr: fixTurkishText(cd?.name || cd?.name_tr || ""),
-          nameEn: fixTurkishText(cd?.name_en || cd?.nameEn || cd?.name || ""),
-          tz: ""
-        };
-        state.countries.push(cObj);
+        const { data: countryResponse } = await fetchJsonWithTimeout(
+          `https://ezanvakti.imsakiyem.com/api/locations/countries/${encodeURIComponent(countryId)}`
+        );
+        remoteCountry = countryResponse?.data || countryResponse;
+        cObj = findCanonicalCountryFromApi([
+          remoteCountry?.name_tr, remoteCountry?.name, remoteCountry?.name_en, remoteCountry?.nameEn
+        ], state.countries);
       }
-      if (!cObj) throw new Error("Country not resolved");
+
+      // External service IDs belong to sourceIds, never to the canonical country ID.
+      if (!cObj && countryId) {
+        const sourceMatches = state.countries.filter(country =>
+          getLocationSourceId(country, "imsakiyem") === countryId
+        );
+        if (sourceMatches.length === 1) cObj = sourceMatches[0];
+      }
+      if (!cObj) throw new Error("Country could not be mapped to one canonical country");
+      cObj.sourceIds = { ...(cObj.sourceIds || {}), imsakiyem: countryId };
 
       state.selectedCountry = cObj;
       state.zone = detectTimezoneForCountry(state.selectedCountry);
@@ -3111,35 +3188,54 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (lang === "nl") return ["translation","dutch","nld","nl","dua","text","content","body","description","verse","ayah","result"];
     return ["translation","english","eng","en","dua","text","content","body","description","verse","ayah","result"];
   }
-  function extractApiTextPayload(payload, targetLang = state.lang, kind = "hadith", depth = 0) {
-    if (payload == null || depth > 8) return "";
+  function isUsableApiText(value, kind) {
+    const clean = cleanApiTextValue(value);
+    if (!clean || clean.length < (kind === "hadith" ? 10 : 5)) return "";
+    if (/^(?:no record found|not found|unauthorized|forbidden|internal server error|error|undefined|null)$/i.test(clean)) return "";
+    if (/^\{[\s\S]*"(?:error|message|status)"\s*:/i.test(clean)) return "";
+    return clean;
+  }
+
+  function inspectApiTextPayload(payload, targetLang = state.lang, kind = "hadith", depth = 0, path = "$") {
+    if (payload == null || depth > 9) return null;
     if (typeof payload === "string") {
-      const clean = cleanApiTextValue(payload);
-      return clean.length >= 5 ? clean : "";
+      const text = isUsableApiText(payload, kind);
+      return text ? { text, path, property: path.split(".").pop() || "$" } : null;
     }
     if (Array.isArray(payload)) {
-      const candidates = payload.map(item => extractApiTextPayload(item,targetLang,kind,depth+1)).filter(Boolean);
-      return candidates.length ? candidates[Math.floor(Math.random()*candidates.length)] : "";
+      const candidates = payload
+        .map((item, index) => inspectApiTextPayload(item, targetLang, kind, depth + 1, `${path}[${index}]`))
+        .filter(Boolean);
+      return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
     }
-    if (typeof payload !== "object") return "";
-    for (const key of primaryTextKeys(kind,targetLang)) {
-      if (Object.prototype.hasOwnProperty.call(payload,key)) {
-        const found=extractApiTextPayload(payload[key],targetLang,kind,depth+1);
-        if(found)return found;
-      }
+    if (typeof payload !== "object") return null;
+
+    for (const key of primaryTextKeys(kind, targetLang)) {
+      if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
+      const found = inspectApiTextPayload(payload[key], targetLang, kind, depth + 1, `${path}.${key}`);
+      if (found) return found;
     }
-    for (const key of ["data","result","response","item","record","items","results","hadiths","duas","verses","ayahs"]) {
-      if (Object.prototype.hasOwnProperty.call(payload,key)) {
-        const found=extractApiTextPayload(payload[key],targetLang,kind,depth+1);
-        if(found)return found;
-      }
+
+    for (const key of ["data", "result", "response", "item", "record", "items", "results", "hadiths", "duas", "verses", "ayahs", "translations", "translation"]) {
+      if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
+      const found = inspectApiTextPayload(payload[key], targetLang, kind, depth + 1, `${path}.${key}`);
+      if (found) return found;
     }
-    for (const [key,value] of Object.entries(payload)) {
-      if (/^(?:id|_id|number|ref|reference|url|href|link|docs|slug|source|book|kitab|bab|chapter|author|attribution|explanation|commentary|sharh|arabic|ar|grade|grade_source|meta|metadata|title|name|category)$/i.test(key)) continue;
-      const found=extractApiTextPayload(value,targetLang,kind,depth+1);
-      if(found)return found;
+
+    const textLikeKey = /(?:text|translation|content|hadith|hadeeth|dua|verse|ayah|matn|narration|turkish|english|dutch|meal|body|supplication|adhkar|dhikr|zekr|transliteration|description)/i;
+    const excludedKey = /^(?:id|_id|number|ref|reference|url|href|link|docs|slug|source|book|kitab|bab|chapter|author|attribution|explanation|commentary|sharh|arabic|ar|grade|grade_source|meta|metadata|title|name|category|error|errors|message|status|code|count|total|page|limit)$/i;
+    for (const [key, value] of Object.entries(payload)) {
+      if (excludedKey.test(key)) continue;
+      if (typeof value === "string" && !textLikeKey.test(key)) continue;
+      if (typeof value !== "object" && typeof value !== "string") continue;
+      const found = inspectApiTextPayload(value, targetLang, kind, depth + 1, `${path}.${key}`);
+      if (found) return found;
     }
-    return "";
+    return null;
+  }
+
+  function extractApiTextPayload(payload, targetLang = state.lang, kind = "hadith", depth = 0) {
+    return inspectApiTextPayload(payload, targetLang, kind, depth)?.text || "";
   }
   function collectApiObjects(payload,out=[],depth=0) {
     if(payload==null||depth>7)return out;
@@ -3195,6 +3291,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function renderApiResponseDetails(containerId,payload,kind,fallbackUrl="") {
     const box=$(containerId);if(!box)return;
     box.replaceChildren();
+    const selectedField = inspectApiTextPayload(payload, state.lang, kind);
     const objects=collectApiObjects(payload);
     const rows=kind==="hadith"?[
       ["Kitap",["book.name","book_name","collection.name","collection"]],
@@ -3213,6 +3310,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       ["Tekrar sayısı",["count","repeat","repetitions","repeat_count"]]
     ];
     let visible=false;
+    if(selectedField?.path){
+      const row=document.createElement("div");row.className="quote-meta-row";
+      const title=document.createElement("span");title.className="quote-meta-label";title.textContent="Gösterilen metin alanı:";
+      const val=document.createElement("span");val.className="quote-meta-value";val.textContent=selectedField.path;
+      row.append(title,val);box.appendChild(row);visible=true;
+    }
     for(const [label,paths] of rows){
       const value=apiDisplayValue(getApiPathValue(objects,paths));if(!value)continue;
       const row=document.createElement("div");row.className="quote-meta-row";
@@ -3300,49 +3403,107 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchCleanFromHadeethEnc(selLang, seedNo, signal) {
-    const hLang = selLang === "tr" ? "tr" : selLang === "nl" ? "nl" : "en";
-    const page = (seedNo % 15) + 1;
-    const listUrl = `https://hadeethenc.com/api/v1/hadeeths/list/?language=${hLang}&category_id=1&page=${page}&per_page=20`;
-    const { data: lj } = await fetchJsonWithTimeout(listUrl, { signal, timeoutMs: 6500 });
-    const arr = Array.isArray(lj?.data) ? [...lj.data] : [];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
+    const hLang = selLang === "tr" ? "tr" : "en";
+    const languageFallback = selLang === "nl";
+    let categories = [];
+    try {
+      const { data: categoryPayload } = await fetchApiPayloadWithTimeout(
+        `https://hadeethenc.com/api/v1/categories/roots/?language=${hLang}`,
+        { signal, timeoutMs: 5500 }
+      );
+      const rows = Array.isArray(categoryPayload?.data) ? categoryPayload.data
+        : (Array.isArray(categoryPayload) ? categoryPayload : []);
+      categories = rows.map(row => ({
+        id: Number(row?.id),
+        count: Number(row?.hadeeths_count || row?.hadeethsCount || 0)
+      })).filter(row => Number.isFinite(row.id) && row.id > 0 && row.count > 0);
+    } catch (error) {
+      if (signal?.aborted) throw error;
     }
-    for (const pick of arr.slice(0, 6)) {
+    if (!categories.length) {
+      categories = [2,3,4,5,6,7].map(id => ({ id, count: 20 }));
+    }
+
+    for (let attempt = 0; attempt < Math.min(categories.length, 6); attempt++) {
       if (signal?.aborted) throw new Error("Aborted");
-      if (!pick?.id) continue;
-      const oneUrl = `https://hadeethenc.com/api/v1/hadeeths/one/?language=${hLang}&id=${pick.id}`;
+      const category = categories[(attempt + Math.abs(Number(seedNo) || 0)) % categories.length];
+      const pageCount = Math.max(1, Math.ceil(category.count / 20));
+      const page = 1 + ((Math.abs(Number(seedNo) || 0) + attempt) % pageCount);
+      const listUrl = `https://hadeethenc.com/api/v1/hadeeths/list/?language=${hLang}&category_id=${category.id}&page=${page}&per_page=20`;
+      let listPayload;
       try {
-        const { data: dj } = await fetchJsonWithTimeout(oneUrl, { signal, timeoutMs: 5500 });
-        const rawTxt = extractCleanText(dj?.hadeeth || pick.title, selLang);
-        const validated = cleanAndValidateHadithText(rawTxt, selLang);
-        if (validated.isValid) {
-          const attr = extractCleanText(dj?.attribution, selLang) || "HadeethEnc";
-          const explanation = extractHadithExplanation(dj) || extractHadithExplanation(dj?.data);
+        const { data } = await fetchApiPayloadWithTimeout(listUrl, { signal, timeoutMs: 6500 });
+        listPayload = data;
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        continue;
+      }
+
+      const rows = Array.isArray(listPayload?.data) ? [...listPayload.data] : [];
+      for (let i = rows.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rows[i], rows[j]] = [rows[j], rows[i]];
+      }
+
+      for (const pick of rows.slice(0, 10)) {
+        if (signal?.aborted) throw new Error("Aborted");
+        if (!pick?.id) continue;
+        const oneUrl = `https://hadeethenc.com/api/v1/hadeeths/one/?language=${hLang}&id=${pick.id}`;
+        try {
+          const { data: detail } = await fetchApiPayloadWithTimeout(oneUrl, { signal, timeoutMs: 5500 });
+          const inspected = inspectApiTextPayload(detail, hLang, "hadith");
+          const validated = cleanAndValidateHadithText(inspected?.text || "", hLang);
+          if (!validated.isValid) continue;
+          const attribution = extractCleanText(detail?.attribution, hLang) || "HadeethEnc";
           return {
             text: validated.text,
-            commentary: explanation,
-            raw: dj,
-            source: validated.tahric ? `${attr} (#${pick.id}) — ${validated.tahric}` : `${attr} (#${pick.id})`,
+            commentary: extractHadithExplanation(detail) || extractHadithExplanation(detail?.data),
+            raw: detail,
+            source: validated.tahric ? `${attribution} (#${pick.id}) — ${validated.tahric}` : `${attribution} (#${pick.id})`,
             ref: `hadeethenc #${pick.id}`,
-            liveUrl: oneUrl
+            liveUrl: oneUrl,
+            provider: "HadeethEnc",
+            languageFallback
           };
+        } catch (error) {
+          if (signal?.aborted) throw error;
         }
-      } catch (err) {
-        if (signal?.aborted) throw err;
       }
     }
     return null;
   }
 
   async function fetchLiveHadithInLang(selLang, book, randNo, signal) {
+    if (selLang === "tr") {
+      try {
+        const { data: payload } = await fetchApiPayloadWithTimeout("https://sunnetimiz.com/api/v1/random", { signal, timeoutMs: 5500 });
+        const item = payload?.hadith || payload?.data || payload;
+        const inspected = inspectApiTextPayload(item, "tr", "hadith");
+        const validated = cleanAndValidateHadithText(inspected?.text || "", "tr");
+        if (validated.isValid) {
+          const bookName = extractCleanText(item?.book?.name || item?.book_name || "Sünnetimiz", "tr");
+          const ref = extractCleanText(item?.ref || item?.number || item?.hadith_no, "tr");
+          return {
+            text: validated.text,
+            commentary: extractHadithExplanation(payload) || extractHadithExplanation(item),
+            raw: payload,
+            source: [bookName, ref ? `(${ref})` : "", validated.tahric].filter(Boolean).join(" — "),
+            ref: ref || item?.ref || "Sünnetimiz",
+            liveUrl: item?.url || "https://sunnetimiz.com/api/v1/random",
+            provider: "Sünnetimiz API"
+          };
+        }
+      } catch (error) {
+        if (signal?.aborted) throw error;
+      }
+    }
+
     if (selLang === "nl") {
       try {
         const nlClean = await fetchCleanFromHadeethEnc("nl", randNo, signal);
         if (nlClean) return nlClean;
-      } catch (err) {
-        if (signal?.aborted) throw err;
+      } catch (error) {
+        if (signal?.aborted) throw error;
       }
     }
 
@@ -3351,37 +3512,35 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions",
       "https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions"
     ];
-
-    for (let attempt = 0; attempt < 6; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       if (signal?.aborted) throw new Error("Aborted");
-      const tryBook = attempt < 3 ? book : HADITH_BOOKS[attempt % HADITH_BOOKS.length];
-      const tryNo = attempt === 0 ? randNo : (Math.floor(Math.random() * 2500) + 1);
-      const host = cdnHosts[attempt % cdnHosts.length];
-      const cdnUrl = `${host}/${editionPrefix}-${tryBook}/${tryNo}.min.json`;
+      const tryBook = attempt < 4 ? book : HADITH_BOOKS[attempt % HADITH_BOOKS.length];
+      const tryNo = attempt === 0 ? randNo : Math.floor(Math.random() * 2500) + 1;
+      const cdnUrl = `${cdnHosts[attempt % cdnHosts.length]}/${editionPrefix}-${tryBook}/${tryNo}.min.json`;
       try {
-        const { data: j } = await fetchJsonWithTimeout(cdnUrl, { signal, timeoutMs: 5000 });
-        const hObj = Array.isArray(j?.hadiths) ? j.hadiths[0] : (j?.hadith || j);
-        const rawTxt = extractApiTextPayload(hObj, selLang, "hadith") || extractApiTextPayload(j, selLang, "hadith");
-        const validated = cleanAndValidateHadithText(rawTxt, selLang);
+        const { data: payload } = await fetchApiPayloadWithTimeout(cdnUrl, { signal, timeoutMs: 5000 });
+        const hObj = Array.isArray(payload?.hadiths) ? payload.hadiths[0] : (payload?.hadith || payload);
+        const inspected = inspectApiTextPayload(hObj, selLang, "hadith") || inspectApiTextPayload(payload, selLang, "hadith");
+        const validated = cleanAndValidateHadithText(inspected?.text || "", selLang);
         if (!validated.isValid) continue;
-
-        const bookTitle = extractCleanText(j?.metadata?.name, selLang) || tryBook.toUpperCase();
+        const bookTitle = extractCleanText(payload?.metadata?.name, selLang) || tryBook.toUpperCase();
         return {
           text: validated.text,
-          commentary: extractHadithExplanation(j) || extractHadithExplanation(hObj),
-          raw: j,
+          commentary: extractHadithExplanation(payload) || extractHadithExplanation(hObj),
+          raw: payload,
           source: validated.tahric ? `${bookTitle} #${tryNo} — ${validated.tahric}` : `${bookTitle} #${tryNo}`,
           ref: `${editionPrefix}-${tryBook} #${tryNo}`,
-          liveUrl: cdnUrl
+          liveUrl: cdnUrl,
+          provider: "FawazAhmed0 Hadith CDN"
         };
-      } catch (err) {
-        if (signal?.aborted) throw err;
+      } catch (error) {
+        if (signal?.aborted) throw error;
       }
     }
 
-    const fallbackClean = await fetchCleanFromHadeethEnc(selLang, randNo, signal);
-    if (fallbackClean) return fallbackClean;
-    throw new Error("Hadith record unavailable");
+    const finalHadeethEnc = await fetchCleanFromHadeethEnc(selLang, randNo, signal);
+    if (finalHadeethEnc) return finalHadeethEnc;
+    throw new Error("No valid hadith text was found in the selected or fallback APIs");
   }
 
   async function loadRandomHadith() {
@@ -3442,14 +3601,33 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       if (state.selectedHadithApi === "hadeethenc") {
         const cleanItem = await fetchCleanFromHadeethEnc(selLang, randNo, signal);
         const ms = Math.round(performance.now() - t0);
-        if (!cleanItem) throw new Error("No record found");
+        if (!cleanItem) {
+          const fallback = await fetchLiveHadithInLang(selLang, book, randNo, signal);
+          const fallbackMs = Math.round(performance.now() - t0);
+          $("hadithText").textContent = `“${fallback.text}”`;
+          renderHadithCommentary(fallback.commentary || "", true);
+          renderApiResponseDetails("hadithMeta", fallback.raw || {}, "hadith", fallback.liveUrl || endpointUrl);
+          $("hadithSource").textContent = fallback.source;
+          $("hadithApiProvider").textContent = `${providerLabel} → ${fallback.provider || "Yedek kaynak"}`;
+          $("hadithApiStatus").textContent = `Yedek kaynak · ${fallbackMs} ms`;
+          $("hadithApiStatus").className = "api-val warn";
+          $("hadithApiRef").textContent = `${fallback.ref} · ${langLabel}`;
+          $("hadithApiUpdated").textContent = formatClock();
+          $("hadithApiUrl").textContent = fallback.liveUrl || endpointUrl;
+          if (fallback.languageFallback) {
+            renderHadithCommentary([fallback.commentary || "", "HadeethEnc Hollandaca desteklemediği için İngilizce yedek metin gösterildi."].filter(Boolean).join("\n\n"), true);
+          }
+          return;
+        }
         $("hadithText").textContent = `“${cleanItem.text}”`;
-        renderHadithCommentary(cleanItem.commentary, true);
+        renderHadithCommentary(cleanItem.languageFallback
+          ? [cleanItem.commentary || "", "HadeethEnc Hollandaca desteklemediği için İngilizce yedek metin gösterildi."].filter(Boolean).join("\n\n")
+          : cleanItem.commentary, true);
         renderApiResponseDetails("hadithMeta", cleanItem.raw || {}, "hadith", cleanItem.liveUrl);
         $("hadithSource").textContent = cleanItem.source;
         $("hadithApiProvider").textContent = providerLabel;
-        $("hadithApiStatus").textContent = `200 OK · ${ms} ms`;
-        $("hadithApiStatus").className = "api-val ok";
+        $("hadithApiStatus").textContent = cleanItem.languageFallback ? `English fallback · ${ms} ms` : `200 OK · ${ms} ms`;
+        $("hadithApiStatus").className = cleanItem.languageFallback ? "api-val warn" : "api-val ok";
         $("hadithApiRef").textContent = `${cleanItem.ref} · ${langLabel}`;
         $("hadithApiUpdated").textContent = formatClock();
         $("hadithApiUrl").textContent = cleanItem.liveUrl;
@@ -3519,22 +3697,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       renderApiResponseDetails("hadithMeta", live.raw || {}, "hadith", live.liveUrl || endpointUrl);
       $("hadithSource").textContent = live.source;
       const hadithUsesSelectedFallback = state.selectedHadithApi === "fawaz_hadith" || (state.selectedHadithApi === "sunnetimiz" && selLang !== "tr");
-      const fallbackProvider = live.ref.toLowerCase().includes("hadeethenc") ? "HadeethEnc yedek" : "FawazAhmed0 yedek";
-      $("hadithApiProvider").textContent = hadithUsesSelectedFallback ? providerLabel : `${providerLabel} → ${fallbackProvider}`;
-      $("hadithApiStatus").textContent = hadithUsesSelectedFallback ? `200 OK · ${ms} ms` : `Yedek kaynak · ${ms} ms`;
-      $("hadithApiStatus").className = hadithUsesSelectedFallback ? "api-val ok" : "api-val warn";
+      const fallbackProvider = live.provider || (live.ref.toLowerCase().includes("hadeethenc") ? "HadeethEnc" : "FawazAhmed0 Hadith CDN");
+      $("hadithApiProvider").textContent = `${providerLabel} → ${fallbackProvider}`;
+      $("hadithApiStatus").textContent = live.languageFallback ? `English fallback · ${ms} ms` : `Yedek kaynak · ${ms} ms`;
+      $("hadithApiStatus").className = "api-val warn";
       $("hadithApiRef").textContent = `${live.ref} · ${langLabel}`;
       $("hadithApiUpdated").textContent = formatClock();
-      $("hadithApiUrl").textContent = state.selectedHadithApi === "fawaz_hadith" ? live.liveUrl : endpointUrl;
+      $("hadithApiUrl").textContent = live.liveUrl || endpointUrl;
     } catch (e) {
       if (signal.aborted) return;
       const ms = Math.round(performance.now() - t0);
-      $("hadithText").textContent = t("hadithFetchErr", { msg: e.message });
+      $("hadithText").textContent = selLang === "tr"
+        ? "Seçilen hadis API'si ve yedek kaynaklardan geçerli bir hadis metni alınamadı. “Yeni Hadis” düğmesiyle tekrar deneyin."
+        : selLang === "nl"
+          ? "De geselecteerde hadith-API en reservebronnen leverden geen geldige tekst. Probeer opnieuw met “Nieuwe hadith”."
+          : "The selected hadith API and fallback sources returned no valid text. Press “New Hadith” to try again.";
       renderHadithCommentary("");
       clearApiResponseDetails("hadithMeta");
       $("hadithSource").textContent = "-";
       $("hadithApiProvider").textContent = providerLabel;
-      $("hadithApiStatus").textContent = `Error: ${e.message} · ${ms} ms`;
+      $("hadithApiStatus").textContent = `No valid record · ${ms} ms`;
       $("hadithApiStatus").className = "api-val warn";
       $("hadithApiRef").textContent = langLabel;
       $("hadithApiUpdated").textContent = formatClock();
@@ -3636,22 +3818,43 @@ const QURAN_DUA_REFS = [
   }
 
   async function fetchLiveDuaInLang(selLang, refObj, signal) {
-    const edition = getQuranEditionForLang(selLang);
-    const url = `https://api.alquran.cloud/v1/ayah/${refObj.ayah}/${edition}`;
-    const { data: j } = await fetchJsonWithTimeout(url, { signal });
-    const txt = extractApiTextPayload(j, selLang, "dua");
-    if (!txt) throw new Error("Empty dua text");
-    const surahTitle = selLang === "tr"
-      ? (refObj.surahTr || fixTurkishText(j?.data?.surah?.name || ""))
-      : (selLang === "nl"
-        ? (refObj.surahNl || formatLatinName(j?.data?.surah?.englishName || ""))
-        : (refObj.surahEn || formatLatinName(j?.data?.surah?.englishName || "")));
-    return {
-      text: txt,
-      source: t("surahFormat", { surah: surahTitle, no: `${refObj.surah}:${refObj.verse}` }),
-      liveUrl: url,
-      raw: j
-    };
+    const surahTitle = selLang === "tr" ? refObj.surahTr : (selLang === "nl" ? refObj.surahNl : refObj.surahEn);
+    const alquranUrl = `https://api.alquran.cloud/v1/ayah/${refObj.ayah}/${getQuranEditionForLang(selLang)}`;
+    try {
+      const { data: payload } = await fetchApiPayloadWithTimeout(alquranUrl, { signal, timeoutMs: 5500 });
+      const inspected = inspectApiTextPayload(payload, selLang, "dua");
+      if (inspected?.text) {
+        return {
+          text: inspected.text,
+          source: t("surahFormat", { surah: surahTitle, no: `${refObj.surah}:${refObj.verse}` }),
+          liveUrl: alquranUrl,
+          raw: payload,
+          provider: "AlQuran Cloud API"
+        };
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+
+    const edition = selLang === "tr" ? "turkish_shaban" : (selLang === "nl" ? "dutch_siregar" : "english_saheeh");
+    const quranEncUrl = `https://quranenc.com/api/v1/translation/aya/${edition}/${refObj.surah}/${refObj.verse}`;
+    try {
+      const { data: payload } = await fetchApiPayloadWithTimeout(quranEncUrl, { signal, timeoutMs: 5500 });
+      const inspected = inspectApiTextPayload(payload, selLang, "dua");
+      if (inspected?.text) {
+        return {
+          text: inspected.text,
+          source: t("surahFormat", { surah: surahTitle, no: `${refObj.surah}:${refObj.verse}` }),
+          liveUrl: quranEncUrl,
+          raw: payload,
+          provider: "QuranEnc API"
+        };
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+
+    throw new Error("No valid dua or verse text was returned by fallback APIs");
   }
 
   async function loadRandomDua() {
@@ -3759,16 +3962,20 @@ const QURAN_DUA_REFS = [
       renderApiResponseDetails("duaMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl);
       $("duaSource").textContent = live.source;
       const duaUsesSelectedFallback = state.selectedDuaApi === "alquran_cloud" || state.selectedDuaApi === "alquran_pages";
-      $("duaApiProvider").textContent = duaUsesSelectedFallback ? providerLabel : `${providerLabel} → AlQuran Cloud yedek`;
+      $("duaApiProvider").textContent = duaUsesSelectedFallback ? (live.provider || providerLabel) : `${providerLabel} → ${live.provider || "Yedek kaynak"}`;
       $("duaApiStatus").textContent = duaUsesSelectedFallback ? `200 OK · ${ms} ms` : `Yedek kaynak · ${ms} ms`;
       $("duaApiStatus").className = duaUsesSelectedFallback ? "api-val ok" : "api-val warn";
       $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
       $("duaApiUpdated").textContent = formatClock();
-      $("duaApiUrl").textContent = (state.selectedDuaApi === "alquran_cloud" || state.selectedDuaApi === "alquran_pages") ? live.liveUrl : endpointUrl;
+      $("duaApiUrl").textContent = live.liveUrl || endpointUrl;
     } catch (e) {
       if (signal.aborted) return;
       const ms = Math.round(performance.now() - t0);
-      $("duaText").textContent = t("duaFetchErr", { msg: e.message });
+      $("duaText").textContent = selLang === "tr"
+        ? "Seçilen dua API'si ve yedek kaynaklardan geçerli bir metin alınamadı. “Yeni Dua” düğmesiyle tekrar deneyin."
+        : selLang === "nl"
+          ? "De geselecteerde dua-API en reservebronnen leverden geen geldige tekst. Probeer opnieuw met “Nieuwe dua”."
+          : "The selected dua API and fallback sources returned no valid text. Press “New Dua” to try again.";
       clearApiResponseDetails("duaMeta");
       renderDuaCommentary(selLang === "tr"
         ? "Metin gösterilemedi. Açıklama: API yanıtı boş, eksik veya biçim açısından şüpheli olabilir; anlamı değiştirecek otomatik düzeltme yapılmadı."
@@ -3777,7 +3984,7 @@ const QURAN_DUA_REFS = [
           : "The text could not be displayed. The API response may be empty, incomplete or malformed; no meaning-changing auto-correction was applied.");
       $("duaSource").textContent = formatSurahRef(refObj, selLang);
       $("duaApiProvider").textContent = providerLabel;
-      $("duaApiStatus").textContent = `Error: ${e.message} · ${ms} ms`;
+      $("duaApiStatus").textContent = `No valid record · ${ms} ms`;
       $("duaApiStatus").className = "api-val warn";
       $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
       $("duaApiUpdated").textContent = formatClock();
