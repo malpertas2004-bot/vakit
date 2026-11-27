@@ -3297,6 +3297,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           return {
             text: validated.text,
             commentary: explanation,
+            raw: dj,
             source: validated.tahric ? `${attr} (#${pick.id}) — ${validated.tahric}` : `${attr} (#${pick.id})`,
             ref: `hadeethenc #${pick.id}`,
             liveUrl: oneUrl
@@ -3334,7 +3335,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       try {
         const { data: j } = await fetchJsonWithTimeout(cdnUrl, { signal, timeoutMs: 5000 });
         const hObj = Array.isArray(j?.hadiths) ? j.hadiths[0] : (j?.hadith || j);
-        const rawTxt = extractCleanText(hObj?.text || hObj, selLang);
+        const rawTxt = extractApiTextPayload(hObj, selLang, "hadith") || extractApiTextPayload(j, selLang, "hadith");
         const validated = cleanAndValidateHadithText(rawTxt, selLang);
         if (!validated.isValid) continue;
 
@@ -3342,6 +3343,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         return {
           text: validated.text,
           commentary: extractHadithExplanation(j) || extractHadithExplanation(hObj),
+          raw: j,
           source: validated.tahric ? `${bookTitle} #${tryNo} — ${validated.tahric}` : `${bookTitle} #${tryNo}`,
           ref: `${editionPrefix}-${tryBook} #${tryNo}`,
           liveUrl: cdnUrl
@@ -3377,6 +3379,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("hadithLangBadge").textContent = langLabel;
     $("hadithText").textContent = t("hadithFetching");
     renderHadithCommentary("");
+    clearApiResponseDetails("hadithMeta");
 
     try {
       if (state.selectedHadithApi === "sunnetimiz" && selLang === "tr") {
@@ -3385,7 +3388,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           const ctype = (headers.get("content-type") || "").toLowerCase();
           if (ctype.includes("json")) {
             const item = j?.hadith || j?.data || j;
-            const rawTxt = extractCleanText(item?.turkish || item?.meal || item?.text || item, "tr");
+            const rawTxt = extractApiTextPayload(item, "tr", "hadith");
             const validated = cleanAndValidateHadithText(rawTxt, "tr");
             if (validated.isValid && !validated.text.startsWith("<")) {
               const bookName = extractCleanText(item?.book?.name || item?.book_name || item?.book, "tr") || "Hadis";
@@ -3393,6 +3396,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
               const baseSource = refVal ? `${bookName} (${refVal})` : bookName;
               $("hadithText").textContent = `“${validated.text}”`;
               renderHadithCommentary(extractHadithExplanation(j) || extractHadithExplanation(item), true);
+              renderApiResponseDetails("hadithMeta", j, "hadith", item?.url || "https://sunnetimiz.com/api/v1/random");
               const sourceParts = [baseSource, validated.tahric, validated.tekrar ? `Tekrar: ${validated.tekrar}` : ""].filter(Boolean);
               $("hadithSource").textContent = sourceParts.join(" — ");
               $("hadithApiProvider").textContent = providerLabel;
@@ -3415,6 +3419,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         if (!cleanItem) throw new Error("No record found");
         $("hadithText").textContent = `“${cleanItem.text}”`;
         renderHadithCommentary(cleanItem.commentary, true);
+        renderApiResponseDetails("hadithMeta", cleanItem.raw || {}, "hadith", cleanItem.liveUrl);
         $("hadithSource").textContent = cleanItem.source;
         $("hadithApiProvider").textContent = providerLabel;
         $("hadithApiStatus").textContent = `200 OK · ${ms} ms`;
@@ -3429,13 +3434,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
           const item = j?.data || j;
-          const rawTxt = extractCleanText(item?.hadith_english || item?.text || item, "en");
+          const rawTxt = extractApiTextPayload(item, "en", "hadith");
           const validated = cleanAndValidateHadithText(rawTxt, "en");
           if (validated.isValid) {
             const bName = extractCleanText(item?.book, "en") || book;
             const rNo = extractCleanText(item?.refno || item?.id, "en");
             $("hadithText").textContent = `“${validated.text}”`;
             renderHadithCommentary(extractHadithExplanation(j) || extractHadithExplanation(item), true);
+            renderApiResponseDetails("hadithMeta", j, "hadith", item?.url || endpointUrl);
             $("hadithSource").textContent = rNo ? `${bName} (${rNo})` : bName;
             $("hadithApiProvider").textContent = providerLabel;
             $("hadithApiStatus").textContent = `${status} OK · ${ms} ms`;
@@ -3450,10 +3456,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      if (!["fawaz_hadith", "sunnetimiz", "hadeethenc"].includes(state.selectedHadithApi) && !(state.selectedHadithApi === "random_hadith_gen" && selLang === "en")) {
+      if (state.selectedHadithApi !== "hadeethenc" && !(state.selectedHadithApi === "sunnetimiz" && selLang === "tr") && !(state.selectedHadithApi === "random_hadith_gen" && selLang === "en")) {
         try {
           const selectedResponse = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
-          const selectedText = extractApiTextPayload(selectedResponse.data, selLang);
+          const selectedText = extractApiTextPayload(selectedResponse.data, selLang, "hadith");
           const selectedValid = cleanAndValidateHadithText(selectedText, selLang);
           if (selectedValid.isValid) {
             const record = selectedResponse.data?.data || selectedResponse.data?.hadith || selectedResponse.data;
@@ -3463,6 +3469,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             const selectedCommentary = extractHadithExplanation(selectedResponse.data) || extractHadithExplanation(record);
             $("hadithText").textContent = `“${selectedValid.text}”`;
             renderHadithCommentary(selectedCommentary, true);
+            renderApiResponseDetails("hadithMeta", selectedResponse.data, "hadith", endpointUrl);
             $("hadithSource").textContent = [selectedSource, selectedValid.tahric, selectedValid.tekrar ? `Tekrar: ${selectedValid.tekrar}` : ""].filter(Boolean).join(" — ");
             $("hadithApiProvider").textContent = providerLabel;
             $("hadithApiStatus").textContent = `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
@@ -3483,6 +3490,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
       $("hadithText").textContent = `“${live.text}”`;
       renderHadithCommentary(live.commentary || "", true);
+      renderApiResponseDetails("hadithMeta", live.raw || {}, "hadith", live.liveUrl || endpointUrl);
       $("hadithSource").textContent = live.source;
       const hadithUsesSelectedFallback = state.selectedHadithApi === "fawaz_hadith" || (state.selectedHadithApi === "sunnetimiz" && selLang !== "tr");
       const fallbackProvider = live.ref.toLowerCase().includes("hadeethenc") ? "HadeethEnc yedek" : "FawazAhmed0 yedek";
@@ -3497,6 +3505,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const ms = Math.round(performance.now() - t0);
       $("hadithText").textContent = t("hadithFetchErr", { msg: e.message });
       renderHadithCommentary("");
+      clearApiResponseDetails("hadithMeta");
       $("hadithSource").textContent = "-";
       $("hadithApiProvider").textContent = providerLabel;
       $("hadithApiStatus").textContent = `Error: ${e.message} · ${ms} ms`;
@@ -3604,7 +3613,7 @@ const QURAN_DUA_REFS = [
     const edition = getQuranEditionForLang(selLang);
     const url = `https://api.alquran.cloud/v1/ayah/${refObj.ayah}/${edition}`;
     const { data: j } = await fetchJsonWithTimeout(url, { signal });
-    const txt = fixTurkishText(j?.data?.text || "");
+    const txt = extractApiTextPayload(j, selLang, "dua");
     if (!txt) throw new Error("Empty dua text");
     const surahTitle = selLang === "tr"
       ? (refObj.surahTr || fixTurkishText(j?.data?.surah?.name || ""))
@@ -3614,7 +3623,8 @@ const QURAN_DUA_REFS = [
     return {
       text: txt,
       source: t("surahFormat", { surah: surahTitle, no: `${refObj.surah}:${refObj.verse}` }),
-      liveUrl: url
+      liveUrl: url,
+      raw: j
     };
   }
 
@@ -3638,17 +3648,19 @@ const QURAN_DUA_REFS = [
     $("duaLangBadge").textContent = langLabel;
     $("duaText").textContent = t("duaFetching");
     renderDuaCommentary("");
+    clearApiResponseDetails("duaMeta");
 
     try {
       if (state.selectedDuaApi === "acikkuran_api" && selLang === "tr") {
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
           const v = j?.data || j;
-          const txt = fixTurkishText(v?.translation?.text || v?.meal?.text || "");
+          const txt = extractApiTextPayload(j, selLang, "dua");
           if (txt) {
             const sName = fixTurkishText(v?.surah?.name || refObj.surahTr);
             $("duaText").textContent = `“${txt}”`;
             renderDuaCommentary(inspectReligiousText(txt, selLang).note);
+            renderApiResponseDetails("duaMeta", j, "dua", endpointUrl);
             $("duaSource").textContent = t("surahFormat", { surah: sName, no: `${refObj.surah}:${refObj.verse}` });
             $("duaApiProvider").textContent = providerLabel;
             $("duaApiStatus").textContent = `${status} OK · ${ms} ms`;
@@ -3666,10 +3678,11 @@ const QURAN_DUA_REFS = [
       if (state.selectedDuaApi === "fawaz_quran_cdn") {
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
-          const txt = fixTurkishText(j?.text || "");
+          const txt = extractApiTextPayload(j, selLang, "dua");
           if (txt) {
             $("duaText").textContent = `“${txt}”`;
             renderDuaCommentary(inspectReligiousText(txt, selLang).note);
+            renderApiResponseDetails("duaMeta", j, "dua", endpointUrl);
             $("duaSource").textContent = formatSurahRef(refObj, selLang);
             $("duaApiProvider").textContent = providerLabel;
             $("duaApiStatus").textContent = `${status} OK · ${ms} ms`;
@@ -3684,16 +3697,17 @@ const QURAN_DUA_REFS = [
         }
       }
 
-      if (!["alquran_cloud", "alquran_pages", "acikkuran_api", "fawaz_quran_cdn"].includes(state.selectedDuaApi)) {
+      if (state.selectedDuaApi !== "fawaz_quran_cdn" && !(state.selectedDuaApi === "acikkuran_api" && selLang === "tr")) {
         try {
           const selectedResponse = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
-          const selectedText = extractApiTextPayload(selectedResponse.data, selLang);
+          const selectedText = extractApiTextPayload(selectedResponse.data, selLang, "dua");
           const selectedReview = inspectReligiousText(selectedText, selLang);
           if (selectedText && !selectedReview.issues.length) {
             const payload = selectedResponse.data?.data || selectedResponse.data?.result || selectedResponse.data;
             const sourceLabel = extractCleanText(payload?.source || payload?.book || payload?.surah?.name, selLang) || formatSurahRef(refObj, selLang);
             $("duaText").textContent = `“${selectedText}”`;
             renderDuaCommentary(selectedReview.note);
+            renderApiResponseDetails("duaMeta", selectedResponse.data, "dua", endpointUrl);
             $("duaSource").textContent = sourceLabel;
             $("duaApiProvider").textContent = providerLabel;
             $("duaApiStatus").textContent = `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
@@ -3716,6 +3730,7 @@ const QURAN_DUA_REFS = [
       if (duaReview.issues.length) throw new Error(duaReview.note);
       $("duaText").textContent = `“${live.text}”`;
       renderDuaCommentary(duaReview.note);
+      renderApiResponseDetails("duaMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl);
       $("duaSource").textContent = live.source;
       const duaUsesSelectedFallback = state.selectedDuaApi === "alquran_cloud" || state.selectedDuaApi === "alquran_pages";
       $("duaApiProvider").textContent = duaUsesSelectedFallback ? providerLabel : `${providerLabel} → AlQuran Cloud yedek`;
@@ -3728,6 +3743,7 @@ const QURAN_DUA_REFS = [
       if (signal.aborted) return;
       const ms = Math.round(performance.now() - t0);
       $("duaText").textContent = t("duaFetchErr", { msg: e.message });
+      clearApiResponseDetails("duaMeta");
       renderDuaCommentary(selLang === "tr"
         ? "Metin gösterilemedi. Açıklama: API yanıtı boş, eksik veya biçim açısından şüpheli olabilir; anlamı değiştirecek otomatik düzeltme yapılmadı."
         : selLang === "nl"
@@ -4039,6 +4055,7 @@ const QURAN_DUA_REFS = [
     if (!state.selectedHadithApi) {
       $("hadithText").textContent = t("hadithPlaceholder");
       renderHadithCommentary("");
+      clearApiResponseDetails("hadithMeta");
       $("hadithApiStatus").textContent = t("hadithWaitingStatus");
       $("hadithApiUrl").textContent = t("hadithWaitingUrl");
     }
@@ -4060,6 +4077,7 @@ const QURAN_DUA_REFS = [
     if (!state.selectedDuaApi) {
       $("duaText").textContent = t("duaPlaceholder");
       renderDuaCommentary("");
+      clearApiResponseDetails("duaMeta");
       $("duaApiStatus").textContent = t("duaWaitingStatus");
       $("duaApiUrl").textContent = t("duaWaitingUrl");
     }
