@@ -3298,7 +3298,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (payload == null || depth > 9) return null;
     if (typeof payload === "string") {
       const text = isUsableApiText(payload, kind);
-      return text ? { text, path, property: path.split(".").pop() || "$" } : null;
+      return text && isLikelyRequestedLanguage(text, targetLang)
+        ? { text, path, property: path.split(".").pop() || "$" }
+        : null;
     }
     if (Array.isArray(payload)) {
       const candidates = payload
