@@ -2922,6 +2922,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       .trim();
 
     let tahric = "";
+    let tekrar = "";
+    // Sünnetimiz may append repeat/index numbers to the narration body.
+    // Separate this metadata so it is never quoted as part of the hadith.
+    const tekrarMatch = s.match(/\s*(?:Tekrar(?:lar)?|Tekrarr|Tekrâr)\s*:\s*([\s\S]*)$/i);
+    if (tekrarMatch) {
+      tekrar = tekrarMatch[1].replace(/\s+/g, " ").trim();
+      s = s.slice(0, tekrarMatch.index).trim();
+    }
+
     const tahricMatch = s.match(/\s*(Bunu\s+(?:yalnız\s+)?(?:Buh[âa]r[îi]|M[üu]slim|Eb[ûu]\s+D[âa]v[ûu]d|Tirmiz[îi]|Nes[âa][îi]|[İI]bn\s+M[âa]ce|Ahmed|M[âa]lik)[^"]*(?:rivayet\s+etmi[şs]tir|tahri[çc]\s+etmi[şs]tir)[^"]*)$/i);
     if (tahricMatch) {
       tahric = tahricMatch[1].replace(/\s+/g, " ").trim();
@@ -2931,18 +2940,21 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     for (const [rx, rep] of HADITH_OCR_FIX_RULES) {
       s = s.replace(rx, rep);
     }
-    return { text: s.trim(), tahric };
+    return { text: s.trim(), tahric, tekrar };
   }
 
   function cleanAndValidateHadithText(rawText, targetLang = "tr") {
     const parsed = targetLang === "tr"
       ? parseAndCleanSunnetimizHadith(rawText)
-      : { text: fixTurkishText(rawText).replace(/\s+/g, " ").trim(), tahric: "" };
+      : { text: fixTurkishText(rawText).replace(/\s+/g, " ").trim(), tahric: "", tekrar: "" };
     const cleaned = parsed.text;
+    // A final conjunction or separator usually means the API returned a truncated narration.
+    const looksTruncated = /(?:\bve|\bile|\bveya|\byahut|\bki|[,;:])\s*$/i.test(cleaned);
     return {
       text: cleaned,
       tahric: parsed.tahric,
-      isValid: cleaned.length > 10 && !CORRUPTED_ELLIPSIS_RX.test(cleaned)
+      tekrar: parsed.tekrar,
+      isValid: cleaned.length > 10 && !CORRUPTED_ELLIPSIS_RX.test(cleaned) && !looksTruncated
     };
   }
 
@@ -3147,7 +3159,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
               const baseSource = refVal ? `${bookName} (${refVal})` : bookName;
               $("hadithText").textContent = `“${validated.text}”`;
               renderHadithCommentary(extractCleanText(item?.explanation || item?.commentary || item?.sharh || item?.serh, "tr"));
-              $("hadithSource").textContent = validated.tahric ? `${baseSource} — ${validated.tahric}` : baseSource;
+              const sourceParts = [baseSource, validated.tahric, validated.tekrar ? `Tekrar: ${validated.tekrar}` : ""].filter(Boolean);
+              $("hadithSource").textContent = sourceParts.join(" — ");
               $("hadithApiProvider").textContent = providerLabel;
               $("hadithApiStatus").textContent = `${status} OK · ${ms} ms`;
               $("hadithApiStatus").className = "api-val ok";
