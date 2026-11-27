@@ -2090,8 +2090,16 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     birlesikarapemirligi: "birlesikarapemirlikleri",
     birlesikarapemirlik: "birlesikarapemirlikleri",
     unitedarabemirates: "birlesikarapemirlikleri",
+    verenigdearabischeemiraten: "birlesikarapemirlikleri",
+    emiratosarabesunidos: "birlesikarapemirlikleri",
+    emiratiarabiuniti: "birlesikarapemirlikleri",
+    emiratsarabesunis: "birlesikarapemirlikleri",
     uae: "birlesikarapemirlikleri",
-    bae: "birlesikarapemirlikleri"
+    bae: "birlesikarapemirlikleri",
+    italya: "italy",
+    italia: "italy",
+    italy: "italy",
+    italie: "italy"
   });
 
   function countryApiNameKey(raw) {
@@ -2542,13 +2550,27 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       if (!state.selectedState && stateId) {
         const { data: sj } = await fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states/${encodeURIComponent(stateId)}`);
         const sd = sj?.data || sj;
-        state.selectedState = {
-          id: stateId,
-          nameTr: fixTurkishText(sd?.name || sd?.name_tr || ""),
-          nameEn: fixTurkishText(sd?.name_en || sd?.nameEn || sd?.name || "")
-        };
-        state.states.push(state.selectedState);
-            renderStateSelect();
+        const stateNames = [sd?.name_tr, sd?.name, sd?.name_en, sd?.nameEn]
+          .map(canonicalLocationNameKey).filter(Boolean);
+        const stateMatches = state.states.filter(candidate =>
+          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
+            .some(name => stateNames.includes(canonicalLocationNameKey(name)))
+        );
+        if (stateMatches.length === 1) {
+          state.selectedState = stateMatches[0];
+          state.selectedState.sourceIds = { ...(state.selectedState.sourceIds || {}), imsakiyem: stateId };
+        } else if (stateMatches.length > 1) {
+          throw new Error("State name is ambiguous in the selected country");
+        } else {
+          state.selectedState = {
+            id: stateId,
+            nameTr: fixTurkishText(sd?.name_tr || sd?.name || ""),
+            nameEn: fixTurkishText(sd?.name_en || sd?.nameEn || sd?.name || ""),
+            sourceIds: { imsakiyem: stateId }
+          };
+          state.states.push(state.selectedState);
+          renderStateSelect();
+        }
       }
 
       if (state.selectedState) {
@@ -2556,13 +2578,28 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
 
       if (!state.selectedDistrict) {
-        state.selectedDistrict = {
-          id: distId,
-          nameTr: fixTurkishText(dist?.name || dist?.name_tr || ""),
-          nameEn: fixTurkishText(dist?.name_en || dist?.nameEn || dist?.name || "")
-        };
-        state.districts.push(state.selectedDistrict);
-        renderDistrictSelect();
+        const districtTr = fixTurkishText(dist?.name_tr || dist?.name || "");
+        const districtEn = fixTurkishText(dist?.name_en || dist?.nameEn || dist?.name || "");
+        const districtKeys = [districtTr, districtEn].map(canonicalLocationNameKey).filter(Boolean);
+        const districtMatches = state.districts.filter(candidate =>
+          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
+            .some(name => districtKeys.includes(canonicalLocationNameKey(name)))
+        );
+        if (districtMatches.length === 1) {
+          state.selectedDistrict = districtMatches[0];
+          state.selectedDistrict.sourceIds = { ...(state.selectedDistrict.sourceIds || {}), imsakiyem: distId };
+        } else if (districtMatches.length > 1) {
+          throw new Error("District name is ambiguous in the selected state");
+        } else {
+          state.selectedDistrict = {
+            id: distId,
+            nameTr: districtTr,
+            nameEn: districtEn,
+            sourceIds: { imsakiyem: distId }
+          };
+          state.districts.push(state.selectedDistrict);
+          renderDistrictSelect();
+        }
       }
 
       state.todayData = null;
