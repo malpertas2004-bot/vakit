@@ -3191,7 +3191,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function isUsableApiText(value, kind) {
     const clean = cleanApiTextValue(value);
     if (!clean || clean.length < (kind === "hadith" ? 10 : 5)) return "";
-    if (/^(?:no record found|not found|unauthorized|forbidden|internal server error|error|undefined|null)$/i.test(clean)) return "";
+    if (/\b(?:no record found|not found|unauthorized|forbidden|internal server error|live api connection error|connection error|please click .{0,30} again)\b/i.test(clean)) return "";
     if (/^\{[\s\S]*"(?:error|message|status)"\s*:/i.test(clean)) return "";
     return clean;
   }
@@ -3312,7 +3312,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     let visible=false;
     if(selectedField?.path){
       const row=document.createElement("div");row.className="quote-meta-row";
-      const title=document.createElement("span");title.className="quote-meta-label";title.textContent="Gösterilen metin alanı:";
+      const title=document.createElement("span");title.className="quote-meta-label";
+      title.textContent=state.lang==="nl"?"Gebruikt tekstveld:":state.lang==="en"?"Selected text field:":"Gösterilen metin alanı:";
       const val=document.createElement("span");val.className="quote-meta-value";val.textContent=selectedField.path;
       row.append(title,val);box.appendChild(row);visible=true;
     }
@@ -3615,17 +3616,21 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           $("hadithApiUpdated").textContent = formatClock();
           $("hadithApiUrl").textContent = fallback.liveUrl || endpointUrl;
           if (fallback.languageFallback) {
-            renderHadithCommentary([fallback.commentary || "", "HadeethEnc Hollandaca desteklemediği için İngilizce yedek metin gösterildi."].filter(Boolean).join("\n\n"), true);
+            renderHadithCommentary([fallback.commentary || "", state.lang === "nl"
+            ? "HadeethEnc ondersteunt geen Nederlands; de Engelse tekst wordt als terugvaltaal getoond."
+            : "HadeethEnc does not provide Dutch; the English text is shown as a fallback."].filter(Boolean).join("\n\n"), true);
           }
           return;
         }
         $("hadithText").textContent = `“${cleanItem.text}”`;
         renderHadithCommentary(cleanItem.languageFallback
-          ? [cleanItem.commentary || "", "HadeethEnc Hollandaca desteklemediği için İngilizce yedek metin gösterildi."].filter(Boolean).join("\n\n")
+          ? [cleanItem.commentary || "", state.lang === "nl"
+            ? "HadeethEnc ondersteunt geen Nederlands; de Engelse tekst wordt als terugvaltaal getoond."
+            : "HadeethEnc does not provide Dutch; the English text is shown as a fallback."].filter(Boolean).join("\n\n")
           : cleanItem.commentary, true);
         renderApiResponseDetails("hadithMeta", cleanItem.raw || {}, "hadith", cleanItem.liveUrl);
         $("hadithSource").textContent = cleanItem.source;
-        $("hadithApiProvider").textContent = providerLabel;
+        $("hadithApiProvider").textContent = cleanItem.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
         $("hadithApiStatus").textContent = cleanItem.languageFallback ? `English fallback · ${ms} ms` : `200 OK · ${ms} ms`;
         $("hadithApiStatus").className = cleanItem.languageFallback ? "api-val warn" : "api-val ok";
         $("hadithApiRef").textContent = `${cleanItem.ref} · ${langLabel}`;
@@ -3961,8 +3966,8 @@ const QURAN_DUA_REFS = [
       renderDuaCommentary(duaReview.note);
       renderApiResponseDetails("duaMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl);
       $("duaSource").textContent = live.source;
-      const duaUsesSelectedFallback = state.selectedDuaApi === "alquran_cloud" || state.selectedDuaApi === "alquran_pages";
-      $("duaApiProvider").textContent = duaUsesSelectedFallback ? (live.provider || providerLabel) : `${providerLabel} → ${live.provider || "Yedek kaynak"}`;
+      const duaUsesSelectedFallback = live.provider === providerLabel;
+      $("duaApiProvider").textContent = duaUsesSelectedFallback ? providerLabel : `${providerLabel} → ${live.provider || "Yedek kaynak"}`;
       $("duaApiStatus").textContent = duaUsesSelectedFallback ? `200 OK · ${ms} ms` : `Yedek kaynak · ${ms} ms`;
       $("duaApiStatus").className = duaUsesSelectedFallback ? "api-val ok" : "api-val warn";
       $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
