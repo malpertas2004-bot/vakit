@@ -971,9 +971,12 @@ details.nav-item > summary:hover{background:#163b30}
   <!-- Language Switcher -->
   <nav class="lang-bar" aria-label="Language selector">
     <div class="lang-group" role="group" aria-label="Dil / Language / Taal">
-      <button type="button" class="lang-btn active" data-lang="tr">T&uuml;rk&ccedil;e</button>
-      <button type="button" class="lang-btn" data-lang="en">English</button>
-      <button type="button" class="lang-btn" data-lang="nl">Nederlands</button>
+      <button type="button" class="lang-btn active" data-lang="tr">🇹🇷 Türkçe</button>
+      <button type="button" class="lang-btn" data-lang="en">🇬🇧 English</button>
+      <button type="button" class="lang-btn" data-lang="nl">🇳🇱 Nederlands</button>
+      <button type="button" class="lang-btn" data-lang="de">🇩🇪 Deutsch</button>
+      <button type="button" class="lang-btn" data-lang="fr">🇫🇷 Français</button>
+      <button type="button" class="lang-btn" data-lang="ar">🇸🇦 العربية</button>
     </div>
   </nav>
 
@@ -1527,6 +1530,12 @@ details.nav-item > summary:hover{background:#163b30}
       soundPermFail: "Browser heeft geluid geblokkeerd. Tik nogmaals op de knop."
     }
   };
+
+  // Google Translate handles DE/FR/AR; the app keeps its native TR/EN/NL dictionaries.
+  I18N.de = { ...I18N.en, locale: "de-DE", langNameBadge: "Deutsch (DE)" };
+  I18N.fr = { ...I18N.en, locale: "fr-FR", langNameBadge: "Français (FR)" };
+  I18N.ar = { ...I18N.en, locale: "ar", langNameBadge: "العربية" };
+
 
   /* ==========================================================================
      3. EMBEDDED DIYANET LOCATIONS DATASET & LINGUISTIC NORMALIZATION MAPS
@@ -2290,6 +2299,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
+  function isCountryNameReturnedAsState(rawNames, countryObj) {
+    const parentNames = [countryObj?.nameTr, countryObj?.nameEn, countryObj?.nameNl]
+      .filter(Boolean).map(countryApiNameKey);
+    const parentKeys = new Set(parentNames);
+    return (Array.isArray(rawNames) ? rawNames : [rawNames])
+      .filter(Boolean).some(name => parentKeys.has(countryApiNameKey(name)));
+  }
+
   async function loadStatesForCountry(countryObj, preselectStateId = "") {
     const stateSel = $("stateSelect");
     const distSel = $("districtSelect");
@@ -2330,13 +2347,19 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        mergeLocationRecord(mapById, id, item?.name || item?.name_tr || "", item?.name_en || item?.nameEn || "", { countryId: String(countryObj.id) }, "imsakiyem");
+        const rawTr = item?.name || item?.name_tr || "";
+        const rawEn = item?.name_en || item?.nameEn || "";
+        if (isCountryNameReturnedAsState([rawTr, rawEn], countryObj)) continue;
+        mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.SehirID || "").trim();
-        mergeLocationRecord(mapById, id, item?.SehirAdi || "", item?.SehirAdiEn || "", { countryId: String(countryObj.id) }, "emushaf");
+        const rawTr = item?.SehirAdi || "";
+        const rawEn = item?.SehirAdiEn || "";
+        if (isCountryNameReturnedAsState([rawTr, rawEn], countryObj)) continue;
+        mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "emushaf");
       }
     }
 
@@ -4356,7 +4379,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   function applyLanguageUI(reloadQuotes = false) {
-    document.documentElement.lang = state.lang;
+    document.documentElement.lang = state.lang;\n    document.documentElement.dir = state.lang === "ar" ? "rtl" : "ltr";
     document.querySelectorAll(".lang-btn").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.lang === state.lang);
     });
@@ -4565,14 +4588,29 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     });
   }
 
+  function setGoogleTranslateLanguage(lang) {
+    const supported = ["de", "fr", "ar"];
+    const value = supported.includes(lang) ? `/tr/${lang}` : "";
+    const expire = "Thu, 01 Jan 1970 00:00:00 GMT";
+    const host = location.hostname;
+    if (value) {
+      document.cookie = `googtrans=${value}; path=/; SameSite=Lax`;
+      if (host) document.cookie = `googtrans=${value}; path=/; domain=${host}; SameSite=Lax`;
+    } else {
+      document.cookie = `googtrans=; expires=${expire}; path=/; SameSite=Lax`;
+      if (host) document.cookie = `googtrans=; expires=${expire}; path=/; domain=${host}; SameSite=Lax`;
+    }
+  }
+
   function bindEvents() {
     document.querySelectorAll(".lang-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const nextLang = btn.dataset.lang;
-        if (!nextLang || nextLang === state.lang) return;
+        if (!nextLang || !I18N[nextLang] || nextLang === state.lang) return;
         state.lang = nextLang;
         Persistence.savePrefs();
-        applyLanguageUI(true);
+        setGoogleTranslateLanguage(nextLang);
+        location.reload();
       });
     });
 
@@ -4799,5 +4837,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   init();
 })();
 </script>
+<div id="google_translate_element" aria-hidden="true"></div>
+<style>
+  #google_translate_element { position:fixed; left:-10000px; top:-10000px; width:1px; height:1px; overflow:hidden; }
+  .goog-te-banner-frame { display:none !important; }
+  body { top:0 !important; }
+</style>
+<script>
+  window.googleTranslateElementInit = function () {
+    if (!window.google || !google.translate) return;
+    new google.translate.TranslateElement({
+      pageLanguage: "tr",
+      includedLanguages: "de,fr,ar",
+      autoDisplay: false
+    }, "google_translate_element");
+  };
+</script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
 </body>
 </html>
