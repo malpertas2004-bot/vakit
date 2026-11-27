@@ -3089,12 +3089,50 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return "";
   }
 
-  function renderHadithCommentary(commentaryText, reviewText = "") {
+  function extractHadithExplanation(payload, depth = 0) {
+    if (payload == null || depth > 7) return "";
+    if (Array.isArray(payload)) {
+      for (const item of payload) {
+        const found = extractHadithExplanation(item, depth + 1);
+        if (found) return found;
+      }
+      return "";
+    }
+    if (typeof payload !== "object") return "";
+    const explanationKeys = [
+      "explanation", "commentary", "sharh", "sharh_text", "sharhText",
+      "serh", "şerh", "comment", "comment_text", "meaning", "description",
+      "notes", "note", "explain", "interpretation", "fawaid", "benefits"
+    ];
+    for (const key of explanationKeys) {
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        const value = extractApiTextPayload(payload[key], state.lang);
+        if (value) return fixTurkishText(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      }
+    }
+    const nestedKeys = ["data", "result", "hadith", "hadeeth", "item", "record", "response", "details"];
+    for (const key of nestedKeys) {
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        const found = extractHadithExplanation(payload[key], depth + 1);
+        if (found) return found;
+      }
+    }
+    return "";
+  }
+
+  function renderHadithCommentary(commentaryText, showMissing = false) {
     const box = $("hadithCommentary");
-    const clean = [fixTurkishText(commentaryText || ""), fixTurkishText(reviewText || "")]
-      .filter(Boolean).join("\n\n");
+    const clean = fixTurkishText(commentaryText || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     if (clean) {
-      box.textContent = clean;
+      const prefix = state.lang === "tr" ? "Hadis açıklaması: " : state.lang === "nl" ? "Hadith-uitleg: " : "Hadith explanation: ";
+      box.textContent = prefix + clean;
+      box.style.display = "block";
+    } else if (showMissing) {
+      box.textContent = state.lang === "tr"
+        ? "Bu API kaydı için ayrıca hadis açıklaması veya şerh sağlanmamış."
+        : state.lang === "nl"
+          ? "Deze API levert voor deze hadith geen aparte uitleg of commentaar."
+          : "This API record does not provide a separate hadith explanation or commentary.";
       box.style.display = "block";
     } else {
       box.textContent = "";
@@ -3228,10 +3266,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
               const refVal = extractCleanText(item?.ref || item?.reference || item?.number || item?.hadith_no, "tr");
               const baseSource = refVal ? `${bookName} (${refVal})` : bookName;
               $("hadithText").textContent = `“${validated.text}”`;
-              renderHadithCommentary(
-                extractCleanText(item?.explanation || item?.commentary || item?.sharh || item?.serh, "tr"),
-                inspectReligiousText(validated.text, "tr").note
-              );
+              renderHadithCommentary(extractHadithExplanation(j) || extractHadithExplanation(item), true);
               const sourceParts = [baseSource, validated.tahric, validated.tekrar ? `Tekrar: ${validated.tekrar}` : ""].filter(Boolean);
               $("hadithSource").textContent = sourceParts.join(" — ");
               $("hadithApiProvider").textContent = providerLabel;
@@ -3253,7 +3288,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const ms = Math.round(performance.now() - t0);
         if (!cleanItem) throw new Error("No record found");
         $("hadithText").textContent = `“${cleanItem.text}”`;
-        renderHadithCommentary(cleanItem.commentary, inspectReligiousText(cleanItem.text, selLang).note);
+        renderHadithCommentary(cleanItem.commentary, true);
         $("hadithSource").textContent = cleanItem.source;
         $("hadithApiProvider").textContent = providerLabel;
         $("hadithApiStatus").textContent = `200 OK · ${ms} ms`;
@@ -3274,7 +3309,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             const bName = extractCleanText(item?.book, "en") || book;
             const rNo = extractCleanText(item?.refno || item?.id, "en");
             $("hadithText").textContent = `“${validated.text}”`;
-            renderHadithCommentary("", inspectReligiousText(validated.text, selLang).note);
+            renderHadithCommentary(extractHadithExplanation(j) || extractHadithExplanation(item), true);
             $("hadithSource").textContent = rNo ? `${bName} (${rNo})` : bName;
             $("hadithApiProvider").textContent = providerLabel;
             $("hadithApiStatus").textContent = `${status} OK · ${ms} ms`;
@@ -3299,9 +3334,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             const bookTitle = extractCleanText(record?.book?.name || record?.book || record?.collection || record?.source, selLang);
             const refNo = extractCleanText(record?.reference || record?.number || record?.hadith_no || record?.id, selLang);
             const selectedSource = [bookTitle || providerLabel, refNo ? `#${refNo}` : ""].filter(Boolean).join(" ");
-            const selectedCommentary = extractCleanText(record?.explanation || record?.commentary || record?.description, selLang);
+            const selectedCommentary = extractHadithExplanation(selectedResponse.data) || extractHadithExplanation(record);
             $("hadithText").textContent = `“${selectedValid.text}”`;
-            renderHadithCommentary(selectedCommentary, inspectReligiousText(selectedValid.text, selLang).note);
+            renderHadithCommentary(selectedCommentary, true);
             $("hadithSource").textContent = [selectedSource, selectedValid.tahric, selectedValid.tekrar ? `Tekrar: ${selectedValid.tekrar}` : ""].filter(Boolean).join(" — ");
             $("hadithApiProvider").textContent = providerLabel;
             $("hadithApiStatus").textContent = `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
@@ -3321,7 +3356,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const ms = Math.round(performance.now() - t0);
 
       $("hadithText").textContent = `“${live.text}”`;
-      renderHadithCommentary(live.commentary, inspectReligiousText(live.text, selLang).note);
+      renderHadithCommentary(live.commentary || "", true);
       $("hadithSource").textContent = live.source;
       const hadithUsesSelectedFallback = state.selectedHadithApi === "fawaz_hadith" || (state.selectedHadithApi === "sunnetimiz" && selLang !== "tr");
       const fallbackProvider = live.ref.toLowerCase().includes("hadeethenc") ? "HadeethEnc yedek" : "FawazAhmed0 yedek";
