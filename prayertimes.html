@@ -3871,6 +3871,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const set = dictionaries[lang] || dictionaries.en;
     const hits = words.reduce((n, word) => n + (set.has(word) ? 1 : 0), 0);
     if (lang === "tr" && /[çğıöşüÇĞİÖŞÜ]/u.test(text)) return true;
+    if (lang === "nl") return hits >= 2;
     return words.length < 12 ? hits >= 1 : hits >= 2 && hits / words.length >= 0.025;
   }
 
