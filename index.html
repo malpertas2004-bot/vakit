@@ -3606,6 +3606,23 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     clearApiResponseDetails("hadithMeta");
 
     try {
+      if (selLang === "nl") {
+        const dutchHadith = await fetchCleanFromHadeethEnc("nl", randNo, signal);
+        if (!dutchHadith) throw new Error("HadeethEnc returned no Dutch translation.");
+        const ms = Math.round(performance.now() - t0);
+        $("hadithText").textContent = `“${dutchHadith.text}”`;
+        renderHadithCommentary(dutchHadith.commentary || "", true);
+        renderApiResponseDetails("hadithMeta", dutchHadith.raw || {}, "hadith", dutchHadith.liveUrl, dutchHadith.textInfo);
+        $("hadithSource").textContent = dutchHadith.source;
+        $("hadithApiProvider").textContent = "HadeethEnc Dutch translation";
+        $("hadithApiStatus").textContent = `200 OK · ${ms} ms`;
+        $("hadithApiStatus").className = "api-val ok";
+        $("hadithApiRef").textContent = `${dutchHadith.ref} · ${langLabel}`;
+        $("hadithApiUpdated").textContent = formatClock();
+        $("hadithApiUrl").textContent = dutchHadith.liveUrl;
+        return;
+      }
+
       if (state.selectedHadithApi === "sunnetimiz" && selLang === "tr") {
         try {
           const { data: j, status, ms, headers } = await fetchJsonWithTimeout("https://sunnetimiz.com/api/v1/random", { signal, timeoutMs: 5500 });
