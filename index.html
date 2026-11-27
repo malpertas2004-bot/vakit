@@ -2478,7 +2478,48 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       state.zone = detectTimezoneForCountry(state.selectedCountry);
       renderCountrySelect();
       await loadStatesForCountry(state.selectedCountry, localHit.state.id);
+
+      if (!state.selectedState) {
+        const stateNames = [localHit.state.nameTr, localHit.state.nameEn, localHit.state.nameNl]
+          .map(canonicalLocationNameKey).filter(Boolean);
+        const matches = state.states.filter(candidate =>
+          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
+            .some(name => stateNames.includes(canonicalLocationNameKey(name)))
+        );
+        if (matches.length === 1) {
+          state.selectedState = matches[0];
+        } else if (matches.length === 0) {
+          state.selectedState = {
+            ...localHit.state,
+            countryId: String(state.selectedCountry.id),
+            fallbackDistricts: localHit.state.districts || []
+          };
+          state.states.push(state.selectedState);
+          renderStateSelect();
+        } else {
+          throw new Error("Local state ID is ambiguous");
+        }
+      }
+
       await loadDistrictsForState(state.selectedState, localHit.district.id);
+      if (!state.selectedDistrict) {
+        const districtNames = [localHit.district.nameTr, localHit.district.nameEn, localHit.district.nameNl]
+          .map(canonicalLocationNameKey).filter(Boolean);
+        const matches = state.districts.filter(candidate =>
+          [candidate.nameTr, candidate.nameEn, candidate.nameNl]
+            .some(name => districtNames.includes(canonicalLocationNameKey(name)))
+        );
+        if (matches.length === 1) {
+          state.selectedDistrict = matches[0];
+        } else if (matches.length === 0) {
+          state.selectedDistrict = { ...localHit.district, countryId: String(state.selectedCountry.id) };
+          state.districts.push(state.selectedDistrict);
+          renderDistrictSelect();
+        } else {
+          throw new Error("Local district ID is ambiguous in the selected state");
+        }
+      }
+
       state.todayData = null;
       Persistence.savePrefs();
       updateCityHeaderAndFooter();
