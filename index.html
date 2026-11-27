@@ -3604,7 +3604,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const { data: payload } = await fetchApiPayloadWithTimeout(cdnUrl, { signal, timeoutMs: 5000 });
         const hObj = Array.isArray(payload?.hadiths) ? payload.hadiths[0] : (payload?.hadith || payload);
         const textInfo = extractProviderApiText("fawaz_hadith", payload, selLang, "hadith");
-        const validated = cleanAndValidateHadithText(textInfo?.text || "", selLang);
+        const validated = cleanAndValidateHadithText(textInfo?.text || "", textInfo?.sourceLanguage || selLang);
         if (!validated.isValid) continue;
         const bookTitle = extractCleanText(payload?.metadata?.name, selLang) || tryBook.toUpperCase();
         return {
@@ -3756,7 +3756,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         try {
           const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
           const selectedTextInfo = extractProviderApiText(state.selectedHadithApi, selectedResponse.data, selLang, "hadith");
-          const selectedValid = cleanAndValidateHadithText(selectedTextInfo?.text || "", selLang);
+          const selectedValid = cleanAndValidateHadithText(selectedTextInfo?.text || "", selectedTextInfo?.sourceLanguage || selLang);
           if (selectedValid.isValid) {
             const record = selectedTextInfo.record || selectedResponse.data?.data || selectedResponse.data?.hadith || selectedResponse.data;
             const bookTitle = extractCleanText(record?.book?.name || record?.book || record?.collection_name || record?.collection || record?.source, selLang);
@@ -3980,7 +3980,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         const value = node.value;
         if (part === "*" && Array.isArray(value)) {
           value.forEach((item, index) => next.push({ value: item, path: node.path + "[" + index + "]", parent: value }));
-        } else if (Array.isArray(value) && /^\\d+$/.test(part)) {
+        } else if (Array.isArray(value) && /^\d+$/.test(part)) {
           const index = Number(part);
           if (index < value.length) next.push({ value: value[index], path: node.path + "[" + index + "]", parent: value });
         } else if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, part)) {
