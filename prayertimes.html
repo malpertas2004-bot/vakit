@@ -2110,7 +2110,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function loadCountries() {
     const sel = $("countrySelect");
-    sel.innerHTML = \`<option value="" disabled selected>\${escapeHtml(t("loadingList"))}</option>\`;
+    sel.innerHTML = `<option value="" disabled selected>${escapeHtml(t("loadingList"))}</option>`;
 
     // The embedded dataset is the single source of truth for country names.
     // Live country APIs only map their own IDs to canonical countries; their
