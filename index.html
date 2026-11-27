@@ -2873,6 +2873,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       renderCountrySelect();
       await loadStatesForCountry(state.selectedCountry, stateId);
 
+      // When a provider uses the country itself as a parent-state container,
+      // the requested city ID now belongs to one of the re-parented regions.
+      if (!state.selectedState && distId) {
+        const regionMatches = state.states.filter(candidate =>
+          (candidate.fallbackDistricts || []).some(district =>
+            String(district.id) === distId ||
+            Object.values(district.sourceIds || {}).some(sourceId => String(sourceId) === distId)
+          )
+        );
+        if (regionMatches.length === 1) {
+          state.selectedState = regionMatches[0];
+        } else if (regionMatches.length > 1) {
+          throw new Error("District ID maps to multiple re-parented regions");
+        }
+      }
+
       if (!state.selectedState && stateId) {
         const { data: sj } = await fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states/${encodeURIComponent(stateId)}`);
         const sd = sj?.data || sj;
