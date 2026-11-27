@@ -3380,58 +3380,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if(fallbackUrl)add(fallbackUrl,"api");
     return found;
   }
-  function renderApiResponseDetails(containerId,payload,kind,fallbackUrl="",selectedFieldOverride=null) {
-    const box=$(containerId);if(!box)return;
+  function renderApiResponseDetails(containerId) {
+    const box = $(containerId);
+    if (!box) return;
     box.replaceChildren();
-    const selectedField = selectedFieldOverride || null;
-    const objects=collectApiObjects(payload);
-    const rows=kind==="hadith"?[
-      ["Kitap",["book.name","book_name","collection.name","collection"]],
-      ["Kitap bölümü",["kitab.title","chapter.title","chapter.name","kitab.name"]],
-      ["Bab",["bab.title","bab.title_ar","section.title","bab.name"]],
-      ["Bab numarası",["bab.number","chapter.number","section.number"]],
-      ["Hadis numarası",["number","hadith_no","hadithNumber","reference","ref"]],
-      ["Hadis derecesi",["grade.label","grade.grade","grade_source.grade","grading.label"]],
-      ["Derecelendiren",["grade.by","grade_source.grader","grading.by"]],
-      ["Kaynak",["meta.attribution","attribution","meta.source","source"]]
-    ]:[
-      ["Başlık",["title","name","dua.title","item.title"]],
-      ["Kategori",["category.title","category.name","category"]],
-      ["Kaynak",["meta.attribution","attribution","source","meta.source","book.name"]],
-      ["Referans",["reference","ref","number","verse_key","ayah","id"]],
-      ["Tekrar sayısı",["count","repeat","repetitions","repeat_count"]]
-    ];
-    let visible=false;
-    if(selectedField?.path){
-      const row=document.createElement("div");row.className="quote-meta-row";
-      const title=document.createElement("span");title.className="quote-meta-label";
-      title.textContent=state.lang==="nl"?"Gebruikt tekstveld:":state.lang==="en"?"Selected text field:":"Gösterilen metin alanı:";
-      const val=document.createElement("span");val.className="quote-meta-value";val.textContent=selectedField.path;
-      row.append(title,val);box.appendChild(row);visible=true;
-    }
-    for(const [label,paths] of rows){
-      const value=apiDisplayValue(getApiPathValue(objects,paths));if(!value)continue;
-      const row=document.createElement("div");row.className="quote-meta-row";
-      const title=document.createElement("span");title.className="quote-meta-label";title.textContent=label+":";
-      const val=document.createElement("span");val.className="quote-meta-value";val.textContent=value;
-      row.append(title,val);box.appendChild(row);visible=true;
-    }
-    const arabic=apiDisplayValue(getApiPathValue(objects,["arabic","ar","text_ar","hadith_ar","dua_ar","arabic_text"]));
-    if(arabic){
-      const details=document.createElement("details"),summary=document.createElement("summary"),text=document.createElement("p");
-      summary.textContent="Arapça metni göster";text.className="quote-meta-arabic";text.dir="rtl";text.lang="ar";text.textContent=arabic;
-      details.append(summary,text);box.appendChild(details);visible=true;
-    }
-    const links=collectApiResponseLinks(payload,fallbackUrl);
-    if(links.length){
-      const group=document.createElement("div");group.className="quote-meta-links";
-      for(const link of links){
-        const anchor=document.createElement("a");anchor.className="quote-meta-link";anchor.href=link.url;
-        anchor.target="_blank";anchor.rel="noopener noreferrer";anchor.textContent=link.label;group.appendChild(anchor);
-      }
-      box.appendChild(group);visible=true;
-    }
-    box.style.display=visible?"grid":"none";
+    box.style.display = "none";
   }
   function clearApiResponseDetails(containerId) {
     const box=$(containerId);if(!box)return;box.replaceChildren();box.style.display="none";
@@ -3468,31 +3421,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return "";
   }
 
-  function renderHadithCommentary(commentaryText, showMissing = false) {
+  function renderHadithCommentary() {
     const box = $("hadithCommentary");
-    const clean = fixTurkishText(commentaryText || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-    if (clean) {
-      const prefix = state.lang === "tr" ? "Hadis açıklaması: " : state.lang === "nl" ? "Hadith-uitleg: " : "Hadith explanation: ";
-      box.textContent = prefix + clean;
-      box.style.display = "block";
-    } else if (showMissing) {
-      box.textContent = state.lang === "tr"
-        ? "Bu API yanıtında ayrı açıklama alanı yok. Ana Türkçe metnin içine eklenmiş açıklama bölümleri yukarıda korunur."
-        : state.lang === "nl"
-          ? "Deze API levert geen afzonderlijk uitlegveld. Een toelichting in de hoofdtekst blijft hierboven zichtbaar."
-          : "This API record has no separate explanation field. Any explanatory passage included in the main hadith text is still shown above.";
-      box.style.display = "block";
-    } else {
-      box.textContent = "";
-      box.style.display = "none";
-    }
+    if (box) { box.textContent = ""; box.style.display = "none"; }
   }
 
-  function renderDuaCommentary(reviewText = "") {
+  function renderDuaCommentary() {
     const box = $("duaCommentary");
-    const clean = fixTurkishText(reviewText || "");
-    box.textContent = clean;
-    box.style.display = clean ? "block" : "none";
+    if (box) { box.textContent = ""; box.style.display = "none"; }
   }
 
   async function fetchCleanFromHadeethEnc(selLang, seedNo, signal) {
@@ -3735,7 +3671,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         return;
       }
 
-      if (state.selectedHadithApi === "random_hadith_gen" && selLang === "en" && API_TEXT_SCHEMAS.hadith.random_hadith_gen?.verified) {
+      if (state.selectedHadithApi === "random_hadith_gen" && selLang === "en") {
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
           const item = j?.data || j;
@@ -3761,10 +3697,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      const selectedHadithSchema = API_TEXT_SCHEMAS.hadith[state.selectedHadithApi];
       if (state.selectedHadithApi !== "hadeethenc" &&
-          !(state.selectedHadithApi === "sunnetimiz" && selLang === "tr") &&
-          selectedHadithSchema?.verified && selectedHadithSchema.languages?.[selLang]) {
+          !(state.selectedHadithApi === "sunnetimiz" && selLang === "tr")) {
         try {
           const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
           const selectedTextInfo = extractProviderApiText(state.selectedHadithApi, selectedResponse.data, selLang, "hadith");
@@ -3898,95 +3832,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
 
   /* Exact provider response schemas. A source without a verified field/language is not guessed. */
-  const API_TEXT_SCHEMAS = Object.freeze({
-    hadith: Object.freeze({
-      sunnetimiz: { verified: true, languages: {
-        tr: { paths: ["turkish"], sourceLanguage: "tr" },
-        en: { paths: ["hadiths.0.text"], sourceLanguage: "en" },
-        nl: { paths: ["hadiths.0.text"], sourceLanguage: "en" }
-      }},
-      fawaz_hadith: { verified: true, languages: {
-        tr: { paths: ["hadiths.0.text"], sourceLanguage: "tr" },
-        en: { paths: ["hadiths.0.text"], sourceLanguage: "en" },
-        nl: { paths: ["hadiths.0.text"], sourceLanguage: "en" }
-      }},
-      hadeethenc: { verified: true, languages: {
-        tr: { paths: ["hadeeth"], sourceLanguage: "tr" },
-        en: { paths: ["hadeeth"], sourceLanguage: "en" },
-        nl: { paths: ["hadeeth"], sourceLanguage: "en" }
-      }},
-      ummahapi_hadith: { verified: true, languages: {
-        en: { paths: ["data.english"], sourceLanguage: "en" },
-        nl: { paths: ["data.english"], sourceLanguage: "en" }
-      }},
-      hadith_gading: { verified: false, reason: "Indonesian-language response; no verified Turkish, Dutch or English translation field." },
-      random_hadith_gen: { verified: false, reason: "A stable response schema and language-specific text field could not be verified." },
-      dorar_hadith: { verified: false, reason: "The documented search response contains Arabic hadith text, not the requested translated text." },
-      sunnah_com: { verified: false, reason: "The public API requires credentials not configured in this browser app." },
-      islamic_network_hadith: { verified: false, reason: "The exact endpoint response schema and translation fields could not be verified." },
-      thaqalayn_api: { verified: true, languages: {
-        en: { paths: ["englishText"], sourceLanguage: "en" },
-        nl: { paths: ["englishText"], sourceLanguage: "en" }
-      }},
-      haditssoft_api: { verified: false, reason: "The documented endpoint differs from the configured URL and its data is Indonesian, not Turkish/Dutch/English." },
-      sunnahsource_hadith: { verified: false, reason: "The documented full API requires provider access credentials not configured here." },
-      ahmedbaset_hadith: { verified: true, languages: {
-        en: { paths: ["*.english.text", "hadiths.*.english.text", "data.*.english.text"], sourceLanguage: "en" },
-        nl: { paths: ["*.english.text", "hadiths.*.english.text", "data.*.english.text"], sourceLanguage: "en" }
-      }},
-      islamhouse_hadith: { verified: false, reason: "The configured response shape and requested translation fields could not be verified." },
-      diyanet_hadis: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
-      islamic_content_hadith: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
-      muslimapi_hadith: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
-      quran_nlp_hadith: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
-      alhadith_api: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
-      hadithapi_com: { verified: false, reason: "The documented public endpoint requires an API key not configured here." }
-    }),
-    dua: Object.freeze({
-      alquran_cloud: { verified: true, languages: {
-        tr: { paths: ["data.text"], sourceLanguage: "tr" },
-        nl: { paths: ["data.text"], sourceLanguage: "nl" },
-        en: { paths: ["data.text"], sourceLanguage: "en" }
-      }},
-      fawaz_quran_cdn: { verified: true, languages: {
-        tr: { paths: ["text"], sourceLanguage: "tr" },
-        nl: { paths: ["text"], sourceLanguage: "nl" },
-        en: { paths: ["text"], sourceLanguage: "en" }
-      }},
-      acikkuran_api: { verified: false, reason: "The documented REST API requires a Bearer token and cannot be called unauthenticated from this page." },
-      quran_com_v4: { verified: false, reason: "The current Quran Foundation endpoint requires OAuth credentials not configured here." },
-      ummahapi_duas: { verified: true, languages: {
-        en: { paths: ["data.translation"], sourceLanguage: "en" },
-        nl: { paths: ["data.translation"], sourceLanguage: "en" }
-      }},
-      fitrahive_duadhikr: { verified: true, languages: {
-        en: { paths: ["data.translation"], sourceLanguage: "en" },
-        nl: { paths: ["data.translation"], sourceLanguage: "en" }
-      }},
-      hisnul_workers: { verified: false, reason: "The documented translation is Bengali, not Turkish, Dutch or English." },
-      islamic_network_pray_dua: { verified: false, reason: "The exact endpoint response schema and translated text field could not be verified." },
-      quranenc_tr: { verified: true, languages: {
-        tr: { paths: ["result.translation"], sourceLanguage: "tr" },
-        nl: { paths: ["result.translation"], sourceLanguage: "nl" },
-        en: { paths: ["result.translation"], sourceLanguage: "en" }
-      }},
-      tanzil_api: { verified: false, reason: "The configured translation identifiers and returned content format could not be verified." },
-      quran_foundation: { verified: false, reason: "The current Quran Foundation endpoint requires OAuth credentials not configured here." },
-      sunnahsource_duas: { verified: false, reason: "The documented full API requires provider access credentials not configured here." },
-      quranify_dua: { verified: false, reason: "A stable public response schema and language-specific translation field could not be verified." },
-      kind_unes_adhkar: { verified: false, reason: "The configured public data URL could not be verified as an accessible current source." },
-      azkar_db: { verified: false, reason: "The configured public data URL could not be verified as an accessible current source." },
-      hisn_muslim_json: { verified: false, reason: "The configured public data URL could not be verified as an accessible current source." },
-      islamhouse_dua: { verified: false, reason: "The configured endpoint requests fatwa content, not a dua response." },
-      diyanet_kuran: { verified: false, reason: "The current endpoint response field and language variants could not be verified." },
-      global_quran: { verified: false, reason: "The documented endpoint requires an API key and a different URL structure." },
-      alquran_pages: { verified: true, languages: {
-        tr: { paths: ["data.text"], sourceLanguage: "tr" },
-        nl: { paths: ["data.text"], sourceLanguage: "nl" },
-        en: { paths: ["data.text"], sourceLanguage: "en" }
-      }}
-    })
-  });
 
   function resolveProviderTextPath(payload, path) {
     if (path === "$") return [{ value: payload, path: "$", parent: null }];
@@ -4012,27 +3857,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   function extractProviderApiText(providerId, payload, targetLang = state.lang, kind = "hadith") {
-    const providerSchema = API_TEXT_SCHEMAS[kind]?.[providerId];
-    if (!providerSchema?.verified) return null;
-    const languageRule = providerSchema.languages?.[targetLang];
-    if (!languageRule) return null;
-    for (const schemaPath of languageRule.paths || []) {
-      const candidates = resolveProviderTextPath(payload, schemaPath)
-        .map(node => {
-          const text = isUsableApiText(node.value, kind);
-          return text ? { ...node, text } : null;
-        })
-        .filter(Boolean);
-      if (!candidates.length) continue;
-      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-      return {
-        text: chosen.text,
-        path: chosen.path,
-        property: chosen.path.split(".").pop() || "$",
-        record: chosen.parent,
-        sourceLanguage: languageRule.sourceLanguage || targetLang,
-        languageFallback: (languageRule.sourceLanguage || targetLang) !== targetLang
-      };
+    const preferred = inspectApiTextPayload(payload, targetLang, kind);
+    if (preferred) return { ...preferred, record: payload, sourceLanguage: targetLang, languageFallback: false };
+    if (targetLang !== "en") {
+      const english = inspectApiTextPayload(payload, "en", kind);
+      if (english) return { ...english, record: payload, sourceLanguage: "en", languageFallback: true };
     }
     return null;
   }
@@ -4193,10 +4022,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      const selectedDuaSchema = API_TEXT_SCHEMAS.dua[state.selectedDuaApi];
       if (state.selectedDuaApi !== "fawaz_quran_cdn" &&
-          state.selectedDuaApi !== "fitrahive_duadhikr" &&
-          selectedDuaSchema?.verified && selectedDuaSchema.languages?.[selLang]) {
+          state.selectedDuaApi !== "fitrahive_duadhikr") {
         try {
           const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
           const selectedTextInfo = extractProviderApiText(state.selectedDuaApi, selectedResponse.data, selLang, "dua");
