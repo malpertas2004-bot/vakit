@@ -3485,7 +3485,11 @@ const DIYANET_ALL_LOCATIONS = [];
 
   async function resolveTurkeyCityCentreId(districtObj, source, signal) {
     if (!districtObj?.isTurkishProvinceCity) {
-      return getLocationSourceId(districtObj, "imsakiyem") || districtObj.id;
+      const sourceId = getLocationSourceId(districtObj, source);
+      if (!sourceId) {
+        throw new Error("Seçilen konum için İmsakiyem API eşleşen ID bulunamadı.");
+      }
+      return sourceId;
     }
     if (source !== "imsakiyem") throw new Error("Bu konum için desteklenmeyen şehir ID kaynağı.");
     const stateId = getLocationSourceId(districtObj, "imsakiyem");
