@@ -1525,17 +1525,15 @@ const DIYANET_ALL_LOCATIONS = [];
     return [];
   }
 
-  // AlAdhan and UmmahAPI calculate times from a city/country pair or
-  // coordinates; they do not publish a hierarchical country/state/city
-  // catalogue. Their selector therefore uses live location catalogues from
-  // the available location endpoints, with the selected prayer source first.
+  // Each visible hierarchy comes from one catalogue at a time. Mixing catalogue
+  // rows from providers with different IDs and spellings creates duplicate places.
   function getLocationCatalogSourceOrder(mode = state.selectedApiMode) {
     const plans = {
       imsakiyem: ["imsakiyem", "emushaf", "mtopal"],
       aladhan: ["emushaf", "mtopal", "imsakiyem"],
-      ummahapi: ["mtopal", "emushaf", "imsakiyem"],
-      qasra: ["mtopal", "emushaf", "imsakiyem"],
-      auto: ["imsakiyem", "mtopal", "emushaf"]
+      ummahapi: ["emushaf", "mtopal", "imsakiyem"],
+      qasra: ["emushaf", "mtopal", "imsakiyem"],
+      auto: ["emushaf", "mtopal", "imsakiyem"]
     };
     return [...(plans[mode] || plans.auto)];
   }
@@ -2534,8 +2532,13 @@ function findMatchingLocationRecordInList(records, previous) {
 
   function isTurkeyLocationCountry(countryId) {
     const selected = state.selectedCountry;
-    return String(countryId || "") === "2" ||
-      !!(selected && String(selected.id) === String(countryId || "") && isTurkeyCountry(selected));
+    if (!selected) return String(countryId || "") === "2";
+    const requested = String(countryId || "");
+    const belongsToSelectedCountry = !requested ||
+      requested === String(selected.id || "") ||
+      Object.values(selected.sourceIds || {}).some(id => String(id) === requested);
+    return belongsToSelectedCountry &&
+      (isTurkeyCountry(selected) || getLocationCountryIso2(selected) === "TR");
   }
 
   function normalizeLocationApiLabel(raw, countryId) {
@@ -2576,15 +2579,15 @@ function findMatchingLocationRecordInList(records, previous) {
     return matches.length === 1 ? matches[0] : null;
   }
 
-  function findMatchingLocationRecord(mapById, cleanTr, cleanEn) {
-    const trKey = canonicalLocationNameKey(cleanTr);
-    const enKey = canonicalLocationNameKey(cleanEn);
-    if ((!trKey && !enKey) || isNonAdministrativeLocationName(cleanTr, cleanEn)) {
+  function findMatchingLocationRecord(mapById, cleanTr, cleanEn, extraAliases = []) {
+    const inputKeys = new Set([
+      cleanTr, cleanEn, ...extraAliases
+    ].map(canonicalLocationNameKey).filter(Boolean));
+    if (!inputKeys.size || isNonAdministrativeLocationName(cleanTr, cleanEn, ...extraAliases)) {
       return { conflict: true };
     }
 
-    const trMatches = new Set();
-    const enMatches = new Set();
+    const matches = new Set();
     for (const [candidateKey, candidate] of mapById) {
       const candidateAliases = new Set([
         candidate?.apiName,
@@ -2593,19 +2596,12 @@ function findMatchingLocationRecordInList(records, previous) {
         candidate?.nameNl,
         ...(Array.isArray(candidate?.nameAliases) ? candidate.nameAliases : [])
       ].map(canonicalLocationNameKey).filter(Boolean));
-
-      if (trKey && candidateAliases.has(trKey)) trMatches.add(candidateKey);
-      if (enKey && candidateAliases.has(enKey)) enMatches.add(candidateKey);
+      if ([...inputKeys].some(key => candidateAliases.has(key))) matches.add(candidateKey);
     }
 
-    // Language variants must point to the same canonical location.
-    const allMatches = new Set([...trMatches, ...enMatches]);
-    if (allMatches.size > 1 || trMatches.size > 1 || enMatches.size > 1) {
-      return { conflict: true };
-    }
-
-    if (allMatches.size === 1) {
-      const key = [...allMatches][0];
+    if (matches.size > 1) return { conflict: true };
+    if (matches.size === 1) {
+      const key = [...matches][0];
       return { key, record: mapById.get(key), conflict: false };
     }
     return null;
@@ -2620,20 +2616,31 @@ function findMatchingLocationRecordInList(records, previous) {
     if (!sourceId) return;
 
     const countryId = String(extra?.countryId || "");
-    const cleanTr = countryId && countryId !== "2"
-      ? formatTurkishForeignLocationName(rawTr || "")
-      : formatTurkishName(rawTr || "");
+    const cleanTr = isTurkeyLocationCountry(countryId)
+      ? formatTurkishName(rawTr || "")
+      : formatTurkishForeignLocationName(rawTr || "");
     const cleanEn = formatLatinName(rawEn || "");
     const cleanApiName = normalizeLocationApiLabel(extra?.apiName || rawTr || rawEn || cleanTr || cleanEn, countryId);
     if (isNonAdministrativeLocationName(cleanTr, cleanEn, cleanApiName)) return;
 
     const sourceKey = source ? source + ":" + sourceId : sourceId;
     const directPrev = mapById.get(sourceKey);
-    const matched = findMatchingLocationRecord(mapById, cleanTr, cleanEn);
+    const matched = findMatchingLocationRecord(mapById, cleanTr, cleanEn, [
+      extra?.apiName, ...(Array.isArray(extra?.nameAliases) ? extra.nameAliases : [])
+    ]);
     if (matched?.conflict) return;
 
-    const targetKey = directPrev ? sourceKey : (matched?.key || sourceKey);
-    const prev = directPrev || matched?.record;
+    const targetKey = matched?.key || sourceKey;
+    const matchedPrev = matched?.record;
+    const prev = matchedPrev && directPrev && matchedPrev !== directPrev
+      ? {
+          ...directPrev,
+          ...matchedPrev,
+          sourceIds: { ...(directPrev.sourceIds || {}), ...(matchedPrev.sourceIds || {}) },
+          nameAliases: [...new Set([...(directPrev.nameAliases || []), ...(matchedPrev.nameAliases || [])])]
+        }
+      : (matchedPrev || directPrev);
+    if (directPrev && matchedPrev && matched.key !== sourceKey) mapById.delete(sourceKey);
 
     // Existing canonical/local names always win. Remote APIs attach source IDs
     // and fill missing fields; they never overwrite known translations.
@@ -2681,94 +2688,103 @@ function findMatchingLocationRecordInList(records, previous) {
       source,
       response: await fetchJsonWithTimeout(endpoints[source], { timeoutMs: 8000 })
     })));
-
-    const countriesByIdentity = new Map();
-    const aliasesFor = record => [...new Set([
-      record?.nameTr, record?.nameEn, record?.nameNl, record?.apiName,
-      ...(record?.nameAliases || [])
-    ].map(countryApiNameKey).filter(Boolean))];
-
+    const sourceData = new Map();
     for (const result of settled) {
       if (result.status !== "fulfilled") continue;
-      const { source, response } = result.value;
-      const rows = getLocationApiRows(response.data);
+      const rows = getLocationApiRows(result.value.response.data);
+      if (rows.length) sourceData.set(result.value.source, rows);
+    }
 
-      for (const item of rows) {
-        let id = "";
-        let rawTr = "";
-        let rawEn = "";
-        let rawNl = "";
-        let iso2 = "";
+    const primarySource = sourceOrder.find(source => sourceData.has(source));
+    const primaryRows = primarySource ? sourceData.get(primarySource) : [];
+    const countriesByIdentity = new Map();
 
-        if (source === "imsakiyem") {
-          id = String(item?._id ?? item?.id ?? "").trim();
-          rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.name ?? "").trim();
-          rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.UlkeAdiEN ?? item?.english_name ?? "").trim();
-          rawNl = String(item?.name_nl ?? item?.nameNl ?? "").trim();
-          iso2 = String(item?.iso2 ?? item?.iso_code ?? item?.country_code ?? item?.code ?? "").toUpperCase();
-        } else {
-          id = String(item?.UlkeID ?? item?._id ?? item?.id ?? item?.country_id ?? "").trim();
-          rawTr = String(item?.UlkeAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? item?.country ?? "").trim();
-          rawEn = String(item?.UlkeAdiEn ?? item?.UlkeAdiEN ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "").trim();
-          rawNl = String(item?.UlkeAdiNl ?? item?.name_nl ?? item?.nameNl ?? "").trim();
-          iso2 = String(item?.iso2 ?? item?.iso_code ?? item?.country_code ?? item?.code ?? "").toUpperCase();
-        }
+    const parseCountryRow = (item, source) => {
+      let id = "", rawTr = "", rawEn = "", rawNl = "";
+      if (source === "imsakiyem") {
+        id = String(item?._id ?? item?.id ?? "").trim();
+        rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.name ?? "").trim();
+        rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.UlkeAdiEN ?? item?.english_name ?? "").trim();
+        rawNl = String(item?.name_nl ?? item?.nameNl ?? "").trim();
+      } else {
+        id = String(item?.UlkeID ?? item?._id ?? item?.id ?? item?.country_id ?? "").trim();
+        rawTr = String(item?.UlkeAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? item?.country ?? "").trim();
+        rawEn = String(item?.UlkeAdiEn ?? item?.UlkeAdiEN ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "").trim();
+        rawNl = String(item?.UlkeAdiNl ?? item?.name_nl ?? item?.nameNl ?? "").trim();
+      }
+      const codeRaw = String(item?.iso2 ?? item?.iso_code ?? item?.country_code ?? item?.code ?? "").toUpperCase();
+      const iso2 = /^[A-Z]{2}$/.test(codeRaw) && COUNTRY_ISO_CODES.includes(codeRaw)
+        ? codeRaw
+        : (countryIso2FromName(rawEn) || countryIso2FromName(rawTr) || countryIso2FromName(rawNl));
+      const aliases = [...new Set([
+        rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)
+      ].filter(Boolean))];
+      return { id, rawTr, rawEn, rawNl, iso2, aliases };
+    };
 
-        if (!id || (!rawTr && !rawEn && !rawNl)) continue;
-        rawTr = rawTr || rawEn || rawNl;
-        rawEn = rawEn || rawTr;
-        const identityName = countryApiNameKey(rawEn) || countryApiNameKey(rawTr);
-        if (!iso2 && !identityName) continue;
+    // The first complete catalogue controls visible country names and country records.
+    for (const item of primaryRows) {
+      const parsed = parseCountryRow(item, primarySource);
+      const { id, rawTr, rawEn, rawNl, iso2, aliases } = parsed;
+      if (!id || (!rawTr && !rawEn && !rawNl) || isNonAdministrativeLocationName(...aliases)) continue;
+      const displayName = rawTr || rawEn || rawNl;
+      const identityName = countryApiNameKey(rawEn || rawTr || rawNl);
+      const identity = iso2 ? "iso-" + iso2.toLowerCase() : "name-" + identityName;
+      if (!iso2 && !identityName) continue;
 
-        let record = iso2 ? [...countriesByIdentity.values()].find(c => c.iso2 === iso2) : null;
-        if (!record) {
-          const candidateKeys = new Set([
-            rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)
-          ].map(countryApiNameKey).filter(Boolean));
-          const matches = [...countriesByIdentity.values()].filter(existing =>
-            aliasesFor(existing).some(key => candidateKeys.has(key))
+      let record = countriesByIdentity.get(identity);
+      if (!record) {
+        record = {
+          id: "country-" + identity,
+          countryId: "",
+          nameTr: rawTr || rawEn || rawNl,
+          nameEn: rawEn || rawTr || rawNl,
+          nameNl: rawNl || rawEn || rawTr,
+          apiName: displayName,
+          nameAliases: [],
+          iso2,
+          sourceIds: {},
+          catalogSource: primarySource,
+          locationKind: "country"
+        };
+        countriesByIdentity.set(identity, record);
+      }
+      record.sourceIds[primarySource] = id;
+      record.nameAliases = [...new Set([...(record.nameAliases || []), ...aliases])].slice(0, 60);
+      if (!record.iso2 && iso2) record.iso2 = iso2;
+    }
+
+    const countries = [...countriesByIdentity.values()];
+    const aliasesFor = country => new Set([
+      country.nameTr, country.nameEn, country.nameNl, country.apiName,
+      ...(country.nameAliases || [])
+    ].map(countryApiNameKey).filter(Boolean));
+
+    // Secondary APIs only supply IDs for the already visible canonical countries.
+    for (const source of sourceOrder) {
+      if (source === primarySource || !sourceData.has(source)) continue;
+      for (const item of sourceData.get(source)) {
+        const parsed = parseCountryRow(item, source);
+        if (!parsed.id || (!parsed.rawTr && !parsed.rawEn && !parsed.rawNl)) continue;
+        const rowKeys = new Set(parsed.aliases.map(countryApiNameKey).filter(Boolean));
+        let match = parsed.iso2 ? countries.find(country => country.iso2 === parsed.iso2) || null : null;
+        if (!match && rowKeys.size) {
+          const candidates = countries.filter(country =>
+            [...aliasesFor(country)].some(key => rowKeys.has(key))
           );
-          if (matches.length === 1) record = matches[0];
+          if (candidates.length === 1) match = candidates[0];
         }
-
-        if (!record) {
-          const identity = iso2 ? "iso-" + iso2.toLowerCase() : "name-" + identityName;
-          record = {
-            id: "country-" + identity,
-            countryId: "",
-            nameTr: rawTr,
-            nameEn: rawEn,
-            nameNl: rawNl || rawEn,
-            apiName: rawTr || rawEn || rawNl,
-            nameAliases: [...new Set([rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)].filter(Boolean))],
-            iso2,
-            sourceIds: {},
-            locationKind: "country"
-          };
-          countriesByIdentity.set(identity, record);
-        }
-
-        record.sourceIds = record.sourceIds || {};
-        record.sourceIds[source] = id;
-        if (source === "imsakiyem") record.id = id;
-        if (!record.iso2 && iso2) record.iso2 = iso2;
-        if (!record.nameTr && rawTr) record.nameTr = rawTr;
-        if (!record.nameEn && rawEn) record.nameEn = rawEn;
-        if (!record.nameNl && rawNl) record.nameNl = rawNl;
-        if (!record.apiName) record.apiName = rawTr || rawEn || rawNl;
-        record.nameAliases = [...new Set([
-          ...(record.nameAliases || []), rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)
-        ].filter(Boolean))];
+        if (match) match.sourceIds[source] = parsed.id;
       }
     }
 
-    const countries = [...countriesByIdentity.values()]
-      .filter(country => !isNonAdministrativeLocationName(country.nameTr, country.nameEn, country.nameNl))
+    const cleanCountries = countries
+      .filter(country => !isNonAdministrativeLocationName(country.nameTr, country.nameEn, country.nameNl, country.apiName))
       .sort((a, b) => getLocalizedLocationName(a, "country").localeCompare(
         getLocalizedLocationName(b, "country"), I18N[state.lang].locale, { sensitivity: "base" }
       ));
 
-    if (!countries.length) {
+    if (!cleanCountries.length) {
       state.countries = [];
       sel.disabled = true;
       sel.innerHTML = '<option value="" disabled selected>Konum API verisi alınamadı</option>';
@@ -2777,17 +2793,25 @@ function findMatchingLocationRecordInList(records, previous) {
     }
 
     const previousCountry = state.selectedCountry;
-    state.countries = countries;
+    state.countries = cleanCountries;
     if (previousCountry) {
-      state.selectedCountry = countries.find(country =>
-        country.id === String(previousCountry.id) ||
-        Object.values(country.sourceIds || {}).includes(String(previousCountry.id)) ||
-        (previousCountry.iso2 && country.iso2 === previousCountry.iso2)
+      const previousIds = new Set([
+        previousCountry.id, ...Object.values(previousCountry.sourceIds || {})
+      ].map(value => String(value || "")).filter(Boolean));
+      const previousKeys = new Set([
+        previousCountry.nameTr, previousCountry.nameEn, previousCountry.nameNl,
+        previousCountry.apiName, ...(previousCountry.nameAliases || [])
+      ].map(countryApiNameKey).filter(Boolean));
+      state.selectedCountry = cleanCountries.find(country =>
+        (previousCountry.iso2 && country.iso2 === previousCountry.iso2) ||
+        [country.id, ...Object.values(country.sourceIds || {})]
+          .some(value => previousIds.has(String(value || ""))) ||
+        [...previousKeys].some(key => aliasesFor(country).has(key))
       ) || null;
     }
     sel.disabled = false;
     renderCountrySelect();
-    return countries;
+    return cleanCountries;
   }
 
   function renderCountrySelect() {
@@ -3055,21 +3079,28 @@ function findMatchingLocationRecordInList(records, previous) {
       mtopal: id => "https://namazvakti.mtopal.dev/sehirler/" + encodeURIComponent(id)
     };
     const sourceOrder = getLocationCatalogSourceOrder();
-    const requests = sourceOrder.map(async source => {
+    let selectedSource = "";
+    let selectedRows = [];
+    for (const source of sourceOrder) {
       const sourceId = getLocationSourceId(countryObj, source);
-      if (!sourceId) return { source, rows: [] };
-      const response = await fetchJsonWithTimeout(endpoints[source](sourceId), { timeoutMs: 8000 });
-      return { source, rows: getLocationApiRows(response.data) };
-    });
-    const settled = await Promise.allSettled(requests);
+      if (!sourceId) continue;
+      try {
+        const response = await fetchJsonWithTimeout(endpoints[source](sourceId), { timeoutMs: 8000 });
+        const rows = getLocationApiRows(response.data);
+        if (rows.length) {
+          selectedSource = source;
+          selectedRows = rows;
+          break;
+        }
+      } catch (_) {}
+    }
+    const sourceResults = selectedSource ? [{ source: selectedSource, rows: selectedRows }] : [];
 
     const mapById = new Map();
     const parentStateRecords = [];
     const parentKeys = new Set();
 
-    for (const result of settled) {
-      if (result.status !== "fulfilled") continue;
-      const { source, rows } = result.value;
+    for (const { source, rows } of sourceResults) {
       for (const item of rows) {
         let id = "";
         let rawTr = "";
@@ -3103,6 +3134,7 @@ function findMatchingLocationRecordInList(records, previous) {
 
         mergeLocationRecord(mapById, id, rawTr, rawEn, {
           countryId,
+          catalogSource: source,
           apiName: apiName || rawTr || rawEn,
           nameAliases: collectApiLocationNameAliases(item),
           ...getApiLocationCoordinates(item)
@@ -3148,6 +3180,7 @@ function findMatchingLocationRecordInList(records, previous) {
       nameNl: countryObj.nameNl || countryObj.nameEn || countryObj.nameTr,
       apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
       sourceIds: parentSourceIds,
+      catalogSource: parentStateRecords[0]?.source || selectedSource,
       fallbackDistricts: parentCityRecords,
       isCountryLevelParent: true
     } : null;
@@ -3165,6 +3198,7 @@ function findMatchingLocationRecordInList(records, previous) {
         nameNl: "Türkiye",
         apiName: "Türkiye",
         sourceIds: { ...(countryObj.sourceIds || {}) },
+        catalogSource: selectedSource,
         fallbackDistricts: provinces,
         isTurkeyRoot: true
       }];
@@ -3201,6 +3235,7 @@ function findMatchingLocationRecordInList(records, previous) {
               nameNl: "Türkiye",
               apiName: "Türkiye",
               sourceIds: { ...(countryObj.sourceIds || {}) },
+              catalogSource: "osm",
               isTurkeyRoot: true
             };
             root.fallbackDistricts = osmRegions.map(item => ({
@@ -3247,6 +3282,7 @@ function findMatchingLocationRecordInList(records, previous) {
                 nameNl: countryObj.nameNl || countryObj.nameEn,
                 apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
                 osmCountryIso: getLocationCountryIso2(countryObj),
+                catalogSource: "osm",
                 isCountryLevelParent: true,
                 fallbackDistricts: osmCities,
                 sourceIds: {}
@@ -3321,17 +3357,23 @@ function findMatchingLocationRecordInList(records, previous) {
     }
 
     const sourceOrder = getLocationCatalogSourceOrder();
-    const requests = sourceOrder.map(async source => {
+    let selectedSource = "";
+    let selectedRows = [];
+    for (const source of sourceOrder) {
       const sourceId = getLocationSourceId(stateObj, source);
-      if (!sourceId) return { source, rows: [] };
-      const response = await fetchJsonWithTimeout(endpoints[source](sourceId), { timeoutMs: 8000 });
-      return { source, rows: getLocationApiRows(response.data) };
-    });
-    const settled = await Promise.allSettled(requests);
+      if (!sourceId) continue;
+      try {
+        const response = await fetchJsonWithTimeout(endpoints[source](sourceId), { timeoutMs: 8000 });
+        const rows = getLocationApiRows(response.data);
+        if (rows.length) {
+          selectedSource = source;
+          selectedRows = rows;
+          break;
+        }
+      } catch (_) {}
+    }
 
-    for (const result of settled) {
-      if (result.status !== "fulfilled") continue;
-      const { source, rows } = result.value;
+    for (const { source, rows } of (selectedSource ? [{ source: selectedSource, rows: selectedRows }] : [])) {
       for (const item of rows) {
         let id = "";
         let rawTr = "";
@@ -3355,6 +3397,7 @@ function findMatchingLocationRecordInList(records, previous) {
         rawEn = rawEn || rawTr;
         mergeLocationRecord(mapById, id, rawTr, rawEn, {
           countryId,
+          catalogSource: source,
           apiName: apiName || rawTr || rawEn,
           nameAliases: collectApiLocationNameAliases(item),
           ...getApiLocationCoordinates(item)
