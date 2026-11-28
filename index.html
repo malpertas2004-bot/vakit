@@ -2782,6 +2782,117 @@ const DIYANET_ALL_LOCATIONS = [];
     }
   }
 
+  function getLocationCountryIso2(countryObj) {
+    return String(countryObj?.iso2 || (countryObj === state.selectedCountry ? getSelectedCountryIso2() : "") || "").toUpperCase();
+  }
+
+  async function fetchOverpassElements(query) {
+    const endpoints = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter"
+    ];
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      try {
+        const url = endpoint + "?data=" + encodeURIComponent(query);
+        const { data } = await fetchJsonWithTimeout(url, { timeoutMs: 16000 });
+        return Array.isArray(data?.elements) ? data.elements : [];
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("OpenStreetMap konum verisi alınamadı.");
+  }
+
+  function normalizeOsmLocationElement(element, countryObj, kind) {
+    const tags = element?.tags || {};
+    const rawName = String(tags.name || tags["name:en"] || tags["name:tr"] || "").trim();
+    if (!rawName) return null;
+    const rawEn = String(tags["name:en"] || rawName).trim();
+    const rawTr = String(tags["name:tr"] || rawName).trim();
+    if (isNonAdministrativeLocationName(rawTr, rawEn)) return null;
+
+    const record = {
+      id: "osm-" + String(element.type || "item") + "-" + String(element.id || ""),
+      countryId: String(countryObj?.id || ""),
+      nameTr: rawTr,
+      nameEn: rawEn,
+      nameNl: String(tags["name:nl"] || rawEn),
+      apiName: rawName,
+      nameAliases: [...new Set([rawName, rawTr, rawEn].filter(Boolean))],
+      sourceIds: {},
+      locationKind: kind,
+      osmId: Number(element.id)
+    };
+    if (kind === "state" && element.type === "relation") {
+      record.osmAreaId = 3600000000 + Number(element.id);
+    }
+    return record;
+  }
+
+  async function fetchOsmAdminRegions(countryObj) {
+    const iso2 = getLocationCountryIso2(countryObj);
+    if (!iso2) return [];
+    const query = '[out:json][timeout:20];area["ISO3166-1"="' + iso2 + '"]->.country;' +
+      'relation["boundary"="administrative"]["admin_level"~"3|4|5"](area.country);out tags center;';
+    try {
+      const elements = await fetchOverpassElements(query);
+      return elements.map(element => normalizeOsmLocationElement(element, countryObj, "state"))
+        .filter(record => record?.osmAreaId)
+        .filter((record, index, list) => list.findIndex(item =>
+          canonicalLocationNameKey(item.apiName) === canonicalLocationNameKey(record.apiName)
+        ) === index);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function fetchOsmPlacesInArea(areaId, countryObj) {
+    const numericAreaId = Number(areaId);
+    if (!Number.isFinite(numericAreaId) || numericAreaId <= 0) return [];
+    const query = '[out:json][timeout:20];area(' + Math.trunc(numericAreaId) + ')->.selectedArea;' +
+      '(node["place"~"city|town|municipality"](area.selectedArea);' +
+      'relation["place"~"city|town|municipality"](area.selectedArea););out center tags;';
+    try {
+      const elements = await fetchOverpassElements(query);
+      return elements.map(element => normalizeOsmLocationElement(element, countryObj, "district")).filter(Boolean);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function fetchOsmPlacesForCountry(countryObj) {
+    const iso2 = getLocationCountryIso2(countryObj);
+    if (!iso2) return [];
+    const query = '[out:json][timeout:20];area["ISO3166-1"="' + iso2 + '"]->.selectedArea;' +
+      '(node["place"~"city|town|municipality"](area.selectedArea);' +
+      'relation["place"~"city|town|municipality"](area.selectedArea););out center tags;';
+    try {
+      const elements = await fetchOverpassElements(query);
+      return elements.map(element => normalizeOsmLocationElement(element, countryObj, "district")).filter(Boolean);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function fetchOsmPlacesForState(stateObj, countryObj) {
+    if (stateObj?.osmAreaId) return fetchOsmPlacesInArea(stateObj.osmAreaId, countryObj);
+    const iso2 = getLocationCountryIso2(countryObj);
+    const stateName = String(stateObj?.apiName || stateObj?.nameEn || stateObj?.nameTr || "").trim();
+    if (!iso2 || !stateName) return [];
+    const safeName = stateName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const lookup = '[out:json][timeout:15];area["ISO3166-1"="' + iso2 + '"]->.country;' +
+      'relation["boundary"="administrative"]["admin_level"~"3|4|5"]["name"="' + safeName + '"](area.country);out ids;';
+    try {
+      const matches = await fetchOverpassElements(lookup);
+      const relation = matches.find(item => item.type === "relation" && Number(item.id) > 0);
+      if (!relation) return [];
+      return fetchOsmPlacesInArea(3600000000 + Number(relation.id), countryObj);
+    } catch (_) {
+      return [];
+    }
+  }
+
   async function loadStatesForCountry(countryObj, preselectStateId = "") {
     const stateSel = $("stateSelect");
     const distSel = $("districtSelect");
@@ -2903,6 +3014,35 @@ const DIYANET_ALL_LOCATIONS = [];
           (item.legacyDistrictIds || []).includes(requested)
         ) || null;
       }
+
+      const hasActualRegions = state.states.some(item => !item.isCountryLevelParent);
+      if (!hasActualRegions) {
+        const osmRegions = await fetchOsmAdminRegions(countryObj);
+        if (osmRegions.length) {
+          state.states = osmRegions;
+          if (preselectStateId) {
+            const requested = String(preselectStateId);
+            state.selectedState = state.states.find(item => item.id === requested) || null;
+          }
+        } else {
+          const osmCities = await fetchOsmPlacesForCountry(countryObj);
+          if (osmCities.length) {
+            state.states = [{
+              id: "osm-country-root-" + countryId,
+              countryId,
+              nameTr: countryObj.nameTr || countryObj.nameEn,
+              nameEn: countryObj.nameEn || countryObj.nameTr,
+              nameNl: countryObj.nameNl || countryObj.nameEn,
+              apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
+              osmCountryIso: getLocationCountryIso2(countryObj),
+              isCountryLevelParent: true,
+              fallbackDistricts: osmCities,
+              sourceIds: {}
+            }];
+            state.selectedState = state.states[0];
+          }
+        }
+      }
     }
 
     renderStateSelect();
@@ -3004,6 +3144,26 @@ const DIYANET_ALL_LOCATIONS = [];
           countryId,
           apiName: apiName || rawTr || rawEn
         }, source);
+      }
+    }
+
+    if (mapById.size === 0) {
+      let osmPlaces = [];
+      if (stateObj.osmAreaId) {
+        osmPlaces = await fetchOsmPlacesInArea(stateObj.osmAreaId, state.selectedCountry);
+      } else if (stateObj.osmCountryIso || stateObj.isCountryLevelParent) {
+        osmPlaces = stateObj.fallbackDistricts?.length
+          ? [...stateObj.fallbackDistricts]
+          : await fetchOsmPlacesForCountry(state.selectedCountry);
+      } else {
+        osmPlaces = await fetchOsmPlacesForState(stateObj, state.selectedCountry);
+      }
+      for (const item of osmPlaces) {
+        mergeLocationRecord(mapById, item.id, item.nameTr, item.nameEn, {
+          ...item,
+          countryId,
+          apiName: item.apiName
+        });
       }
     }
 
