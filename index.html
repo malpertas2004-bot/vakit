@@ -3017,23 +3017,102 @@ navigator.geolocation.getCurrentPosition(position=>{$("ummahLatInput").value=Str
 error=>{const reason=error?.code===1?"Konum izni verilmedi.":error?.code===2?"Cihaz konumu belirlenemedi.":"Konum isteği zaman aşımına uğradı.";$("status").textContent=state.lang==="tr"?reason+" Enlem ve boylamı elle girebilirsiniz.":reason+" You can enter coordinates manually.";},
 {enableHighAccuracy:false,timeout:15000,maximumAge:300000});
 }
-async function searchQasraPlaces(){
-const query=$("qasraSearchInput").value.trim();if(query.length<2){$("status").textContent=state.lang==="tr"?"Arama için en az iki karakter girin.":"Enter at least two characters to search.";return;}
-const button=$("qasraSearchBtn");button.disabled=true;button.textContent=state.lang==="tr"?"Aranıyor…":"Searching…";$("qasraResultsSelect").disabled=true;
-try{const url="https://geo.qasra.org/search?q="+encodeURIComponent(query);const {data}=await fetchJsonWithTimeout(url,{timeoutMs:9000});const rows=Array.isArray(data)?data:getLocationApiRows(data);
-state.qasraSearchResults=rows.filter(item=>{const lat=Number(item?.lat),lng=Number(item?.lng);return String(item?.name||item?.city||"").trim()&&Number.isFinite(lat)&&lat>=-90&&lat<=90&&Number.isFinite(lng)&&lng>=-180&&lng<=180;}).slice(0,10);
-$("qasraResultsSelect").innerHTML='<option value="">'+(state.lang==="tr"?"Bir konum seçin":"Select a location")+"</option>"+state.qasraSearchResults.map((item,index)=>'<option value="'+index+'">'+escapeHtml([item.name||item.city,item.state,item.country].filter(Boolean).join(" — "))+"</option>").join("");
-$("qasraResultsSelect").disabled=!state.qasraSearchResults.length;$("status").textContent=state.qasraSearchResults.length?(state.lang==="tr"?state.qasraSearchResults.length+" konum bulundu. Doğru şehri seçin.":state.qasraSearchResults.length+" places found. Select the correct city."):(state.lang==="tr"?"Eşleşen şehir bulunamadı.":"No matching places found.");
-}catch(error){$("status").textContent=(state.lang==="tr"?"QASRA konum araması başarısız: ":"QASRA place search failed: ")+String(error?.message||error);}
-finally{button.disabled=false;button.textContent=state.lang==="tr"?"Şehir ara":state.lang==="nl"?"Stad zoeken":"Search city";}
-}
-function selectQasraPlace(){
-const item=state.qasraSearchResults[Number($("qasraResultsSelect").value)];if(!item)return;const zone=validTimezone($("qasraTimezoneInput").value);
-if(!zone){$("status").textContent=state.lang==="tr"?"Şehir için geçerli bir IANA saat dilimi girin (ör. Asia/Kolkata).":"Enter a valid IANA time zone for this city (for example, Asia/Kolkata).";return;}
-const city=String(item.name||item.city).trim(),region=String(item.state||"").trim(),country=String(item.country||"").trim();
-setCustomLocation(country,region,city,{id:"qasra-"+asciiFoldKey(city+"-"+region+"-"+country).replace(/[^a-z0-9]+/g,"-"),lat:Number(item.lat),lng:Number(item.lng),tz:zone});
-state.zone=zone;state.actualApiMode="";state.todayData=null;Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);loadTimes({silentHourly:false});
-}
+
+  async function fetchQasraGeocoder(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(new Error("QASRA Geocoder request timed out")), 10000);
+    try {
+      const response = await fetch(url, { method:"GET", cache:"no-store", headers:{Accept:"application/json"}, signal:controller.signal });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(payload?.error || ("HTTP " + response.status));
+        error.status = response.status;
+        error.retryAfter = response.headers.get("Retry-After") || payload?.retry_after_seconds || "";
+        error.exceeded = payload?.exceeded || "";
+        throw error;
+      }
+      return payload;
+    } finally { clearTimeout(timeout); }
+  }
+  function showQasraGeocoderError(error, operation) {
+    let message=String(error?.message||error);
+    if(error?.status===429){
+      const delay=error.retryAfter?" Retry-After: "+error.retryAfter+" s.":"";
+      const windowName=error.exceeded?" ("+error.exceeded+")":"";
+      message=(state.lang==="tr"?"İstek sınırına ulaşıldı":"Request limit reached")+windowName+"."+delay+
+        (state.lang==="tr"?" Otomatik tekrar yapılmadı; belirtilen süreden sonra yeniden deneyin.":" No automatic retry; try again after the indicated delay.");
+    } else if(error?.status===503&&error.retryAfter) message+=" Retry-After: "+error.retryAfter+" s.";
+    const prefix=operation==="reverse"
+      ? (state.lang==="tr"?"QASRA koordinat sorgusu başarısız: ":"QASRA reverse lookup failed: ")
+      : (state.lang==="tr"?"QASRA yer araması başarısız: ":"QASRA place search failed: ");
+    $("status").textContent=prefix+message;
+  }
+  function setQasraPendingLocation(record,lat,lng,source){
+    const name=String(record?.name||record?.city||"").trim(),region=String(record?.state||"").trim(),country=String(record?.country||"").trim();
+    const latitude=Number(lat??record?.lat),longitude=Number(lng??record?.lng);
+    if(!name||!Number.isFinite(latitude)||latitude < -90||latitude>90||!Number.isFinite(longitude)||longitude < -180||longitude>180) throw new Error("QASRA Geocoder geçerli yer adı ve koordinat döndürmedi.");
+    state.qasraPendingLocation={name,state:region,country,lat:latitude,lng:longitude,source};
+    $("qasraLatInput").value=String(latitude);$("qasraLngInput").value=String(longitude);
+    $("qasraResolvedPlace").textContent=[name,region,country].filter(Boolean).join(" · ");$("qasraUsePendingPlaceBtn").disabled=false;
+  }
+  async function searchQasraPlaces(){
+    const query=$("qasraSearchInput").value.trim();
+    if(query.length<2){$("status").textContent=state.lang==="tr"?"Yer adı araması için en az iki karakter girin.":"Enter at least two characters to search for a place.";return;}
+    const button=$("qasraSearchBtn");button.disabled=true;button.textContent=state.lang==="tr"?"Aranıyor…":"Searching…";
+    $("qasraResultsSelect").disabled=true;state.qasraPendingLocation=null;$("qasraUsePendingPlaceBtn").disabled=true;
+    $("qasraResolvedPlace").textContent=state.lang==="tr"?"Arama sonuçları bekleniyor…":"Waiting for search results…";
+    try{
+      const url=new URL("https://geo.qasra.org/search");url.searchParams.set("q",query);
+      const data=await fetchQasraGeocoder(url.toString());if(!Array.isArray(data))throw new Error("Unexpected QASRA search response.");
+      state.qasraSearchResults=data.filter(item=>{
+        const lat=Number(item?.lat),lng=Number(item?.lng);
+        return String(item?.name||"").trim()&&Number.isFinite(lat)&&lat>=-90&&lat<=90&&Number.isFinite(lng)&&lng>=-180&&lng<=180;
+      }).slice(0,10);
+      $("qasraResultsSelect").innerHTML='<option value="">'+(state.lang==="tr"?"Bir yer seçin":"Select a place")+"</option>"+
+        state.qasraSearchResults.map((item,index)=>'<option value="'+index+'">'+escapeHtml([item.name,item.state,item.country].filter(Boolean).join(" — "))+"</option>").join("");
+      $("qasraResultsSelect").disabled=state.qasraSearchResults.length===0;
+      $("status").textContent=state.qasraSearchResults.length
+        ? (state.lang==="tr"?state.qasraSearchResults.length+" eşleşme bulundu. Bölge ve ülkeye göre doğru yeri seçin.":state.qasraSearchResults.length+" matches found. Choose the correct place using its region and country.")
+        : (state.lang==="tr"?"Eşleşen yer bulunamadı.":"No matching places found.");
+      if(!state.qasraSearchResults.length)$("qasraResolvedPlace").textContent=state.lang==="tr"?"Eşleşen yer bulunamadı.":"No matching place found.";
+    }catch(error){showQasraGeocoderError(error,"search");$("qasraResolvedPlace").textContent=state.lang==="tr"?"Yer arama sonucu yok.":"No place selected.";}
+    finally{button.disabled=false;button.textContent=state.lang==="tr"?"Ara":state.lang==="nl"?"Zoeken":"Search";}
+  }
+  function selectQasraPlace(){
+    const item=state.qasraSearchResults[Number($("qasraResultsSelect").value)];if(!item)return;
+    try{setQasraPendingLocation(item,item.lat,item.lng,"name-search");$("status").textContent=state.lang==="tr"?"Yer seçildi. Saat dilimini girip “Bu konumu kullan” düğmesine basın.":"Place selected. Enter its time zone and choose “Use this location”.";}
+    catch(error){showQasraGeocoderError(error,"search");}
+  }
+  async function reverseQasraCoordinates(){
+    const lat=Number($("qasraLatInput").value),lng=Number($("qasraLngInput").value);
+    if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180){$("status").textContent=state.lang==="tr"?"Geçerli enlem (-90–90) ve boylam (-180–180) girin.":"Enter valid latitude (-90–90) and longitude (-180–180).";return;}
+    const button=$("qasraReverseLookupBtn");button.disabled=true;$("qasraUsePendingPlaceBtn").disabled=true;state.qasraPendingLocation=null;
+    $("qasraResolvedPlace").textContent=state.lang==="tr"?"Koordinat çözülüyor…":"Resolving coordinates…";
+    try{
+      const url=new URL("https://geo.qasra.org/");url.searchParams.set("lat",String(lat));url.searchParams.set("lng",String(lng));
+      const data=await fetchQasraGeocoder(url.toString());if(!data||typeof data!=="object"||Array.isArray(data))throw new Error("Unexpected QASRA reverse lookup response.");
+      setQasraPendingLocation(data,lat,lng,"reverse-lookup");
+      $("status").textContent=state.lang==="tr"?"Koordinatların konum karşılığı bulundu. Saat dilimini girip konumu kullanabilirsiniz.":"A place was resolved for these coordinates. Enter its time zone and use this location.";
+    }catch(error){showQasraGeocoderError(error,"reverse");$("qasraResolvedPlace").textContent=state.lang==="tr"?"Koordinat için yer bulunamadı.":"No place found for these coordinates.";}
+    finally{button.disabled=false;}
+  }
+  function useQasraDeviceLocation(){
+    if(!navigator.geolocation){$("status").textContent=state.lang==="tr"?"Tarayıcı konum iznini desteklemiyor. Koordinatları elle girebilirsiniz.":"Geolocation is unavailable. Enter coordinates manually.";return;}
+    $("status").textContent=state.lang==="tr"?"Cihaz konumu bekleniyor…":"Waiting for device location…";
+    navigator.geolocation.getCurrentPosition(position=>{
+      $("qasraLatInput").value=String(position.coords.latitude);$("qasraLngInput").value=String(position.coords.longitude);reverseQasraCoordinates();
+    },error=>{
+      const reason=error?.code===1?"Konum izni verilmedi.":error?.code===2?"Cihaz konumu belirlenemedi.":"Konum isteği zaman aşımına uğradı.";
+      $("status").textContent=state.lang==="tr"?reason+" Koordinatları elle girebilirsiniz.":reason+" You can enter coordinates manually.";
+    },{enableHighAccuracy:false,timeout:15000,maximumAge:300000});
+  }
+  function applyQasraPendingLocation(){
+    const item=state.qasraPendingLocation;if(!item)return;
+    const zone=validTimezone($("qasraTimezoneInput").value);
+    if(!zone){$("status").textContent=state.lang==="tr"?"Bu yerin IANA saat dilimini girin (ör. Asia/Kolkata). QASRA Geocoder saat dilimi döndürmez.":"Enter this place's IANA time zone (for example, Asia/Kolkata). QASRA Geocoder does not return time zones.";return;}
+    setCustomLocation(item.country,item.state,item.name,{id:"qasra-"+asciiFoldKey(item.name+"-"+item.state+"-"+item.country).replace(/[^a-z0-9]+/g,"-"),lat:item.lat,lng:item.lng,tz:zone});
+    state.zone=zone;state.actualApiMode="";state.todayData=null;Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);loadTimes({silentHourly:false});
+  }
 function restoreCustomProviderLocation(saved){
 if(state.selectedApiMode==="aladhan"){$("aladhanCountryInput").value=saved?.aladhanCountryName||"";$("aladhanStateInput").value=saved?.aladhanStateName||"";$("aladhanCityInput").value=saved?.aladhanCityName||"";if($("aladhanCountryInput").value&&$("aladhanCityInput").value)applyAladhanLocation(false);return;}
 if(saved?.providerLat===null||saved?.providerLat===undefined||saved?.providerLng===null||saved?.providerLng===undefined)return;const lat=Number(saved.providerLat),lng=Number(saved.providerLng);if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180)return;
