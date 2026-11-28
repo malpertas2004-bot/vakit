@@ -3305,7 +3305,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const url = "https://ummahapi.com/api/prayer-times?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
     const record = j?.data || j;
-    const tm = record?.prayer_times || record?.times || record?.timings;
+    const tm = record?.prayer_times || record?.times || record?.timings || record;
     if (!tm) throw new Error("UmmahAPI response did not contain prayer_times");
     const mapped = validateMappedTimes({
       Fajr: cleanTime(tm.Fajr || tm.fajr),
