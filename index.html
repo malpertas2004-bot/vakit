@@ -3058,6 +3058,61 @@ function findMatchingLocationRecordInList(records, previous) {
     }
   }
 
+  function parseStateCatalogRow(item, source) {
+    const isImsakiyem = source === "imsakiyem";
+    const id = String(isImsakiyem
+      ? (item?._id ?? item?.id ?? item?.state_id ?? "")
+      : (item?.SehirID ?? item?._id ?? item?.id ?? item?.state_id ?? "")).trim();
+    const rawTr = String(isImsakiyem
+      ? (item?.name_tr ?? item?.nameTr ?? item?.SehirAdi ?? item?.name ?? "")
+      : (item?.SehirAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? "")).trim();
+    const rawEn = String(isImsakiyem
+      ? (item?.name_en ?? item?.nameEn ?? item?.SehirAdiEn ?? item?.english_name ?? item?.name ?? "")
+      : (item?.SehirAdiEn ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "")).trim();
+    const apiName = String(isImsakiyem
+      ? ((item?.name ?? item?.title ?? rawTr) || rawEn)
+      : (rawTr || rawEn)).trim();
+    const aliases = [...new Set([rawTr, rawEn, apiName, ...collectApiLocationNameAliases(item)].filter(Boolean))];
+    const keys = new Set(aliases.map(canonicalLocationNameKey).filter(Boolean));
+    return { id, rawTr: rawTr || rawEn, rawEn: rawEn || rawTr, apiName, aliases, keys };
+  }
+
+  async function attachAlternateStateSourceIds(stateRecords, countryObj, primarySource, sourceOrder) {
+    if (!Array.isArray(stateRecords) || !stateRecords.length || !primarySource) return;
+    const targets = stateRecords.flatMap(record => record?.isTurkeyRoot
+      ? (record.fallbackDistricts || [])
+      : [record]);
+    const alternateSources = sourceOrder.filter(source =>
+      source !== primarySource && getLocationSourceId(countryObj, source)
+    );
+    const endpoints = {
+      imsakiyem: id => IMSAKIYEM_LOCATION_API + "/states?countryId=" + encodeURIComponent(id),
+      emushaf: id => "https://ezanvakti.emushaf.net/sehirler/" + encodeURIComponent(id),
+      mtopal: id => "https://namazvakti.mtopal.dev/sehirler/" + encodeURIComponent(id)
+    };
+    await Promise.allSettled(alternateSources.map(async source => {
+      const countrySourceId = getLocationSourceId(countryObj, source);
+      const response = await fetchJsonWithTimeout(endpoints[source](countrySourceId), { timeoutMs: 8000 });
+      const rows = getLocationApiRows(response.data);
+      for (const item of rows) {
+        const candidate = parseStateCatalogRow(item, source);
+        if (!candidate.id || !candidate.keys.size ||
+          isCountryNameReturnedAsState(candidate.rawTr, candidate.rawEn, countryObj)) continue;
+        const matches = targets.filter(target => {
+          const keys = new Set([
+            target?.apiName, target?.nameTr, target?.nameEn, target?.nameNl,
+            ...(target?.nameAliases || [])
+          ].map(canonicalLocationNameKey).filter(Boolean));
+          return [...candidate.keys].some(key => keys.has(key));
+        });
+        if (matches.length === 1) {
+          const target = matches[0];
+          target.sourceIds = { ...(target.sourceIds || {}), [source]: candidate.id };
+        }
+      }
+    }));
+  }
+
   async function loadStatesForCountry(countryObj, preselectStateId = "") {
     const stateSel = $("stateSelect");
     const distSel = $("districtSelect");
@@ -3102,26 +3157,9 @@ function findMatchingLocationRecordInList(records, previous) {
 
     for (const { source, rows } of sourceResults) {
       for (const item of rows) {
-        let id = "";
-        let rawTr = "";
-        let rawEn = "";
-        let apiName = "";
-
-        if (source === "imsakiyem") {
-          id = String(item?._id ?? item?.id ?? item?.state_id ?? "").trim();
-          rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.SehirAdi ?? item?.name ?? "").trim();
-          rawEn = String(item?.name_en ?? item?.nameEn ?? item?.SehirAdiEn ?? item?.english_name ?? item?.name ?? "").trim();
-          apiName = String(item?.name ?? item?.title ?? (rawTr || rawEn)).trim();
-        } else {
-          id = String(item?.SehirID ?? item?._id ?? item?.id ?? item?.state_id ?? "").trim();
-          rawTr = String(item?.SehirAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? "").trim();
-          rawEn = String(item?.SehirAdiEn ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "").trim();
-          apiName = rawTr || rawEn;
-        }
-
+        const parsedRow = parseStateCatalogRow(item, source);
+        const { id, rawTr, rawEn, apiName } = parsedRow;
         if (!id || (!rawTr && !rawEn)) continue;
-        rawTr = rawTr || rawEn;
-        rawEn = rawEn || rawTr;
 
         if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
           const parentKey = source + ":" + id;
@@ -3294,6 +3332,11 @@ function findMatchingLocationRecordInList(records, previous) {
       }
     }
 
+    if (selectedSource) {
+      await attachAlternateStateSourceIds(
+        state.states, countryObj, selectedSource, sourceOrder
+      );
+    }
     renderStateSelect();
     return state.states;
   }
