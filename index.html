@@ -292,6 +292,8 @@ select:disabled{opacity:.55;cursor:not-allowed}
   text-align:right;
   line-height:1.45;
 }
+.quote-source a{color:var(--gold);text-decoration:underline;text-underline-offset:2px}
+.quote-source a:hover{color:var(--gold-bright)}
 .quote-meta{margin-top:10px;padding-top:9px;border-top:1px solid rgba(49,86,75,.55);display:grid;gap:5px;font-size:12px;line-height:1.5}
 .quote-meta-row{display:flex;flex-wrap:wrap;gap:5px 8px;align-items:baseline}
 .quote-meta-label{color:var(--muted);font-weight:650}
@@ -3576,6 +3578,23 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     };
   }
 
+  function renderHadithSourceCredit(source, provider) {
+    const target = $("hadithSource");
+    if (!target) return;
+    target.replaceChildren();
+    const label = String(source || provider || "-");
+    if (provider === "Sünnetimiz Hadith API") {
+      const link = document.createElement("a");
+      link.href = "https://sunnetimiz.com";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = label;
+      target.appendChild(link);
+      return;
+    }
+    target.textContent = label;
+  }
+
   async function loadRandomHadith() {
     const signal = renewSignal("hadith");
     state.nextHadithAt = Date.now() + QUOTE_ROTATE_MS;
@@ -3645,7 +3664,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
       $("hadithText").textContent = displayText;
       const ms = Math.round(performance.now() - started);
-      $("hadithSource").textContent = result.source || result.provider || "-";
+      renderHadithSourceCredit(result.source, result.provider);
       $("hadithApiProvider").textContent = result.provider || "Hadith API";
       $("hadithApiStatus").textContent = "200 OK · " + ms + " ms";
       $("hadithApiStatus").className = "api-val ok";
@@ -3660,7 +3679,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           ? "Er kon geen hadith uit de open API-bronnen worden opgehaald. Probeer opnieuw."
           : "No hadith record could be fetched from the open API sources. Please try again.";
       $("hadithText").textContent = message;
-      $("hadithSource").textContent = "-";
+      renderHadithSourceCredit("-", "");
       $("hadithApiProvider").textContent = "Hadith API pool";
       $("hadithApiStatus").textContent = "No record · " + Math.round(performance.now() - started) + " ms";
       $("hadithApiStatus").className = "api-val warn";
@@ -4070,7 +4089,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
       const ms = Math.round(performance.now() - started);
       $("quranText").textContent = displayText;
-      $("quranSource").textContent = "Kur’an · " + ref.surah + ":" + ref.verse;
+      $("quranSource").textContent = "Kur’an · " + ref.surah + ":" + ref.verse + " · " + (result.source || result.provider || "Quran API");
       $("quranApiProvider").textContent = result.provider || result.source || "Quran API";
       $("quranApiStatus").textContent = "200 OK · " + ms + " ms";
       $("quranApiStatus").className = "api-val ok";
