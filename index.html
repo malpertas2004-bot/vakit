@@ -683,6 +683,20 @@ details.nav-item > summary:hover{background:#163b30}
           </select>
         </div>
       </div>
+      <div class="loc-row prayer-options-row" id="customMethodSettingsRow" style="display:none">
+        <div>
+          <label class="field-label" for="customFajrAngle" id="customFajrAngleLabel">Fajr açısı (derece):</label>
+          <input id="customFajrAngle" type="number" min="0" max="30" step="0.1" value="18">
+        </div>
+        <div>
+          <label class="field-label" for="customMaghribSetting" id="customMaghribSettingLabel">Akşam: gün batımından sonra dakika (boş = varsayılan):</label>
+          <input id="customMaghribSetting" type="number" min="0" max="120" step="1" placeholder="Boş bırakılabilir">
+        </div>
+        <div>
+          <label class="field-label" for="customIshaSetting" id="customIshaSettingLabel">Yatsı açısı / dakika:</label>
+          <input id="customIshaSetting" type="number" min="0" max="60" step="0.1" value="17">
+        </div>
+      </div>
       <p class="status" id="prayerMethodHint">Yalnızca seçili API’nin desteklediği yöntemler gösterilir.</p>
     </div>
 
@@ -1023,7 +1037,8 @@ details.nav-item > summary:hover{background:#163b30}
     { value: "jordan", tr: "Ürdün", en: "Jordan", nl: "Jordanië", aladhan: 23, ummah: "Jordan", deen2u: "jordan" },
     { value: "palestine", tr: "Filistin", en: "Palestine", nl: "Palestina", ummah: "Palestine" },
     { value: "brunei", tr: "Brunei", en: "Brunei", nl: "Brunei", deen2u: "brunei" },
-    { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië", salahtable: "malaysia" }
+    { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië", salahtable: "malaysia" },
+    { value: "custom", tr: "Özel yöntem (99)", en: "Custom method (99)", nl: "Aangepaste methode (99)", aladhan: 99 }
   ];
   const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"];
   const QUOTE_ROTATE_MS = 300000; // 5 minutes
@@ -1048,6 +1063,9 @@ details.nav-item > summary:hover{background:#163b30}
       highLatitudeLabel: "Yüksek enlem kuralı:",
       prayerMethodHint: "Yalnızca seçilen API’nin desteklediği hesaplama yöntemleri listelenir. Vakitleri yerel cami veya dinî otoriteyle karşılaştırın.",
       prayerMethodAuto: "Servis varsayılanı / otomatik",
+      customFajrAngleLabel: "İmsak açısı (derece):",
+      customMaghribSettingLabel: "Akşam: gün batımından sonra dakika (boş = varsayılan):",
+      customIshaSettingLabel: "Yatsı açısı / dakika:",
       prayerSchoolShafii: "Şafii / Standart",
       prayerSchoolHanafi: "Hanefi",
       highLatitudeRecommended: "Önerilen",
@@ -1187,6 +1205,9 @@ details.nav-item > summary:hover{background:#163b30}
       highLatitudeLabel: "High-latitude rule:",
       prayerMethodHint: "Only methods supported by the selected API are shown. Compare times with your local mosque or religious authority.",
       prayerMethodAuto: "Provider default / automatic",
+      customFajrAngleLabel: "Fajr angle (degrees):",
+      customMaghribSettingLabel: "Maghrib: minutes after sunset (blank = default):",
+      customIshaSettingLabel: "Isha angle / minutes:",
       prayerSchoolShafii: "Shafi / Standard",
       prayerSchoolHanafi: "Hanafi",
       highLatitudeRecommended: "Recommended",
@@ -1326,6 +1347,9 @@ details.nav-item > summary:hover{background:#163b30}
       highLatitudeLabel: "Regel voor hoge breedtegraden:",
       prayerMethodHint: "Alleen methoden die door de gekozen API worden ondersteund, worden getoond. Vergelijk tijden met uw lokale moskee of religieuze autoriteit.",
       prayerMethodAuto: "Standaard van provider / automatisch",
+      customFajrAngleLabel: "Fajr-hoek (graden):",
+      customMaghribSettingLabel: "Maghrib: minuten na zonsondergang (leeg = standaard):",
+      customIshaSettingLabel: "Isha-hoek / minuten:",
       prayerSchoolShafii: "Shafi / Standaard",
       prayerSchoolHanafi: "Hanafi",
       highLatitudeRecommended: "Aanbevolen",
@@ -1479,6 +1503,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     prayerMethod: "auto",
     prayerSchool: "shafii",
     highLatitudeRule: "recommended",
+    customFajrAngle: 18,
+    customMaghribSetting: "",
+    customIshaSetting: 17,
     calendarMode: "gregorian",
     zikrCount: 0,
     zikrPhrase: "subhanallah",
@@ -1807,6 +1834,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           prayerMethod: state.prayerMethod || "auto",
           prayerSchool: state.prayerSchool || "shafii",
           highLatitudeRule: state.highLatitudeRule || "recommended",
+          customFajrAngle: state.customFajrAngle,
+          customMaghribSetting: state.customMaghribSetting,
+          customIshaSetting: state.customIshaSetting,
           calendarMode: state.calendarMode || "gregorian",
           volume: Number($("volume")?.value ?? 85)
         };
@@ -2857,7 +2887,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     const schoolModes = ["aladhan", "islamic_app", "ummahapi", "deen2u", "salahtable", "esalah"];
     $("prayerSchoolSelect").disabled = !schoolModes.includes(mode);
-    $("highLatitudeSelect").disabled = mode !== "ummahapi";
+    $("highLatitudeSelect").disabled = !["ummahapi", "aladhan"].includes(mode);
+    $("customMethodSettingsRow").style.display = mode === "aladhan" && state.prayerMethod === "custom" ? "" : "none";
+    $("customFajrAngleLabel").textContent = t("customFajrAngleLabel");
+    $("customMaghribSettingLabel").textContent = t("customMaghribSettingLabel");
+    $("customIshaSettingLabel").textContent = t("customIshaSettingLabel");
+    $("customMethodSettingsRow").querySelector("#customFajrAngle").value = String(state.customFajrAngle);
+    $("customMethodSettingsRow").querySelector("#customMaghribSetting").value = state.customMaghribSetting;
+    $("customMethodSettingsRow").querySelector("#customIshaSetting").value = String(state.customIshaSetting);
     $("prayerMethodHint").textContent = t("prayerMethodHint");
     $("prayerMethodLabel").textContent = t("prayerMethodLabel");
     $("prayerSchoolLabel").textContent = t("prayerSchoolLabel");
@@ -2930,6 +2967,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     });
     if (method.aladhan !== "" && method.aladhan !== undefined) params.set("method", String(method.aladhan));
     if (state.prayerMethod === "moonsighting") params.set("shafaq", "general");
+    if (state.prayerMethod === "custom") {
+      const maghrib = state.customMaghribSetting === "" ? "null" : String(state.customMaghribSetting);
+      params.set("methodSettings", [String(state.customFajrAngle), maghrib, String(state.customIshaSetting)].join(","));
+    }
+    const latitudeModes = { MiddleOfNight: "1", SeventhOfNight: "2", TwilightAngle: "3" };
+    if (latitudeModes[state.highLatitudeRule]) params.set("latitudeAdjustmentMethod", latitudeModes[state.highLatitudeRule]);
     const url = "https://api.aladhan.com/v1/timingsByCity/" + compactDate + "?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
     if (j.code !== 200 || !j.data?.timings) throw new Error("AlAdhan data error");
@@ -5097,8 +5140,24 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     $("prayerMethodSelect").addEventListener("change", e => {
       state.prayerMethod = e.target.value || "auto";
+      populatePrayerMethodOptions();
       Persistence.savePrefs();
       if (state.selectedDistrict && state.selectedApiMode) loadTimes({ silentHourly: false });
+    });
+    $("customFajrAngle").addEventListener("change", e => {
+      state.customFajrAngle = Math.max(0, Math.min(30, Number(e.target.value) || 18));
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "aladhan" && state.prayerMethod === "custom") loadTimes({ silentHourly: false });
+    });
+    $("customMaghribSetting").addEventListener("change", e => {
+      state.customMaghribSetting = e.target.value === "" ? "" : String(Math.max(0, Math.min(120, Number(e.target.value) || 0)));
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "aladhan" && state.prayerMethod === "custom") loadTimes({ silentHourly: false });
+    });
+    $("customIshaSetting").addEventListener("change", e => {
+      state.customIshaSetting = Math.max(0, Math.min(60, Number(e.target.value) || 17));
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "aladhan" && state.prayerMethod === "custom") loadTimes({ silentHourly: false });
     });
     $("prayerSchoolSelect").addEventListener("change", e => {
       state.prayerSchool = e.target.value === "hanafi" ? "hanafi" : "shafii";
@@ -5210,6 +5269,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (PRAYER_METHODS.some(item => item.value === saved?.prayerMethod)) state.prayerMethod = saved.prayerMethod;
     if (["shafii","hanafi"].includes(saved?.prayerSchool)) state.prayerSchool = saved.prayerSchool;
     if (["recommended","MiddleOfNight","SeventhOfNight","TwilightAngle"].includes(saved?.highLatitudeRule)) state.highLatitudeRule = saved.highLatitudeRule;
+    if (Number.isFinite(Number(saved?.customFajrAngle))) state.customFajrAngle = Math.max(0, Math.min(30, Number(saved.customFajrAngle)));
+    if (saved?.customMaghribSetting === "" || Number.isFinite(Number(saved?.customMaghribSetting))) state.customMaghribSetting = saved.customMaghribSetting;
+    if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0, Math.min(60, Number(saved.customIshaSetting)));
     loadZikrPrefs();
     if (typeof saved?.volume === "number") {
       $("volume").value = String(saved.volume);
