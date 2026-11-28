@@ -1559,18 +1559,39 @@ const DIYANET_ALL_LOCATIONS = [];
   function getLocationApiRows(payload) {
     const queue = [payload];
     const seen = new Set();
-    const keys = ["data", "results", "items", "records", "countries", "states", "districts", "locations", "list", "docs", "result"];
+    const arrayKeys = ["data", "results", "items", "records", "countries", "states", "districts", "locations", "list", "docs", "result"];
+    const objectKeys = ["data", "countries", "states", "districts", "results", "items", "records", "locations", "list", "docs", "result"];
+    const isRecord = item => item && typeof item === "object" && !Array.isArray(item) &&
+      (item.name || item.name_tr || item.name_en || item.nameTr || item.nameEn ||
+       item.UlkeAdi || item.SehirAdi || item.IlceAdi);
     while (queue.length) {
       const current = queue.shift();
       if (Array.isArray(current)) return current;
       if (!current || typeof current !== "object" || seen.has(current)) continue;
       seen.add(current);
-      for (const key of keys) {
+      for (const key of arrayKeys) {
         if (Array.isArray(current[key])) return current[key];
       }
-      for (const key of keys) {
+      for (const key of objectKeys) {
         const value = current[key];
-        if (value && typeof value === "object") queue.push(value);
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const records = Object.entries(value)
+          .filter(([, item]) => isRecord(item))
+          .map(([id, item]) => ({
+            ...item,
+            id: item.id ?? item._id ?? item.state_id ?? item.district_id ?? id
+          }));
+        if (records.length) return records;
+        queue.push(value);
+      }
+      const rootRecords = Object.entries(current)
+        .filter(([, item]) => isRecord(item))
+        .map(([id, item]) => ({
+          ...item,
+          id: item.id ?? item._id ?? item.state_id ?? item.district_id ?? id
+        }));
+      if (rootRecords.length && rootRecords.length === Object.values(current).filter(v => v && typeof v === "object" && !Array.isArray(v)).length) {
+        return rootRecords;
       }
     }
     return [];
