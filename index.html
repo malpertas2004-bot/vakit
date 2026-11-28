@@ -651,18 +651,18 @@ details.nav-item > summary:hover{background:#163b30}
         <label class="field-label" for="apiSelect" id="apiSelectLabel">Vakit API Kayna&#287;&#305; Se&ccedil;imi (20 Farkl&#305; API):</label>
         <select id="apiSelect" class="prompt-select">
           <option value="" disabled selected>&mdash; Vakit API kayna&#287;&#305;n&#305; se&ccedil;iniz &mdash;</option>
-          <option value="imsakiyem">&#304;msakiyem / Diyanet API</option>
-          <option value="emushaf">eMushaf Namaz Vakitleri API</option>
-          <option value="aladhan">AlAdhan Prayer Times API</option>
-          <option value="ummahapi">UmmahAPI Prayer Times</option>
-          <option value="pawan_krd">Pawan.krd PrayerTimes API</option>
-          <option value="azan_quran_et">Azan Prayer Times API</option>
-          <option value="deen2u">Deen2u Islamic Times API</option>
-                  <option value="salahtable">SalahTable Prayer Times API</option>
-          <option value="islamic_app">islamic.app Prayer Times API</option>
-          <option value="esalah">eSalah Prayer Times API</option>
-          <option value="waqtazan">Waqtazan Prayer Times API</option>
-          <option value="vakit_vercel">Vakit Vercel GPS API</option>
+          <option value="mtopal">MTopal · Diyanet dünya vakitleri</option>
+          <option value="imsakiyem">İmsakiyem · Diyanet API</option>
+          <option value="emushaf">eMushaf · Diyanet API</option>
+          <option value="aladhan">AlAdhan · Prayer Times API</option>
+          <option value="islamic_app">islamic.app · 33.000+ şehir</option>
+          <option value="deen2u">Deen2u · Şehir veya koordinat</option>
+          <option value="salahtable">SalahTable · 407 şehir</option>
+          <option value="ummahapi">UmmahAPI · Koordinat</option>
+          <option value="azan_quran_et">Azan · Koordinat</option>
+          <option value="esalah">eSalah · Koordinat</option>
+          <option value="simplesolat">SimpleSolat · Açık veri</option>
+          <option value="zikr_prayer">Zikr e Quran · Koordinat</option>
 </select>
       </div>
       <div class="loc-row prayer-options-row">
@@ -871,19 +871,19 @@ details.nav-item > summary:hover{background:#163b30}
       <article class="live-stream-item">
         <h3 id="liveMakkahTitle">Mekke · Mescid-i Haram</h3>
         <div class="live-player-wrap">
-          <iframe class="live-player" loading="lazy" title="Mekke Mescid-i Haram canlı yayın" src="https://www.youtube.com/embed/live_stream?channel=UCos52azQNBgW63_9uDJoPDA&amp;modestbranding=1&amp;rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+          <iframe class="live-player" loading="lazy" title="Mekke Mescid-i Haram canlı yayın" src="https://aloula.sba.sa/en/live/quran" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
-        <a class="link-pill" href="https://www.youtube.com/channel/UCos52azQNBgW63_9uDJoPDA/live" target="_blank" rel="noopener noreferrer" id="liveMakkahLink">YouTube’da aç</a>
+        <a class="link-pill" href="https://aloula.sba.sa/en/live/quran" target="_blank" rel="noopener noreferrer" id="liveMakkahLink">YouTube’da aç</a>
       </article>
       <article class="live-stream-item">
         <h3 id="liveMadinahTitle">Medine · Mescid-i Nebevî</h3>
         <div class="live-player-wrap">
-          <iframe class="live-player" loading="lazy" title="Medine Mescid-i Nebevî canlı yayın" src="https://www.youtube.com/embed/live_stream?channel=UCROKYPep-UuODNwyipe6JMw&amp;modestbranding=1&amp;rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+          <iframe class="live-player" loading="lazy" title="Medine Mescid-i Nebevî canlı yayın" src="https://aloula.sba.sa/en/live/sunna" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
-        <a class="link-pill" href="https://www.youtube.com/channel/UCROKYPep-UuODNwyipe6JMw/live" target="_blank" rel="noopener noreferrer" id="liveMadinahLink">YouTube’da aç</a>
+        <a class="link-pill" href="https://aloula.sba.sa/en/live/sunna" target="_blank" rel="noopener noreferrer" id="liveMadinahLink">YouTube’da aç</a>
       </article>
     </div>
-    <p class="status" id="liveStreamNote">Yayınlar Suudi Arabistan Yayın Kurumunun resmî Kur’an ve Sünnet TV kanallarından alınır. Akış açılmazsa YouTube bağlantısını kullanın.</p>
+    <p class="status" id="liveStreamNote">Yayınlar Suudi Arabistan’ın resmî Aloula canlı yayın sayfalarından açılır. Oynatıcı çalışmazsa kanal bağlantısını yeni sekmede açın.</p>
   </section>
 
   <!-- Resources Section -->
@@ -1147,7 +1147,7 @@ details.nav-item > summary:hover{background:#163b30}
       liveMakkahTitle: "Mekke · Mescid-i Haram",
       liveMadinahTitle: "Medine · Mescid-i Nebevî",
       liveFallback: "YouTube’da aç",
-      liveStreamNote: "Yayınlar Suudi Arabistan Yayın Kurumunun resmî Kur’an ve Sünnet TV kanallarından alınır. Akış açılmazsa YouTube bağlantısını kullanın.",
+      liveStreamNote: "Yayınlar Suudi Arabistan’ın resmî Aloula canlı yayın sayfalarından açılır. Oynatıcı çalışmazsa kanal bağlantısını yeni sekmede açın.",
       pageSuffix: "Namaz Vakitleri — DİYANET",
       unselectedTitle: "Ülke, Eyalet/İl ve İlçe Seçiniz",
       selectCountryOption: "— Ülke seçiniz —",
@@ -1193,18 +1193,18 @@ details.nav-item > summary:hover{background:#163b30}
       apiSelectLabel: "Vakit API kaynağı:",
       religiousLangLabel: "Hadis ve Kur’an dili:",
       apiOptions: {
-        imsakiyem: "İmsakiyem / Diyanet API",
-        emushaf: "eMushaf Namaz Vakitleri API",
-        aladhan: "AlAdhan Prayer Times API",
-        ummahapi: "UmmahAPI Prayer Times",
-        pawan_krd: "Pawan.krd PrayerTimes API",
-        azan_quran_et: "Azan Prayer Times API",
-        deen2u: "Deen2u Islamic Times API",
-        salahtable: "SalahTable Prayer Times API",
-        islamic_app: "islamic.app Prayer Times API",
-        esalah: "eSalah Prayer Times API",
-        waqtazan: "Waqtazan Prayer Times API",
-        vakit_vercel: "Vakit Vercel GPS API"
+        mtopal: "MTopal · Diyanet dünya vakitleri",
+        imsakiyem: "İmsakiyem · Diyanet API",
+        emushaf: "eMushaf · Diyanet API",
+        aladhan: "AlAdhan · Prayer Times API",
+        islamic_app: "islamic.app · Şehir tabanlı API",
+        deen2u: "Deen2u · Şehir veya koordinat",
+        salahtable: "SalahTable · Şehir tabanlı API",
+        ummahapi: "UmmahAPI · Koordinat tabanlı API",
+        azan_quran_et: "Azan · Koordinat tabanlı API",
+        esalah: "eSalah · Koordinat tabanlı API",
+        simplesolat: "SimpleSolat · Açık veri API",
+        zikr_prayer: "Zikr e Quran · Prayer Times API"
       },
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
@@ -1298,7 +1298,7 @@ details.nav-item > summary:hover{background:#163b30}
       liveMakkahTitle: "Makkah · Masjid al-Haram",
       liveMadinahTitle: "Madinah · Prophet’s Mosque",
       liveFallback: "Open on YouTube",
-      liveStreamNote: "Streams are embedded from the official Saudi Quran TV and Sunnah TV channels. Use the YouTube link if a stream does not load.",
+      liveStreamNote: "Streams open from Saudi Arabia’s official Aloula live pages. Open the channel link in a new tab if the embedded player does not load.",
       pageSuffix: "Prayer Times — DIYANET",
       unselectedTitle: "Select Country, State & District",
       selectCountryOption: "— Select Country —",
@@ -1344,18 +1344,18 @@ details.nav-item > summary:hover{background:#163b30}
       apiSelectLabel: "Prayer Times API source:",
       religiousLangLabel: "Hadith and Quran language:",
       apiOptions: {
-        imsakiyem: "Imsakiyem / Diyanet API",
-        emushaf: "eMushaf Prayer Times API",
-        aladhan: "AlAdhan Prayer Times API",
-        ummahapi: "UmmahAPI Prayer Times",
-        pawan_krd: "Pawan.krd PrayerTimes API",
-        azan_quran_et: "Azan Prayer Times API",
-        deen2u: "Deen2u Islamic Times API",
-        salahtable: "SalahTable Prayer Times API",
-        islamic_app: "islamic.app Prayer Times API",
-        esalah: "eSalah Prayer Times API",
-        waqtazan: "Waqtazan Prayer Times API",
-        vakit_vercel: "Vakit Vercel GPS API"
+        mtopal: "MTopal · Diyanet worldwide data",
+        imsakiyem: "Imsakiyem · Diyanet API",
+        emushaf: "eMushaf · Diyanet API",
+        aladhan: "AlAdhan · Prayer Times API",
+        islamic_app: "islamic.app · City-based API",
+        deen2u: "Deen2u · City or coordinates",
+        salahtable: "SalahTable · City-based API",
+        ummahapi: "UmmahAPI · Coordinates",
+        azan_quran_et: "Azan · Coordinates",
+        esalah: "eSalah · Coordinates",
+        simplesolat: "SimpleSolat · Open data API",
+        zikr_prayer: "Zikr e Quran · Prayer Times API"
       },
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
@@ -1449,7 +1449,7 @@ details.nav-item > summary:hover{background:#163b30}
       liveMakkahTitle: "Mekka · Masjid al-Haram",
       liveMadinahTitle: "Medina · Profeetmoskee",
       liveFallback: "Openen op YouTube",
-      liveStreamNote: "De streams zijn afkomstig van de officiële Saudi Quran TV- en Sunnah TV-kanalen. Gebruik de YouTube-link als een stream niet laadt.",
+      liveStreamNote: "De streams openen via de officiële Aloula-livepagina’s van Saudi-Arabië. Open de kanaallink in een nieuw tabblad als de ingesloten speler niet werkt.",
       pageSuffix: "Gebedstijden — DIYANET",
       unselectedTitle: "Kies Land, Provincie & Stad",
       selectCountryOption: "— Kies een land —",
@@ -1495,18 +1495,18 @@ details.nav-item > summary:hover{background:#163b30}
       apiSelectLabel: "Gebedstijden API-bron:",
       religiousLangLabel: "Taal voor hadith en Koran:",
       apiOptions: {
-        imsakiyem: "Imsakiyem / Diyanet API",
-        emushaf: "eMushaf gebedstijden-API",
-        aladhan: "AlAdhan gebedstijden-API",
-        ummahapi: "UmmahAPI gebedstijden",
-        pawan_krd: "Pawan.krd gebedstijden-API",
-        azan_quran_et: "Azan gebedstijden-API",
-        deen2u: "Deen2u Islamic Times API",
-        salahtable: "SalahTable gebedstijden-API",
-        islamic_app: "islamic.app gebedstijden-API",
-        esalah: "eSalah gebedstijden-API",
-        waqtazan: "Waqtazan gebedstijden-API",
-        vakit_vercel: "Vakit Vercel GPS-API"
+        mtopal: "MTopal · Diyanet wereldwijde tijden",
+        imsakiyem: "Imsakiyem · Diyanet-API",
+        emushaf: "eMushaf · Diyanet-API",
+        aladhan: "AlAdhan · gebedstijden-API",
+        islamic_app: "islamic.app · stads-API",
+        deen2u: "Deen2u · Stad of coördinaten",
+        salahtable: "SalahTable · stads-API",
+        ummahapi: "UmmahAPI · coördinaten",
+        azan_quran_et: "Azan · coördinaten",
+        esalah: "eSalah · coördinaten",
+        simplesolat: "SimpleSolat · open data-API",
+        zikr_prayer: "Zikr e Quran · gebedstijden-API"
       },
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
