@@ -1512,8 +1512,9 @@ const DIYANET_ALL_LOCATIONS = [];
   function normalizeImsakiyemLocation(item, countryId, kind = "district") {
     const id = String(item?._id ?? item?.id ?? item?.state_id ?? item?.district_id ?? "").trim();
     const rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.SehirAdi ?? item?.IlceAdi ?? "").trim();
-    const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.SehirAdiEn ?? item?.IlceAdiEn ?? item?.english_name ?? item?.name ?? item?.title ?? rawTr).trim();
-    if (!id || (!rawTr && !rawEn) || isNonAdministrativeLocationName(rawTr, rawEn)) return null;
+    const genericName = String(item?.name ?? item?.title ?? "").trim();
+    const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.SehirAdiEn ?? item?.IlceAdiEn ?? item?.english_name ?? (!rawTr ? genericName : "")).trim();
+    if (!id || (!rawTr && !rawEn && !genericName) || isNonAdministrativeLocationName(rawTr, rawEn || genericName)) return null;
 
     const geo = item?.coordinates || item?.coordinate || item?.location || item?.geo || {};
     const latRaw = item?.latitude ?? item?.lat ?? item?.Latitude ?? geo?.latitude ?? geo?.lat;
@@ -1525,8 +1526,9 @@ const DIYANET_ALL_LOCATIONS = [];
 
     return {
       id, countryId: String(countryId || item?.country_id || ""),
-      nameTr: rawTr || rawEn, nameEn: rawEn || rawTr,
+      nameTr: rawTr, nameEn: rawEn || (!rawTr ? genericName : ""),
       nameNl: String(item?.name_nl ?? item?.nameNl ?? "").trim(),
+      sourceNameLang: item?.language || item?.lang || (rawTr && !rawEn ? "tr" : "en"),
       tz: item?.timezone || item?.time_zone || item?.tz || item?.timezone_id || "",
       iso2: String(item?.iso2 || item?.iso_code || item?.country_code || "").toUpperCase(),
       ...(hasCoords ? { lat: latitude, lng: longitude } : {}),
@@ -1795,7 +1797,11 @@ const DIYANET_ALL_LOCATIONS = [];
         ? (obj.nameNl || obj.nameEn || obj.nameTr || obj.name || "")
         : (obj.nameEn || obj.nameTr || obj.name || "");
     const display = obj.displayNames?.[state.lang] || fallback;
-    return state.lang === "tr" ? formatTurkishName(display) : formatLatinName(display);
+    if (state.lang === "tr") {
+      const isNativeTurkishLocation = type === "country" || isTurkeyCountry(state.selectedCountry);
+      return isNativeTurkishLocation ? formatTurkishName(display) : formatTurkishForeignLocationName(display);
+    }
+    return formatLatinName(display);
   }
 
   const getApiQueryEn = obj => fixTurkishText(obj?.nameEn || obj?.nameTr || "");
