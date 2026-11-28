@@ -656,6 +656,8 @@ details.nav-item > summary:hover{background:#163b30}
           <option value="auto" selected>Otomatik · Çalışan kaynağı bul</option>
           <option value="aladhan">AlAdhan · Prayer Times API</option>
           <option value="ummahapi">UmmahAPI · Prayer Times API</option>
+          <option value="qasra">QASRA · Salah API</option>
+          <option value="imsakiyem">İmsakiyem · Diyanet API</option>
         </select>
       </div>
       <div class="loc-row prayer-options-row">
@@ -1011,34 +1013,34 @@ details.nav-item > summary:hover{background:#163b30}
   const PRAYER_ORDER = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
   const PRAYER_METHOD_PROVIDER_KEY = { aladhan: "aladhan", ummahapi: "ummah" };
   const PRAYER_METHODS = [
-    { value: "auto", tr: "Servis varsayılanı / otomatik", en: "Provider default / automatic", nl: "Standaard van provider / automatisch", aladhan: "", islamic: "", ummah: "", deen2u: "auto", salahtable: "", esalah: "" },
-    { value: "jafari", tr: "Caferî / Şiî", en: "Jafari / Shia Ithna-Ashari", nl: "Jafari / Shia Ithna-Ashari", aladhan: 0, islamic: 0, ummah: "Jafari", esalah: "jafari" },
-    { value: "karachi", tr: "Karaçi", en: "Karachi", nl: "Karachi", aladhan: 1, islamic: 1, ummah: "Karachi", deen2u: "karachi", salahtable: "karachi", esalah: "karachi" },
-    { value: "isna", tr: "ISNA / Kuzey Amerika", en: "ISNA / North America", nl: "ISNA / Noord-Amerika", aladhan: 2, islamic: 2, ummah: "ISNA", deen2u: "isna", salahtable: "isna", esalah: "isna" },
-    { value: "mwl", tr: "Müslüman Dünya Birliği", en: "Muslim World League", nl: "Moslim Wereld Liga", aladhan: 3, islamic: 3, ummah: "MuslimWorldLeague", deen2u: "mwl", salahtable: "mwl", esalah: "mwl" },
-    { value: "ummalqura", tr: "Ümmü’l-Kurâ (Mekke)", en: "Umm al-Qura (Makkah)", nl: "Umm al-Qura (Mekka)", aladhan: 4, islamic: 4, ummah: "UmmAlQura", deen2u: "ummalqura", salahtable: "ummalqura", esalah: "umm-al-qura" },
-    { value: "egypt", tr: "Mısır Genel Ölçüm Kurumu", en: "Egyptian General Authority", nl: "Egyptische Algemene Autoriteit", aladhan: 5, islamic: 5, ummah: "Egyptian", deen2u: "egypt", salahtable: "egyptian", esalah: "egyptian" },
-    { value: "tehran", tr: "Tahran Jeofizik Enstitüsü", en: "Tehran Institute of Geophysics", nl: "Tehran Institute of Geophysics", aladhan: 7, islamic: 7, ummah: "Tehran", deen2u: "tehran" },
-    { value: "gulf", tr: "Körfez Bölgesi", en: "Gulf Region", nl: "Golfregio", aladhan: 8, islamic: 8, ummah: "Gulf", deen2u: "uae" },
-    { value: "kuwait", tr: "Kuveyt", en: "Kuwait", nl: "Koeweit", aladhan: 9, islamic: 9, ummah: "Kuwait", deen2u: "kuwait", salahtable: "kuwait" },
-    { value: "qatar", tr: "Katar", en: "Qatar", nl: "Qatar", aladhan: 10, islamic: 10, ummah: "Qatar", deen2u: "qatar", salahtable: "qatar" },
-    { value: "singapore", tr: "Singapur / MUIS", en: "Singapore / MUIS", nl: "Singapore / MUIS", aladhan: 11, islamic: 11, ummah: "Singapore", deen2u: "muis", salahtable: "singapore" },
-    { value: "muis", tr: "Singapur İslam Dinî Konseyi (MUIS)", en: "Majlis Ugama Islam Singapura (MUIS)", nl: "Islamitische Raad van Singapore (MUIS)", salahtable: "muis" },
-    { value: "uoif", tr: "Fransa İslam Organizasyonları Birliği", en: "UOIF / France", nl: "UOIF / Frankrijk", aladhan: 12, islamic: 12, ummah: "UOIF", salahtable: "uoif" },
-    { value: "diyanet", tr: "Diyanet İşleri Başkanlığı", en: "Diyanet / Turkey", nl: "Diyanet / Turkije", aladhan: 13, islamic: 13, ummah: "Diyanet", deen2u: "diyanet", salahtable: "diyanet" },
-    { value: "russia", tr: "Rusya Müslümanları Dinî İdaresi", en: "Russia", nl: "Rusland", aladhan: 14, islamic: 14, ummah: "Russia" },
-    { value: "moonsighting", tr: "Hilal Gözlem Komitesi", en: "Moonsighting Committee", nl: "Maanwaarnemingscommissie", aladhan: 15, islamic: 15, ummah: "MoonsightingCommittee", salahtable: "moonsighting" },
-    { value: "dubai", tr: "Dubai", en: "Dubai", nl: "Dubai", aladhan: 16, islamic: 16, ummah: "Dubai", salahtable: "dubai" },
-    { value: "jakim", tr: "Malezya JAKIM", en: "JAKIM / Malaysia", nl: "JAKIM / Maleisië", aladhan: 17, ummah: "JAKIM", deen2u: "jakim", salahtable: "jakim" },
+    { value: "auto", tr: "Servis varsayılanı / otomatik", en: "Provider default / automatic", nl: "Standaard van provider / automatisch", aladhan: "", ummah: "" },
+    { value: "jafari", tr: "Caferî / Şiî", en: "Jafari / Shia Ithna-Ashari", nl: "Jafari / Shia Ithna-Ashari", aladhan: 0, ummah: "Jafari" },
+    { value: "karachi", tr: "Karaçi", en: "Karachi", nl: "Karachi", aladhan: 1, ummah: "Karachi" },
+    { value: "isna", tr: "ISNA / Kuzey Amerika", en: "ISNA / North America", nl: "ISNA / Noord-Amerika", aladhan: 2, ummah: "ISNA" },
+    { value: "mwl", tr: "Müslüman Dünya Birliği", en: "Muslim World League", nl: "Moslim Wereld Liga", aladhan: 3, ummah: "MuslimWorldLeague" },
+    { value: "ummalqura", tr: "Ümmü’l-Kurâ (Mekke)", en: "Umm al-Qura (Makkah)", nl: "Umm al-Qura (Mekka)", aladhan: 4, ummah: "UmmAlQura" },
+    { value: "egypt", tr: "Mısır Genel Ölçüm Kurumu", en: "Egyptian General Authority", nl: "Egyptische Algemene Autoriteit", aladhan: 5, ummah: "Egyptian" },
+    { value: "tehran", tr: "Tahran Jeofizik Enstitüsü", en: "Tehran Institute of Geophysics", nl: "Tehran Institute of Geophysics", aladhan: 7, ummah: "Tehran" },
+    { value: "gulf", tr: "Körfez Bölgesi", en: "Gulf Region", nl: "Golfregio", aladhan: 8, ummah: "Gulf" },
+    { value: "kuwait", tr: "Kuveyt", en: "Kuwait", nl: "Koeweit", aladhan: 9, ummah: "Kuwait" },
+    { value: "qatar", tr: "Katar", en: "Qatar", nl: "Qatar", aladhan: 10, ummah: "Qatar" },
+    { value: "singapore", tr: "Singapur / MUIS", en: "Singapore / MUIS", nl: "Singapore / MUIS", aladhan: 11, ummah: "Singapore" },
+    { value: "muis", tr: "Singapur İslam Dinî Konseyi (MUIS)", en: "Majlis Ugama Islam Singapura (MUIS)", nl: "Islamitische Raad van Singapore (MUIS)" },
+    { value: "uoif", tr: "Fransa İslam Organizasyonları Birliği", en: "UOIF / France", nl: "UOIF / Frankrijk", aladhan: 12, ummah: "UOIF" },
+    { value: "diyanet", tr: "Diyanet İşleri Başkanlığı", en: "Diyanet / Turkey", nl: "Diyanet / Turkije", aladhan: 13, ummah: "Diyanet" },
+    { value: "russia", tr: "Rusya Müslümanları Dinî İdaresi", en: "Russia", nl: "Rusland", aladhan: 14, ummah: "Russia" },
+    { value: "moonsighting", tr: "Hilal Gözlem Komitesi", en: "Moonsighting Committee", nl: "Maanwaarnemingscommissie", aladhan: 15, ummah: "MoonsightingCommittee" },
+    { value: "dubai", tr: "Dubai", en: "Dubai", nl: "Dubai", aladhan: 16, ummah: "Dubai" },
+    { value: "jakim", tr: "Malezya JAKIM", en: "JAKIM / Malaysia", nl: "JAKIM / Maleisië", aladhan: 17, ummah: "JAKIM" },
     { value: "tunisia", tr: "Tunus", en: "Tunisia", nl: "Tunesië", aladhan: 18, ummah: "Tunisia" },
     { value: "algeria", tr: "Cezayir", en: "Algeria", nl: "Algerije", aladhan: 19, ummah: "Algeria" },
-    { value: "kemenag", tr: "Endonezya KEMENAG", en: "KEMENAG / Indonesia", nl: "KEMENAG / Indonesië", aladhan: 20, ummah: "KEMENAG", deen2u: "kemenag" },
+    { value: "kemenag", tr: "Endonezya KEMENAG", en: "KEMENAG / Indonesia", nl: "KEMENAG / Indonesië", aladhan: 20, ummah: "KEMENAG" },
     { value: "morocco", tr: "Fas", en: "Morocco", nl: "Marokko", aladhan: 21, ummah: "Morocco" },
     { value: "portugal", tr: "Lizbon / Portekiz", en: "Lisbon / Portugal", nl: "Lissabon / Portugal", aladhan: 22, ummah: "Lisbon" },
-    { value: "jordan", tr: "Ürdün", en: "Jordan", nl: "Jordanië", aladhan: 23, ummah: "Jordan", deen2u: "jordan" },
+    { value: "jordan", tr: "Ürdün", en: "Jordan", nl: "Jordanië", aladhan: 23, ummah: "Jordan" },
     { value: "palestine", tr: "Filistin", en: "Palestine", nl: "Palestina", ummah: "Palestine" },
-    { value: "brunei", tr: "Brunei", en: "Brunei", nl: "Brunei", deen2u: "brunei" },
-    { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië", salahtable: "malaysia" },
+    { value: "brunei", tr: "Brunei", en: "Brunei", nl: "Brunei" },
+    { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië" },
     { value: "custom", tr: "Özel yöntem (99)", en: "Custom method (99)", nl: "Aangepaste methode (99)", aladhan: 99 }
   ];
   const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"];
@@ -1142,6 +1144,8 @@ details.nav-item > summary:hover{background:#163b30}
         auto: "Otomatik · Çalışan kaynağı bul",
         aladhan: "AlAdhan · Prayer Times API",
         ummahapi: "UmmahAPI · Prayer Times API",
+        qasra: "QASRA · Salah API",
+        imsakiyem: "İmsakiyem · Diyanet API"
       },
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
@@ -1284,6 +1288,8 @@ details.nav-item > summary:hover{background:#163b30}
         auto: "Automatic · Find a working source",
         aladhan: "AlAdhan · Prayer Times API",
         ummahapi: "UmmahAPI · Prayer Times API",
+        qasra: "QASRA · Salah API",
+        imsakiyem: "Imsakiyem · Diyanet Prayer Times API"
       },
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
@@ -1426,6 +1432,8 @@ details.nav-item > summary:hover{background:#163b30}
         auto: "Automatisch · Werkende bron zoeken",
         aladhan: "AlAdhan · gebedstijden-API",
         ummahapi: "UmmahAPI · gebedstijden-API",
+        qasra: "QASRA · Salah API",
+        imsakiyem: "Imsakiyem · Diyanet gebedstijden-API"
       },
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
@@ -1526,13 +1534,14 @@ const DIYANET_ALL_LOCATIONS = [];
       imsakiyem: ["imsakiyem", "emushaf", "mtopal"],
       aladhan: ["emushaf", "mtopal", "imsakiyem"],
       ummahapi: ["mtopal", "emushaf", "imsakiyem"],
+      qasra: ["mtopal", "emushaf", "imsakiyem"],
       auto: ["imsakiyem", "mtopal", "emushaf"]
     };
     return [...(plans[mode] || plans.auto)];
   }
 
-
-  function findMatchingLocationRecordInList(records, previous) {
+  
+function findMatchingLocationRecordInList(records, previous) {
     if (!previous || !Array.isArray(records) || !records.length) return null;
     const previousIds = new Set([
       previous.id,
@@ -1573,7 +1582,7 @@ const DIYANET_ALL_LOCATIONS = [];
     return {
       id, countryId: String(countryId || item?.country_id || ""),
       // Keep the API's own location label unchanged; UI language must not translate it.
-      apiName: genericName || rawTr || rawEn,
+      apiName: normalizeLocationApiLabel(genericName || rawTr || rawEn, countryId),
       nameTr: rawTr, nameEn: rawEn || (!rawTr ? genericName : ""),
       nameNl: String(item?.name_nl ?? item?.nameNl ?? "").trim(),
       sourceNameLang: item?.language || item?.lang || (rawTr && !rawEn ? "tr" : "en"),
@@ -2371,20 +2380,33 @@ const DIYANET_ALL_LOCATIONS = [];
 
   function locationNameIdentityKey(raw) {
     return fixTurkishText(raw)
-      .normalize("NFD")
+      .replace(/[ßẞ]/g, "ss")
+      .replace(/[æÆ]/g, "ae")
+      .replace(/[œŒ]/g, "oe")
+      .replace(/[øØ]/g, "o")
+      .replace(/[łŁ]/g, "l")
+      .replace(/[đĐðÐ]/g, "d")
+      .replace(/[þÞ]/g, "th")
+      .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLocaleLowerCase("und")
-      .replace(/ı/g, "i")
+      .replace(/[ıİ]/g, "i")
       .replace(/[’']/g, "")
       .replace(/[^\p{L}\p{N}]+/gu, "");
   }
 
   const NON_ADMINISTRATIVE_LOCATION_KEYS = new Set([
-    "atlanticocean", "atlantikokyanusu", "atlantischeoceaan", "oceanatlantique",
+    "atlanticocean", "atlantikokyanusu", "atlantikokyanus", "atlantischeoceaan",
+    "oceanatlantique", "atlantischerozean", "oceanoatlantico",
     "pacificocean", "pasifikokyanusu", "pacifischeoceaan", "groteoceaan",
-    "indianocean", "hintokyanusu", "indischeoceaan",
-    "arcticocean", "arktikokyanusu", "arktischeoceaan", "noordelijkeijsoceaan", "noordelijkeijszee",
-    "southernocean", "zuidelijkeoceaan", "antarctischeoceaan"
+    "oceanpacifique", "pazifischerozean", "oceanoacifico",
+    "indianocean", "hintokyanusu", "indischeoceaan", "oceanindien",
+    "indischerozean", "oceanoindico",
+    "arcticocean", "arktikokyanusu", "arktischeoceaan", "noordelijkeijsoceaan",
+    "noordelijkeijszee", "oceanarctique", "arktischerozean",
+    "southernocean", "zuidelijkeoceaan", "antarctischeoceaan", "oceanaustral",
+    "africa", "afrique", "afrika", "asia", "asie", "asien", "azija",
+    "europe", "europa", "northamerica", "southamerica", "oceania", "antarctica"
   ]);
 
   function isNonAdministrativeLocationName(...names) {
@@ -2392,39 +2414,136 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   const COUNTRY_API_NAME_ALIASES = Object.freeze({
-    abd: "amerikabirlesikdevletleri",
-    usa: "amerikabirlesikdevletleri",
-    us: "amerikabirlesikdevletleri",
-    stlucia: "saintlucia",
-    sarabistan: "suudiarabistan",
-    ekvator: "ekvador",
-    dominik: "dominika",
-    makedonya: "kuzeymakedonya",
-    kktc: "kuzeykibristurkcumhuriyeti",
-    kuzeykibris: "kuzeykibristurkcumhuriyeti",
-    moldavya: "moldova",
-    birlesikarapemirligi: "birlesikarapemirlikleri",
-    birlesikarapemirlik: "birlesikarapemirlikleri",
-    unitedarabemirates: "birlesikarapemirlikleri",
-    verenigdearabischeemiraten: "birlesikarapemirlikleri",
-    emiratosarabesunidos: "birlesikarapemirlikleri",
-    emiratiarabiuniti: "birlesikarapemirlikleri",
-    emiratsarabesunis: "birlesikarapemirlikleri",
-    uae: "birlesikarapemirlikleri",
-    bae: "birlesikarapemirlikleri",
-    italya: "italy",
-    italia: "italy",
-    italy: "italy",
-    italie: "italy"
+    abd: "US", usa: "US", us: "US", unitedstatesofamerica: "US",
+    uk: "GB", greatbritain: "GB", britain: "GB", unitedkingdom: "GB",
+    hollanda: "NL", holland: "NL", nederland: "NL", netherlands: "NL",
+    turkiye: "TR", turkey: "TR",
+    birlesikarapemirligi: "AE", birlesikarapemirlik: "AE",
+    birlesikarapemirlikleri: "AE", unitedarabemirates: "AE",
+    verenigdearabischeemiraten: "AE", emiratosarabesunidos: "AE",
+    emiratiarabiuniti: "AE", emiratsarabesunis: "AE", uae: "AE", bae: "AE",
+    italya: "IT", italia: "IT", italy: "IT", italie: "IT",
+    zimbabve: "ZW", zimbabwe: "ZW",
+    sarabistan: "SA", suudiarabistan: "SA", saudiarabia: "SA",
+    makedonya: "MK", kuzeymakedonya: "MK",
+    moldavya: "MD", moldova: "MD",
+    saintlucia: "LC", stlucia: "LC",
+    coteivoire: "CI", ivorycoast: "CI",
+    czechrepublic: "CZ", czechia: "CZ",
+    southkorea: "KR", republicofkorea: "KR", korearepublicof: "KR",
+    northkorea: "KP", democraticpeoplesrepublicofkorea: "KP",
+    burma: "MM", myanmar: "MM", swaziland: "SZ", eswatini: "SZ",
+    persia: "IR", iran: "IR"
   });
 
-  function countryApiNameKey(raw) {
+  const COUNTRY_ISO_CODES = (
+    "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ " +
+    "CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR " +
+    "GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP " +
+    "KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT " +
+    "MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW " +
+    "SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG " +
+    "UM US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW"
+  ).split(/\s+/);
+
+  const COUNTRY_NAME_TO_ISO2 = (() => {
+    const names = new Map();
+    const ambiguous = new Set();
+    const locales = ["en", "en-GB", "tr", "nl", "de", "fr", "es", "it", "pt", "ar", "ru", "zh", "ja", "id", "sv", "pl", "uk", "fa"];
+    for (const locale of locales) {
+      let displayNames;
+      try { displayNames = new Intl.DisplayNames([locale], { type: "region" }); }
+      catch (_) { continue; }
+      for (const code of COUNTRY_ISO_CODES) {
+        let label = "";
+        try { label = displayNames.of(code) || ""; } catch (_) {}
+        if (!label || label.toUpperCase() === code) continue;
+        const key = locationNameIdentityKey(label);
+        if (!key || ambiguous.has(key)) continue;
+        const previous = names.get(key);
+        if (previous && previous !== code) {
+          names.delete(key);
+          ambiguous.add(key);
+        } else {
+          names.set(key, code);
+        }
+      }
+    }
+    for (const [alias, code] of Object.entries(COUNTRY_API_NAME_ALIASES)) {
+      names.set(locationNameIdentityKey(alias), code);
+    }
+    return names;
+  })();
+
+  function countryIso2FromName(raw) {
     const key = locationNameIdentityKey(raw);
-    return COUNTRY_API_NAME_ALIASES[key] || key;
+    if (!key) return "";
+    return COUNTRY_API_NAME_ALIASES[key] ||
+      (key.length === 2 && COUNTRY_ISO_CODES.includes(key.toUpperCase()) ? key.toUpperCase() : "") ||
+      COUNTRY_NAME_TO_ISO2.get(key) || "";
+  }
+
+  function countryApiNameKey(raw) {
+    const iso2 = countryIso2FromName(raw);
+    return iso2 ? "country:" + iso2 : locationNameIdentityKey(raw);
   }
 
   function canonicalLocationNameKey(raw) {
     return countryApiNameKey(raw);
+  }
+
+  function collectApiLocationNameAliases(item) {
+    if (!item || typeof item !== "object") return [];
+    const aliases = new Set();
+    const add = value => {
+      if (typeof value !== "string" && typeof value !== "number") return;
+      const name = String(value).replace(/\s+/g, " ").trim();
+      if (name.length >= 2 && name.length <= 120) aliases.add(name);
+    };
+    for (const [key, value] of Object.entries(item)) {
+      if (/^(?:name|title)(?:[_-][a-z]{2,3})?$|^(?:ulkeadi|sehiradi|ilceadi)(?:[_-]?[a-z]{2,3})?$/i.test(key)) add(value);
+    }
+    for (const key of ["names", "translations", "localized_names", "local_names", "name_translations", "nameTranslations"]) {
+      const nested = item[key];
+      if (Array.isArray(nested)) {
+        for (const row of nested) {
+          if (typeof row === "string") add(row);
+          else if (row && typeof row === "object") add(row.name || row.value || row.label);
+        }
+      } else if (nested && typeof nested === "object") {
+        for (const value of Object.values(nested)) {
+          if (typeof value === "string") add(value);
+          else if (value && typeof value === "object") add(value.name || value.value || value.label);
+        }
+      }
+    }
+    return [...aliases].slice(0, 40);
+  }
+
+  function getApiLocationCoordinates(item) {
+    const geo = item?.coordinates || item?.coordinate || item?.location || item?.geo || {};
+    const latRaw = item?.latitude ?? item?.lat ?? item?.Latitude ?? item?.Lat ?? item?.Enlem ??
+      geo?.latitude ?? geo?.lat ?? geo?.Latitude ?? geo?.y;
+    const lngRaw = item?.longitude ?? item?.lng ?? item?.lon ?? item?.Longitude ?? item?.Lon ?? item?.Boylam ??
+      geo?.longitude ?? geo?.lng ?? geo?.lon ?? geo?.Longitude ?? geo?.x;
+    const lat = latRaw !== undefined && latRaw !== null && String(latRaw).trim() !== "" ? Number(latRaw) : NaN;
+    const lng = lngRaw !== undefined && lngRaw !== null && String(lngRaw).trim() !== "" ? Number(lngRaw) : NaN;
+    return Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+      Number.isFinite(lng) && lng >= -180 && lng <= 180 ? { lat, lng } : {};
+  }
+
+  function isTurkeyLocationCountry(countryId) {
+    const selected = state.selectedCountry;
+    return String(countryId || "") === "2" ||
+      !!(selected && String(selected.id) === String(countryId || "") && isTurkeyCountry(selected));
+  }
+
+  function normalizeLocationApiLabel(raw, countryId) {
+    const name = String(raw || "").replace(/\s+/g, " ").trim();
+    if (!name) return "";
+    return isTurkeyLocationCountry(countryId)
+      ? formatTurkishName(name)
+      : formatTurkishForeignLocationName(name);
   }
 
   // A state API can accidentally return the parent country as a state.
@@ -2468,6 +2587,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const enMatches = new Set();
     for (const [candidateKey, candidate] of mapById) {
       const candidateAliases = new Set([
+        candidate?.apiName,
         candidate?.nameTr,
         candidate?.nameEn,
         candidate?.nameNl,
@@ -2504,7 +2624,8 @@ const DIYANET_ALL_LOCATIONS = [];
       ? formatTurkishForeignLocationName(rawTr || "")
       : formatTurkishName(rawTr || "");
     const cleanEn = formatLatinName(rawEn || "");
-    if (isNonAdministrativeLocationName(cleanTr, cleanEn)) return;
+    const cleanApiName = normalizeLocationApiLabel(extra?.apiName || rawTr || rawEn || cleanTr || cleanEn, countryId);
+    if (isNonAdministrativeLocationName(cleanTr, cleanEn, cleanApiName)) return;
 
     const sourceKey = source ? source + ":" + sourceId : sourceId;
     const directPrev = mapById.get(sourceKey);
@@ -2526,15 +2647,17 @@ const DIYANET_ALL_LOCATIONS = [];
 
     const nameAliases = [...new Set([
       ...(prev?.nameAliases || []),
+      ...(Array.isArray(extra?.nameAliases) ? extra.nameAliases : []),
       ...(cleanTr ? [cleanTr] : []),
-      ...(cleanEn ? [cleanEn] : [])
-    ])].slice(0, 12);
+      ...(cleanEn ? [cleanEn] : []),
+      ...(cleanApiName ? [cleanApiName] : [])
+    ])].filter(Boolean).slice(0, 40);
 
     mapById.set(targetKey, {
       ...prev,
       ...extra,
       id: prev?.id || sourceId,
-      apiName: prev?.apiName || extra?.apiName || rawTr || rawEn || bestTr || bestEn,
+      apiName: normalizeLocationApiLabel(prev?.apiName || cleanApiName || bestTr || bestEn, countryId),
       nameTr: bestTr,
       nameEn: bestEn,
       nameNl: bestNl,
@@ -2599,7 +2722,9 @@ const DIYANET_ALL_LOCATIONS = [];
 
         let record = iso2 ? [...countriesByIdentity.values()].find(c => c.iso2 === iso2) : null;
         if (!record) {
-          const candidateKeys = new Set([rawTr, rawEn, rawNl].map(countryApiNameKey).filter(Boolean));
+          const candidateKeys = new Set([
+            rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)
+          ].map(countryApiNameKey).filter(Boolean));
           const matches = [...countriesByIdentity.values()].filter(existing =>
             aliasesFor(existing).some(key => candidateKeys.has(key))
           );
@@ -2615,7 +2740,7 @@ const DIYANET_ALL_LOCATIONS = [];
             nameEn: rawEn,
             nameNl: rawNl || rawEn,
             apiName: rawTr || rawEn || rawNl,
-            nameAliases: [...new Set([rawTr, rawEn, rawNl].filter(Boolean))],
+            nameAliases: [...new Set([rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)].filter(Boolean))],
             iso2,
             sourceIds: {},
             locationKind: "country"
@@ -2632,7 +2757,7 @@ const DIYANET_ALL_LOCATIONS = [];
         if (!record.nameNl && rawNl) record.nameNl = rawNl;
         if (!record.apiName) record.apiName = rawTr || rawEn || rawNl;
         record.nameAliases = [...new Set([
-          ...(record.nameAliases || []), rawTr, rawEn, rawNl
+          ...(record.nameAliases || []), rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)
         ].filter(Boolean))];
       }
     }
@@ -2705,11 +2830,12 @@ const DIYANET_ALL_LOCATIONS = [];
     return {
       id,
       countryId: String(countryId),
-      apiName: apiName || cleanTr || cleanEn,
+      apiName: normalizeLocationApiLabel(apiName || cleanTr || cleanEn, countryId),
       nameTr: cleanTr || cleanEn,
       nameEn: cleanEn || cleanTr,
       nameNl: formatLatinName(item?.name_nl || item?.nameNl || cleanEn || cleanTr),
-      nameAliases: [...new Set([cleanTr, cleanEn].filter(Boolean))],
+      nameAliases: [...new Set([cleanTr, cleanEn, ...collectApiLocationNameAliases(item)].filter(Boolean))],
+      ...getApiLocationCoordinates(item),
       sourceIds: { [source]: id }
     };
   }
@@ -2798,7 +2924,7 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   function getLocationCountryIso2(countryObj) {
-    return String(countryObj?.iso2 || (countryObj === state.selectedCountry ? getSelectedCountryIso2() : "") || "").toUpperCase();
+    return String(countryObj?.iso2 || countryIso2FromName(countryObj?.nameEn || countryObj?.nameTr || countryObj?.nameNl || countryObj?.apiName || "") || (countryObj === state.selectedCountry ? getSelectedCountryIso2() : "") || "").toUpperCase();
   }
 
   async function fetchOverpassElements(query) {
@@ -2833,7 +2959,7 @@ const DIYANET_ALL_LOCATIONS = [];
       nameTr: rawTr,
       nameEn: rawEn,
       nameNl: String(tags["name:nl"] || rawEn),
-      apiName: rawName,
+      apiName: normalizeLocationApiLabel(rawName, countryObj?.id),
       nameAliases: [...new Set([rawName, rawTr, rawEn].filter(Boolean))],
       sourceIds: {},
       locationKind: kind,
@@ -2977,7 +3103,9 @@ const DIYANET_ALL_LOCATIONS = [];
 
         mergeLocationRecord(mapById, id, rawTr, rawEn, {
           countryId,
-          apiName: apiName || rawTr || rawEn
+          apiName: apiName || rawTr || rawEn,
+          nameAliases: collectApiLocationNameAliases(item),
+          ...getApiLocationCoordinates(item)
         }, source);
       }
     }
@@ -3227,7 +3355,9 @@ const DIYANET_ALL_LOCATIONS = [];
         rawEn = rawEn || rawTr;
         mergeLocationRecord(mapById, id, rawTr, rawEn, {
           countryId,
-          apiName: apiName || rawTr || rawEn
+          apiName: apiName || rawTr || rawEn,
+          nameAliases: collectApiLocationNameAliases(item),
+          ...getApiLocationCoordinates(item)
         }, source);
       }
     }
@@ -3309,8 +3439,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const country = state.selectedCountry;
     const direct = String(country?.iso2 || country?.iso_code || country?.country_code || "").toUpperCase();
     if (/^[A-Z]{2}$/.test(direct)) return direct;
-    const key = asciiFoldKey(country?.nameEn || country?.nameTr || country?.nameNl || "");
-    return COUNTRY_ISO2[key] || "";
+    return countryIso2FromName(country?.nameEn || country?.nameTr || country?.nameNl || country?.apiName || "");
   }
 
   async function resolveCityCoords(districtObj, signal) {
@@ -3494,7 +3623,7 @@ const DIYANET_ALL_LOCATIONS = [];
     select.value = state.prayerMethod;
     select.disabled = !key || supported.length <= 1;
 
-    const schoolModes = ["aladhan", "ummahapi"];
+    const schoolModes = ["aladhan", "ummahapi", "qasra"];
     $("prayerSchoolSelect").disabled = !schoolModes.includes(mode);
     $("highLatitudeSelect").disabled = !["ummahapi", "aladhan"].includes(mode);
     $("customMethodSettingsRow").style.display = mode === "aladhan" && state.prayerMethod === "custom" ? "" : "none";
@@ -3572,6 +3701,56 @@ const DIYANET_ALL_LOCATIONS = [];
     $("zikrCountLabel").textContent = t("zikrCountLabel");
     $("zikrTapBtn").textContent = t("zikrTapBtn");
     $("zikrResetBtn").textContent = t("zikrResetBtn");
+  }
+
+  async function resolveTurkeyCityCentreId(districtObj, source, signal) {
+    if (!districtObj?.isTurkishProvinceCity) {
+      const sourceId = getLocationSourceId(districtObj, source);
+      if (!sourceId) {
+        throw new Error("Seçilen konum için İmsakiyem API eşleşen ID bulunamadı.");
+      }
+      return sourceId;
+    }
+    if (source !== "imsakiyem") throw new Error("Bu konum için desteklenmeyen şehir ID kaynağı.");
+    const stateId = getLocationSourceId(districtObj, "imsakiyem");
+    if (!stateId) throw new Error("İmsakiyem il ID bilgisi bulunamadı.");
+    const url = IMSAKIYEM_LOCATION_API + "/districts?stateId=" + encodeURIComponent(stateId);
+    const response = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
+    const rows = getLocationApiRows(response.data);
+    const wanted = canonicalLocationNameKey(districtObj.nameEn || districtObj.nameTr);
+    const match = rows.find(item => canonicalLocationNameKey(
+      item?.name_en || item?.nameEn || item?.name_tr || item?.nameTr || item?.name
+    ) === wanted);
+    const districtId = String(match?._id || match?.id || "");
+    if (!districtId) throw new Error("İmsakiyem seçilen ilin merkez ilçesini bulamadı.");
+    return districtId;
+  }
+
+  async function fetchFromImsakiyem(isoDate, districtObj, signal) {
+    const locationId = await resolveTurkeyCityCentreId(districtObj, "imsakiyem", signal);
+    const url = `https://ezanvakti.imsakiyem.com/api/prayer-times/${locationId}/daily?startDate=${isoDate}&endDate=${isoDate}`;
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
+    const rawData = j?.data || j;
+    const item = Array.isArray(rawData) ? rawData[0] : rawData;
+    const timesMap = item?.times || item?.vakitler || item;
+    if (!timesMap) throw new Error("Times field missing");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(timesMap.imsak || timesMap.Fajr || timesMap.fajr),
+      Sunrise: cleanTime(timesMap.gunes || timesMap.Sunrise || timesMap.sunrise),
+      Dhuhr: cleanTime(timesMap.ogle || timesMap.Dhuhr || timesMap.dhuhr),
+      Asr: cleanTime(timesMap.ikindi || timesMap.Asr || timesMap.asr),
+      Maghrib: cleanTime(timesMap.aksam || timesMap.Maghrib || timesMap.maghrib),
+      Isha: cleanTime(timesMap.yatsi || timesMap.Isha || timesMap.isha)
+    });
+    return {
+      mapped,
+      hijri: extractCleanText(item?.hijriDate || item?.hicriTarih, state.lang),
+      sourceLabel: "T.C. Diyanet / İmsakiyem API",
+      providerName: "İmsakiyem API (T.C. Diyanet)",
+      endpointUrl: url,
+      httpStatus: `${status} OK · ${ms} ms`,
+      paramsSummary: buildDiyanetIdSummary()
+    };
   }
 
   async function fetchFromAladhan(p, districtObj, signal) {
@@ -3666,6 +3845,39 @@ const DIYANET_ALL_LOCATIONS = [];
 
 
 
+  async function fetchFromQasra(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const params = new URLSearchParams({
+      latitude: String(coords.lat),
+      longitude: String(coords.lng),
+      timezone: state.zone || "UTC",
+      date: dateKey(p)
+    });
+    const url = "https://salah.qasra.org/?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 9000 });
+    if (j?.error || !j?.timings) throw new Error(j?.error || "QASRA did not return prayer timings.");
+    const schedule = state.prayerSchool === "hanafi" ? j.timings.hanafi : j.timings.jumhur;
+    if (!schedule) throw new Error("QASRA did not return the selected madhhab timings.");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(schedule.Fajr?.start),
+      Sunrise: cleanTime(schedule.Sunrise?.start),
+      Dhuhr: cleanTime(schedule.Dhuhr?.start),
+      Asr: cleanTime(schedule.Asr?.start),
+      Maghrib: cleanTime(schedule.Maghrib?.start),
+      Isha: cleanTime(schedule.Isha?.start)
+    });
+    const h = j.date?.hijri;
+    const hijri = h ? (h.day + " " + (h.month?.en || h.month?.ar || "") + " " + h.year).trim() : "";
+    return {
+      mapped, hijri,
+      sourceLabel: "QASRA · " + (state.prayerSchool === "hanafi" ? "Hanafi" : "Jumhur"),
+      providerName: "QASRA Salah API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
   function updateApiInfoUI(info, isError = false) {
     $("infoApiProvider").textContent = info.providerName;
     $("infoApiStatus").textContent = info.httpStatus;
@@ -3676,8 +3888,10 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function fetchPrayerTimesByProvider(mode, p, isoDate, districtObj, signal) {
+    if (mode === "imsakiyem") return fetchFromImsakiyem(isoDate, districtObj, signal);
     if (mode === "aladhan") return fetchFromAladhan(p, districtObj, signal);
     if (mode === "ummahapi") return fetchFromUmmahApi(p, districtObj, signal);
+    if (mode === "qasra") return fetchFromQasra(p, districtObj, signal);
     throw new Error("Bilinmeyen vakit kaynağı: " + mode);
   }
 
@@ -3696,7 +3910,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const distName = getLocalizedLocationName(state.selectedDistrict, "district");
     if (!silentHourly || !state.todayData) $("status").textContent = t("fetchingFor", { city: distName });
 
-    const providerOrder = ["aladhan", "ummahapi"];
+    const providerOrder = ["imsakiyem", "aladhan", "ummahapi", "qasra"];
     const requestedMode = state.selectedApiMode;
     const attempts = requestedMode === "auto"
       ? providerOrder
