@@ -3314,6 +3314,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       school: state.prayerSchool === "hanafi" ? "1" : "0"
     });
     if (method.aladhan !== "" && method.aladhan !== undefined) params.set("method", String(method.aladhan));
+    else params.set("method", "13");
     if (state.prayerMethod === "moonsighting") params.set("shafaq", state.shafaqMode || "general");
     if (state.prayerMethod === "custom") {
       const maghrib = state.customMaghribSetting === "" ? "null" : String(state.customMaghribSetting);
@@ -3354,7 +3355,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   async function fetchFromMtopal(p, districtObj, signal) {
     const diyanetId = districtObj?.isTurkishProvinceCity
       ? await resolveTurkeyCityCentreId(districtObj, "mtopal", signal)
-      : (getLocationSourceId(districtObj, "diyanet") || districtObj.id);
+      : (getLocationSourceId(districtObj, "mtopal") || getLocationSourceId(districtObj, "diyanet") || districtObj.id);
     if (!/^\d+$/.test(String(diyanetId))) throw new Error("MTopal için Diyanet ilçe ID bulunamadı.");
     const url = "https://namazvakti.mtopal.dev/vakitler/" + encodeURIComponent(diyanetId);
     const result = await fetchJsonWithTimeout(url, { signal, timeoutMs: 5000 });
@@ -3784,6 +3785,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       return;
     }
     state.actualApiMode = usedMode;
+    updateCityHeaderAndFooter();
     if (usedMode !== requestedMode) {
       const actualName = I18N[state.lang].apiOptions[usedMode] || usedMode;
       res.httpStatus = (requestedMode === "auto" ? "Otomatik seçim" : "Yedek kaynak: " + actualName) + " · " + res.httpStatus;
@@ -5189,6 +5191,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   function updateCityHeaderAndFooter() {
     const titleEl = $("cityTitle");
+    $("districtSelectLabel").textContent = String(state.selectedCountry?.id) === "2"
+      ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
+      : t("districtSelectLabel");
     $("selectionCard").classList.toggle("needs-selection", !state.selectedDistrict || !state.selectedApiMode);
     $("apiSelect").classList.toggle("prompt-select", !state.selectedApiMode);
 
