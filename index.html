@@ -2920,11 +2920,25 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     distSel.disabled = true;
     distSel.innerHTML = `<option value="" disabled selected>${escapeHtml(t("loadingList"))}</option>`;
 
+    if (stateObj.isTurkeyRoot) {
+      state.districts = [...(stateObj.fallbackDistricts || [])];
+      if (preselectDistrictId) {
+        const requestedId = String(preselectDistrictId);
+        state.selectedDistrict = state.districts.find(item =>
+          item.id === requestedId ||
+          (item.legacyDistrictIds || []).includes(requestedId) ||
+          Object.values(item.sourceIds || {}).includes(requestedId)
+        ) || null;
+      }
+      renderDistrictSelect();
+      return;
+    }
+
     const mapById = new Map();
     if (Array.isArray(stateObj.fallbackDistricts)) {
-      for (const d of stateObj.fallbackDistricts) {
-        mergeLocationRecord(mapById, d.id, d.nameTr, d.nameEn, {
-          ...d,
+      for (const item of stateObj.fallbackDistricts) {
+        mergeLocationRecord(mapById, item.id, item.nameTr, item.nameEn, {
+          ...item,
           countryId: String(stateObj.countryId || state.selectedCountry?.id || "")
         }, "diyanet");
       }
@@ -2932,38 +2946,53 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     const imsakiyemStateId = getLocationSourceId(stateObj, "imsakiyem");
     const emushafStateId = getLocationSourceId(stateObj, "emushaf");
-    const [r1, r2] = await Promise.allSettled([
+    const mtopalStateId = getLocationSourceId(stateObj, "mtopal");
+    const [r1, r2, r3] = await Promise.allSettled([
       imsakiyemStateId
-        ? fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(imsakiyemStateId)}`, { timeoutMs: 6500 })
+        ? fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(imsakiyemStateId)}`, { timeoutMs: 5500 })
         : Promise.reject(new Error("No verified Imsakiyem state ID")),
       emushafStateId
-        ? fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(emushafStateId)}`, { timeoutMs: 6500 })
-        : Promise.reject(new Error("No verified Emushaf state ID"))
+        ? fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(emushafStateId)}`, { timeoutMs: 5500 })
+        : Promise.reject(new Error("No verified Emushaf state ID")),
+      mtopalStateId
+        ? fetchJsonWithTimeout(`https://namazvakti.mtopal.dev/ilceler/${encodeURIComponent(mtopalStateId)}`, { timeoutMs: 5500 })
+        : Promise.reject(new Error("No verified MTopal state ID"))
     ]);
 
     if (r1.status === "fulfilled") {
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        const rawTr = item?.name_tr || item?.nameTr || "";
-        const rawEn = item?.name_en || item?.nameEn || "";
-        mergeLocationRecord(mapById, id, rawTr || item?.name || "", rawEn || item?.name || "", { countryId: String(stateObj.countryId || state.selectedCountry?.id || "") }, "imsakiyem");
+        const rawTr = item?.name_tr || item?.nameTr || item?.name || "";
+        const rawEn = item?.name_en || item?.nameEn || item?.name || "";
+        mergeLocationRecord(mapById, id, rawTr, rawEn, {
+          countryId: String(stateObj.countryId || state.selectedCountry?.id || "")
+        }, "imsakiyem");
       }
     }
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
-        const id = String(item?.IlceID || "").trim();
-        mergeLocationRecord(mapById, id, item?.IlceAdi || "", item?.IlceAdiEn || "", { countryId: String(stateObj.countryId || state.selectedCountry?.id || "") }, "emushaf");
+        mergeLocationRecord(mapById, String(item?.IlceID || ""), item?.IlceAdi || "", item?.IlceAdiEn || "", {
+          countryId: String(stateObj.countryId || state.selectedCountry?.id || "")
+        }, "emushaf");
+      }
+    }
+    if (r3.status === "fulfilled" && Array.isArray(r3.value.data)) {
+      for (const item of r3.value.data) {
+        mergeLocationRecord(mapById, String(item?.IlceID || ""), item?.IlceAdi || "", item?.IlceAdiEn || "", {
+          countryId: String(stateObj.countryId || state.selectedCountry?.id || "")
+        }, "mtopal");
       }
     }
 
     state.districts = Array.from(mapById.values());
     if (preselectDistrictId) {
       const requestedId = String(preselectDistrictId);
-      state.selectedDistrict = state.districts.find(d =>
-        d.id === requestedId ||
-        d.sourceIds?.imsakiyem === requestedId ||
-        d.sourceIds?.emushaf === requestedId
+      state.selectedDistrict = state.districts.find(item =>
+        item.id === requestedId ||
+        item.sourceIds?.imsakiyem === requestedId ||
+        item.sourceIds?.emushaf === requestedId ||
+        item.sourceIds?.mtopal === requestedId
       ) || null;
     }
     renderDistrictSelect();
@@ -3114,8 +3143,40 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return mapped;
   }
 
+  async function resolveTurkeyCityCentreId(districtObj, source, signal) {
+    if (!districtObj?.isTurkishProvinceCity) {
+      return getLocationSourceId(districtObj, source) || districtObj.id;
+    }
+    const parentId = getLocationSourceId(districtObj, source);
+    if (!parentId) throw new Error(source + " için il/şehir kaynak ID'si bulunamadı.");
+    let url = "";
+    if (source === "imsakiyem") {
+      url = "https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=" + encodeURIComponent(parentId);
+    } else if (source === "emushaf") {
+      url = "https://ezanvakti.emushaf.net/ilceler/" + encodeURIComponent(parentId);
+    } else if (source === "mtopal") {
+      url = "https://namazvakti.mtopal.dev/ilceler/" + encodeURIComponent(parentId);
+    } else {
+      throw new Error("Bilinmeyen Türkiye şehir kaynağı.");
+    }
+    const { data } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 5000 });
+    const rows = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+    const wanted = canonicalLocationNameKey(districtObj.nameEn || districtObj.nameTr);
+    const match = rows.find(item => {
+      const name = source === "imsakiyem"
+        ? (item?.name_en || item?.name_tr || item?.name)
+        : (item?.IlceAdiEn || item?.IlceAdi);
+      return canonicalLocationNameKey(name) === wanted;
+    });
+    const childId = source === "imsakiyem"
+      ? String(match?._id || match?.id || "")
+      : String(match?.IlceID || "");
+    if (!childId) throw new Error(source + " şehir merkezinin ilçe ID'sini bulamadı.");
+    return childId;
+  }
+
   async function fetchFromImsakiyem(isoDate, districtObj, signal) {
-    const locationId = getLocationSourceId(districtObj, "imsakiyem") || districtObj.id;
+    const locationId = await resolveTurkeyCityCentreId(districtObj, "imsakiyem", signal);
     const url = `https://ezanvakti.imsakiyem.com/api/prayer-times/${locationId}/daily?startDate=${isoDate}&endDate=${isoDate}`;
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
     const rawData = j?.data || j;
@@ -3291,7 +3352,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchFromMtopal(p, districtObj, signal) {
-    const diyanetId = getLocationSourceId(districtObj, "diyanet") || districtObj.id;
+    const diyanetId = districtObj?.isTurkishProvinceCity
+      ? await resolveTurkeyCityCentreId(districtObj, "mtopal", signal)
+      : (getLocationSourceId(districtObj, "diyanet") || districtObj.id);
     if (!/^\d+$/.test(String(diyanetId))) throw new Error("MTopal için Diyanet ilçe ID bulunamadı.");
     const url = "https://namazvakti.mtopal.dev/vakitler/" + encodeURIComponent(diyanetId);
     const result = await fetchJsonWithTimeout(url, { signal, timeoutMs: 5000 });
@@ -3319,7 +3382,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchFromEmushaf(p, districtObj, signal) {
-    const locationId = getLocationSourceId(districtObj, "emushaf") || districtObj.id;
+    const locationId = await resolveTurkeyCityCentreId(districtObj, "emushaf", signal);
     const url = `https://ezanvakti.emushaf.net/vakitler/${locationId}`;
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
     const list = Array.isArray(j) ? j : (Array.isArray(j?.data) ? j.data : []);
@@ -5222,7 +5285,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("locLangBadge").textContent = t("langNameBadge");
     $("countrySelectLabel").textContent = t("countrySelectLabel");
     $("stateSelectLabel").textContent = t("stateSelectLabel");
-    $("districtSelectLabel").textContent = t("districtSelectLabel");
+    $("districtSelectLabel").textContent = String(state.selectedCountry?.id) === "2"
+      ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
+      : t("districtSelectLabel");
     $("apiSelectLabel").textContent = t("apiSelectLabel");
 
     if (state.countries.length > 0) renderCountrySelect();
@@ -5439,7 +5504,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       updateMissingSelectionStatus();
       renderEmptyPrayerPlaceholder(true);
       await loadStatesForCountry(state.selectedCountry);
-      if (state.selectedCountry.id === "184" && state.selectedState) {
+      if (state.selectedState && (state.selectedCountry.id === "184" || state.selectedState.isTurkeyRoot)) {
         await loadDistrictsForState(state.selectedState);
       }
     });
