@@ -1517,7 +1517,7 @@ const DIYANET_ALL_LOCATIONS = [];
     return [];
   }
 
-  // AlAdhan, UmmahAPI and QASRA calculate times from a city/country pair or
+  // AlAdhan and UmmahAPI calculate times from a city/country pair or
   // coordinates; they do not publish a hierarchical country/state/city
   // catalogue. Their selector therefore uses live location catalogues from
   // the available location endpoints, with the selected prayer source first.
@@ -5162,19 +5162,7 @@ const DIYANET_ALL_LOCATIONS = [];
 
     const credit = $("prayerApiCredit");
     credit.replaceChildren();
-    const activePrayerSource = state.actualApiMode || state.selectedApiMode;
-    if (activePrayerSource === "qasra") {
-      const link = document.createElement("a");
-      link.href = "https://salah.qasra.org/";
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = "QASRA · Quran and Sunnah Research Academy, Ajmer";
-      credit.appendChild(document.createTextNode(" · "));
-      credit.appendChild(link);
-      credit.style.display = "inline";
-    } else {
-      credit.style.display = "none";
-    }
+    credit.style.display = "none";
 
     if (!state.todayData) {
       if (!state.selectedDistrict && !state.selectedApiMode) {
