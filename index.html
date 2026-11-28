@@ -66,11 +66,14 @@ main{max-width:620px;margin:0 auto}
 }
 .date{color:var(--muted);font-size:14px}
 .hijri{color:var(--gold);font-size:12.5px;margin-top:4px;min-height:17px}
+.clock-group{display:flex;justify-content:center;align-items:flex-start;gap:12px;margin-top:10px;flex-wrap:wrap}
+.clock-item{display:flex;flex-direction:column;align-items:center;gap:5px}
+.clock-label{font-size:11px;color:var(--muted);font-weight:650;letter-spacing:.04em}
 .clock{
   display:inline-flex;
   align-items:center;
   gap:8px;
-  margin-top:10px;
+  margin-top:0;
   padding:6px 15px;
   border-radius:999px;
   background:var(--panel);
@@ -285,6 +288,7 @@ select:disabled{opacity:.55;cursor:not-allowed}
   color:var(--muted);
 }
 .quote-source{
+  display:none !important;
   margin-top:9px;
   font-size:12px;
   font-weight:650;
@@ -560,9 +564,18 @@ details.nav-item > summary:hover{background:#163b30}
     <h1 id="cityTitle" class="unselected">&Uuml;lke, Eyalet/&#304;l ve &#304;l&ccedil;e Se&ccedil;iniz</h1>
     <div class="date" id="today">Yerel tarih y&uuml;kleniyor&hellip;</div>
     <div class="hijri" id="hijri"></div>
-    <div class="clock" aria-label="Mevcut saat">
-      <span class="live-dot" id="liveDot" aria-hidden="true"></span>
-      <span id="clock">--:--:--</span>
+    <div class="clock-group" aria-label="Saatler">
+      <div class="clock-item">
+        <span class="clock-label" id="deviceClockLabel">Cihaz saati</span>
+        <div class="clock" aria-label="Cihaz saati"><span id="deviceClock">--:--:--</span></div>
+      </div>
+      <div class="clock-item">
+        <span class="clock-label" id="localClockLabel">Yerel saat</span>
+        <div class="clock" aria-label="Yerel saat">
+          <span class="live-dot" id="liveDot" aria-hidden="true"></span>
+          <span id="clock">--:--:--</span>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -897,6 +910,8 @@ details.nav-item > summary:hover{background:#163b30}
       locale: "tr-TR",
       langNameBadge: "Türkçe (TR)",
       topMark: "NAMAZ VAKİTLERİ · DİYANET",
+      deviceClockLabel: "Cihaz saati",
+      localClockLabel: "Yerel saat",
       pageSuffix: "Namaz Vakitleri — DİYANET",
       unselectedTitle: "Ülke, Eyalet/İl ve İlçe Seçiniz",
       selectCountryOption: "— Ülke seçiniz —",
@@ -1006,6 +1021,8 @@ details.nav-item > summary:hover{background:#163b30}
       locale: "en-GB",
       langNameBadge: "English (EN)",
       topMark: "PRAYER TIMES · DIYANET",
+      deviceClockLabel: "Device time",
+      localClockLabel: "Local time",
       pageSuffix: "Prayer Times — DIYANET",
       unselectedTitle: "Select Country, State & District",
       selectCountryOption: "— Select Country —",
@@ -1115,6 +1132,8 @@ details.nav-item > summary:hover{background:#163b30}
       locale: "nl-NL",
       langNameBadge: "Nederlands (NL)",
       topMark: "GEBEDSTIJDEN · DIYANET",
+      deviceClockLabel: "Apparaattijd",
+      localClockLabel: "Lokale tijd",
       pageSuffix: "Gebedstijden — DIYANET",
       unselectedTitle: "Kies Land, Provincie & Stad",
       selectCountryOption: "— Kies een land —",
@@ -1809,6 +1828,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function formatDate() {
     return new Intl.DateTimeFormat(I18N[state.lang].locale, {
       timeZone: state.zone, weekday: "long", day: "numeric", month: "long", year: "numeric"
+    }).format(new Date());
+  }
+
+  function formatDeviceClock() {
+    return new Intl.DateTimeFormat(I18N[state.lang].locale, {
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
     }).format(new Date());
   }
 
@@ -4357,6 +4382,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     });
 
     $("topMark").textContent = t("topMark");
+    $("deviceClockLabel").textContent = t("deviceClockLabel");
+    $("localClockLabel").textContent = t("localClockLabel");
     $("remainLabel").textContent = t("remain");
     $("enableSound").textContent = state.soundEnabled ? t("soundEnabled") : t("enableSound");
     $("stopAdhanBtn").textContent = t("stopAdhan");
@@ -4475,6 +4502,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   function tick() {
     const nowMs = Date.now();
+    $("deviceClock").textContent = formatDeviceClock();
     $("clock").textContent = formatClock();
     updateQuoteTimers(nowMs);
 
