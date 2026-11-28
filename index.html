@@ -273,6 +273,8 @@ select:disabled{opacity:.55;cursor:not-allowed}
   font-size:15px;
   line-height:1.68;
   color:var(--white);
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
 }
 .quote-commentary{
   margin-top:10px;
@@ -540,7 +542,7 @@ details.nav-item > summary:hover{background:#163b30}
   .lang-btn{padding:6px 11px;font-size:12px}
 }
 
-  /* Hadis ve dua kartlarında API durum ayrıntılarını gösterme. */
+  /* Hadis ve Kur’an metinlerinde API yanıtının boşluk ve satır yapısını koru. */
   #hadithCard .api-info,
   #quranCard .api-info,
   #hadithCard .quote-source,
@@ -2868,7 +2870,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   /* ==========================================================================
-     10. HADITH SANITIZER & 20 DISTINCT HADITH APIs
+     10. HADITH API SOURCES — ORIGINAL TEXT DISPLAY
      ========================================================================== */
   const HADITH_OCR_FIX_RULES = [
     [/([.!?":]\s+)0(?=,)/g, "$1O"],
@@ -3165,11 +3167,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchCleanFromHadeethEnc(selLang, seedNo, signal) {
     const hLang = selLang === "tr" ? "tr" : selLang === "nl" ? "nl" : "en";
-    const languageFallback = false;
     let categories = [];
     try {
       const { data: categoryPayload } = await fetchApiPayloadWithTimeout(
-        `https://hadeethenc.com/api/v1/categories/roots/?language=${hLang}`,
+        "https://hadeethenc.com/api/v1/categories/roots/?language=" + hLang,
         { signal, timeoutMs: 5500 }
       );
       const rows = Array.isArray(categoryPayload?.data) ? categoryPayload.data
@@ -3181,16 +3182,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     } catch (error) {
       if (signal?.aborted) throw error;
     }
-    if (!categories.length) {
-      categories = [2,3,4,5,6,7].map(id => ({ id, count: 20 }));
-    }
+    if (!categories.length) categories = [2,3,4,5,6,7].map(id => ({ id, count: 20 }));
 
     for (let attempt = 0; attempt < Math.min(categories.length, 6); attempt++) {
       if (signal?.aborted) throw new Error("Aborted");
       const category = categories[(attempt + Math.abs(Number(seedNo) || 0)) % categories.length];
       const pageCount = Math.max(1, Math.ceil(category.count / 20));
       const page = 1 + ((Math.abs(Number(seedNo) || 0) + attempt) % pageCount);
-      const listUrl = `https://hadeethenc.com/api/v1/hadeeths/list/?language=${hLang}&category_id=${category.id}&page=${page}&per_page=20`;
+      const listUrl = "https://hadeethenc.com/api/v1/hadeeths/list/?language=" + hLang
+        + "&category_id=" + category.id + "&page=" + page + "&per_page=20";
       let listPayload;
       try {
         const { data } = await fetchApiPayloadWithTimeout(listUrl, { signal, timeoutMs: 6500 });
@@ -3209,24 +3209,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       for (const pick of rows.slice(0, 10)) {
         if (signal?.aborted) throw new Error("Aborted");
         if (!pick?.id) continue;
-        const oneUrl = `https://hadeethenc.com/api/v1/hadeeths/one/?language=${hLang}&id=${pick.id}`;
+        const oneUrl = "https://hadeethenc.com/api/v1/hadeeths/one/?language=" + hLang + "&id=" + pick.id;
         try {
           const { data: detail } = await fetchApiPayloadWithTimeout(oneUrl, { signal, timeoutMs: 5500 });
-          const hadeethText = cleanApiTextValue(detail?.hadeeth || detail?.hadith || detail?.text || "");
-          const textInfo = hadeethText ? { text: hadeethText, path: "$.hadeeth", property: "hadeeth", record: detail, sourceLanguage: hLang, languageFallback: false } : null;
-          const validated = cleanAndValidateHadithText(hadeethText, hLang);
-          if (!validated.isValid) continue;
-          const attribution = extractCleanText(detail?.attribution, hLang) || "HadeethEnc";
+          const rawText = [detail?.hadeeth, detail?.hadith, detail?.text]
+            .find(value => typeof value === "string" && value.length > 0);
+          if (typeof rawText !== "string") continue;
+          const attribution = typeof detail?.attribution === "string" && detail.attribution.length
+            ? detail.attribution : "HadeethEnc";
           return {
-            text: validated.text,
-            textInfo,
-            commentary: extractHadithExplanation(detail) || extractHadithExplanation(detail?.data),
+            text: rawText,
             raw: detail,
-            source: validated.tahric ? `${attribution} (#${pick.id}) — ${validated.tahric}` : `${attribution} (#${pick.id})`,
-            ref: `hadeethenc #${pick.id}`,
+            source: attribution + " (#" + pick.id + ")",
+            ref: "hadeethenc #" + pick.id,
             liveUrl: oneUrl,
             provider: "HadeethEnc",
-            languageFallback
+            languageFallback: false
           };
         } catch (error) {
           if (signal?.aborted) throw error;
@@ -3240,7 +3238,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (selLang === "nl") {
       const dutch = await fetchCleanFromHadeethEnc("nl", randNo, signal);
       if (dutch) return dutch;
-      throw new Error("No verified Dutch hadith translation returned.");
+      throw new Error("No Dutch hadith text was returned by the selected API.");
     }
     const prefix = selLang === "tr" ? "tur" : "eng";
     const books = prefix === "tur"
@@ -3260,26 +3258,32 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         try {
           const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 4800 });
           const payload = response.data;
-          const record = Array.isArray(payload?.hadiths) ? payload.hadiths[0] : (payload?.hadith || payload?.data || payload);
-          const textInfo = extractProviderApiText("fawaz_hadith", payload, selLang, "hadith");
-          const rawText = textInfo?.text || record?.text || record?.hadith || "";
-          const validated = cleanAndValidateHadithText(rawText, selLang);
-          if (!validated.isValid) continue;
-          const title = extractCleanText(payload?.metadata?.name, selLang) || selectedBook.toUpperCase();
+          const record = Array.isArray(payload?.hadiths) ? payload.hadiths[0]
+            : (payload?.hadith || payload?.data || payload);
+          const rawText = typeof record?.text === "string" ? record.text
+            : typeof record?.hadith === "string" ? record.hadith : "";
+          if (!rawText.length) continue;
+          const title = typeof payload?.metadata?.name === "string" && payload.metadata.name.length
+            ? payload.metadata.name : selectedBook.toUpperCase();
           return {
-            text: validated.text, textInfo: textInfo || { text: validated.text, sourceLanguage: selLang, record },
-            commentary: "", raw: payload,
+            text: rawText,
+            raw: payload,
             source: title + " #" + selectedNumber,
             ref: prefix + "-" + selectedBook + " #" + selectedNumber,
-            liveUrl: url, provider: "FawazAhmed0 Hadith CDN", languageFallback: false
+            liveUrl: url,
+            provider: "FawazAhmed0 Hadith API",
+            languageFallback: false
           };
-        } catch (error) { if (signal?.aborted) throw error; }
+        } catch (error) {
+          if (signal?.aborted) throw error;
+        }
       }
     }
     const fallback = await fetchCleanFromHadeethEnc(selLang, randNo, signal);
     if (fallback) return fallback;
-    throw new Error("No valid open hadith record found.");
+    throw new Error("No hadith record was returned by the selected APIs.");
   }
+
   async function loadRandomHadith() {
     const signal = renewSignal("hadith");
     state.nextHadithAt = Date.now() + QUOTE_ROTATE_MS;
@@ -3303,16 +3307,19 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           result = provider === "hadeethenc"
             ? await fetchCleanFromHadeethEnc(targetLang, seed, signal)
             : await fetchLiveHadithInLang(targetLang, HADITH_BOOKS[Math.floor(Math.random() * HADITH_BOOKS.length)], seed, signal);
-          if (result?.text) break;
-        } catch (error) { if (signal.aborted) throw error; result = null; }
+          if (typeof result?.text === "string" && result.text.length > 0) break;
+        } catch (error) {
+          if (signal.aborted) throw error;
+          result = null;
+        }
       }
-      if (!result?.text) throw new Error("No verified hadith record was returned.");
-      const validated = cleanAndValidateHadithText(result.text, targetLang);
-      if (!validated.isValid) throw new Error("The returned hadith text did not pass validation.");
+      if (typeof result?.text !== "string" || result.text.length === 0) {
+        throw new Error("No hadith text was returned by the selected APIs.");
+      }
       const ms = Math.round(performance.now() - t0);
-      $("hadithText").textContent = "“" + validated.text + "”";
+      $("hadithText").textContent = result.text;
       renderHadithCommentary("");
-      renderApiResponseDetails("hadithMeta", result.raw || {}, "hadith", result.liveUrl, result.textInfo);
+      renderApiResponseDetails("hadithMeta", result.raw || {}, "hadith", result.liveUrl);
       $("hadithSource").textContent = result.source || result.provider || "-";
       $("hadithApiProvider").textContent = result.provider || "Open Hadith source";
       $("hadithApiStatus").textContent = "200 OK · " + ms + " ms";
@@ -3322,11 +3329,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       $("hadithApiUrl").textContent = result.liveUrl || "-";
     } catch (error) {
       if (signal.aborted) return;
-      const message = state.lang === "tr" ? "Açık hadis kaynaklarından geçerli bir kayıt alınamadı. “Yeni Hadis” ile tekrar deneyin." : state.lang === "nl" ? "Er kon geen geldige hadith uit de open bronnen worden opgehaald. Probeer opnieuw." : "No valid hadith record could be fetched from the open sources. Please try again.";
+      const message = state.lang === "tr"
+        ? "Seçilen açık hadis API kaynaklarından metin alınamadı. “Yeni Hadis” ile tekrar deneyin."
+        : state.lang === "nl"
+          ? "Er kon geen hadithtekst uit de geselecteerde API-bronnen worden opgehaald. Probeer opnieuw."
+          : "No hadith text could be fetched from the selected API sources. Please try again.";
       $("hadithText").textContent = message;
       $("hadithSource").textContent = "-";
-      $("hadithApiProvider").textContent = "HadeethEnc / Fawaz Hadith";
-      $("hadithApiStatus").textContent = "No valid record · " + Math.round(performance.now() - t0) + " ms";
+      $("hadithApiProvider").textContent = "HadeethEnc / Fawaz Hadith API";
+      $("hadithApiStatus").textContent = "No record · " + Math.round(performance.now() - t0) + " ms";
       $("hadithApiStatus").className = "api-val warn";
       $("hadithApiRef").textContent = langLabel;
       $("hadithApiUpdated").textContent = formatClock();
@@ -3334,8 +3345,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       clearApiResponseDetails("hadithMeta");
     }
   }
+
   /* ==========================================================================
-     11. 20 DISTINCT DUA & QURANIC SUPPLICATION APIs
+     11. QURAN API EDITIONS — ORIGINAL TEXT DISPLAY
      ========================================================================== */
   /* Exact provider response schemas  /* Exact provider response schemas. A source without a verified field/language is not guessed. */
 
@@ -3385,6 +3397,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return { ...preferred, record: payload, sourceLanguage: targetLang, languageFallback: false };
   }
 
+  // These are edition IDs from one provider (FawazAhmed0), not independent API services.
   const QURAN_TRANSLATION_SOURCES = {
     tr: [
       ["tur-abdulbakigolpin","Abdulbaki Gölpınarlı"],["tur-ademugur","Adem Uğur"],["tur-alibulac","Ali Bulaç"],
@@ -3414,7 +3427,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       ["nld-sofianssiregar","Sofian S. Siregar"],["nld-unknown","Van De Taal"]
     ]
   };
-  const QURAN_TRANSLATION_SOURCE_COUNT = 50;
   const QURAN_SURAH_VERSE_COUNTS = [
     7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,112,78,118,64,77,
     227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,
@@ -3430,21 +3442,27 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchQuranTranslation(source, ref, signal) {
     const base = "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/" + source[0] + "/" + ref.surah + "/" + ref.verse;
-    const urls = [base + ".min.json", base + ".json", "https://raw.githubusercontent.com/fawazahmed0/quran-api/1/editions/" + source[0] + "/" + ref.surah + "/" + ref.verse + ".json"];
+    const urls = [
+      base + ".min.json",
+      base + ".json",
+      "https://raw.githubusercontent.com/fawazahmed0/quran-api/1/editions/" + source[0] + "/" + ref.surah + "/" + ref.verse + ".json"
+    ];
     let lastError = null;
     for (const url of urls) {
       try {
         const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 4800 });
         const payload = response.data;
-        const text = cleanApiTextValue(payload?.text || payload?.translation || payload?.data?.text || "");
-        if (!text || text.length < 5 || /\b(?:undefined|null|not found|error)\b/i.test(text)) throw new Error("No verse text in response");
-        return { text, url, status: response.status, ms: response.ms };
+        const rawText = typeof payload?.text === "string" ? payload.text
+          : typeof payload?.translation === "string" ? payload.translation
+          : typeof payload?.data?.text === "string" ? payload.data.text : "";
+        if (!rawText.length) throw new Error("No verse text in response");
+        return { text: rawText, url, status: response.status, ms: response.ms, raw: payload };
       } catch (error) {
         if (signal?.aborted) throw error;
         lastError = error;
       }
     }
-    throw lastError || new Error("Quran translation endpoint unavailable");
+    throw lastError || new Error("Quran API endpoint unavailable");
   }
 
   async function loadRandomQuran() {
@@ -3472,7 +3490,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
       if (!result || !source) throw new Error("No valid open Quran translation was returned.");
       const ms = Math.round(performance.now() - started);
-      $("quranText").textContent = "“" + result.text + "”";
+      $("quranText").textContent = result.text;
       $("quranSource").textContent = "Kur’an · " + ref.surah + ":" + ref.verse;
       $("quranApiProvider").textContent = source[1] + " — " + source[0];
       $("quranApiStatus").textContent = "200 OK · " + ms + " ms";
@@ -3485,7 +3503,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const message = state.lang === "tr" ? "Açık Kur’an tercüme kaynaklarından geçerli bir ayet alınamadı. “Yeni Ayet” ile tekrar deneyin." : state.lang === "nl" ? "Er kon geen geldige Koranvertaling worden opgehaald. Probeer opnieuw." : "No valid Quran translation could be fetched. Please try again.";
       $("quranText").textContent = message;
       $("quranSource").textContent = "Kur’an · " + ref.surah + ":" + ref.verse;
-      $("quranApiProvider").textContent = "FawazAhmed0 Quran API (" + QURAN_TRANSLATION_SOURCE_COUNT + " editions)";
+      $("quranApiProvider").textContent = "FawazAhmed0 Quran API";
       $("quranApiStatus").textContent = "No valid record · " + Math.round(performance.now() - started) + " ms";
       $("quranApiStatus").className = "api-val warn";
       $("quranApiRef").textContent = ref.surah + ":" + ref.verse + " · " + langLabel;
