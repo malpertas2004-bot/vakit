@@ -599,29 +599,14 @@ details.nav-item > summary:hover{background:#163b30}
       </div>
 
       <div>
-        <label class="field-label" for="apiSelect" id="apiSelectLabel">Vakit API Kayna&#287;&#305; Se&ccedil;imi (20 Farkl&#305; API):</label>
+        <label class="field-label" for="apiSelect" id="apiSelectLabel">Vakit kaynağı (Diyanet):</label>
         <select id="apiSelect" class="prompt-select">
-          <option value="" disabled selected>&mdash; Vakit API kayna&#287;&#305;n&#305; se&ccedil;iniz &mdash;</option>
-          <option value="imsakiyem">1. &#304;msakiyem API (T.C. Diyanet Resmi &#304;l&ccedil;e Verisi)</option>
-          <option value="aladhan">2. AlAdhan API (Diyanet Hesaplama Y&ouml;ntemi - Method 13)</option>
-          <option value="emushaf">3. EzanVakti eMushaf API (Diyanet Tablosu)</option>
-          <option value="vakit_vercel">4. Vakit Vercel API (Turkey / Diyanet)</option>
-          <option value="islamicapi">5. IslamicAPI (Diyanet Hesaplama Y&ouml;ntemi)</option>
-          <option value="ummahapi">6. UmmahAPI Prayer Times Servisi</option>
-          <option value="pawan_krd">7. Pawan.krd PrayerTimes REST API</option>
-          <option value="islamic_network_pray">8. Islamic Network Pray API</option>
-          <option value="muslimsalat">9. MuslimSalat JSON API</option>
-          <option value="prayzone">10. Pray.zone Islamic Prayer API</option>
-          <option value="namazvakti_tr">11. NamazVakti.com.tr A&ccedil;&#305;k Veri API</option>
-          <option value="collectapi_pray">12. CollectAPI Namaz Vakitleri Servisi</option>
-          <option value="nosyapi_ezan">13. NosyAPI Ezan Vakitleri Servisi</option>
-          <option value="awqatsalah_diyanet">14. Diyanet AwqatSalah Resmi API</option>
-          <option value="mawaqit_api">15. Mawaqit Cami Vakitleri REST API</option>
-          <option value="sunnahsource_pray">16. SunnahSource Salah Times API</option>
-          <option value="alislam_salat">17. Al-Islam Salat Times API</option>
-          <option value="salat_times_org">18. SalatTimes.org REST API</option>
-          <option value="adhanjs_calc">19. Adhan.js Astronomik Motor (Diyanet 18&deg;/17&deg;)</option>
-          <option value="praytimes_calc">20. PrayTimes.org Astronomik Motor (Diyanet)</option>
+          <option value="auto" selected>Otomatik Diyanet kaynak seçimi</option>
+          <option value="imsakiyem">İmsakiyem — Diyanet verisi</option>
+          <option value="emushaf">eMushaf — Diyanet verisi</option>
+          <option value="mtopal">MTopal — Diyanet verisi</option>
+          <option value="prayertime">PrayerTime.info — Diyanet yöntemi</option>
+          <option value="aladhan">AlAdhan — Diyanet Method 13 hesaplaması</option>
         </select>
       </div>
     </div>
@@ -990,10 +975,10 @@ details.nav-item > summary:hover{background:#163b30}
       selectApiOption: "— Vakit API kaynağını seçiniz —",
       promptBoth: "Aşağıdan ülke, eyalet/il, ilçe ve vakit API kaynağını seçiniz",
       promptLocationOnly: "Aşağıdan ülke, eyalet/il ve ilçe seçiniz",
-      promptApiOnly: "Aşağıdan 20 farklı API kaynağından birini seçiniz",
+      promptApiOnly: "Aşağıdan Diyanet veri kaynağından birini seçiniz",
       statusNeedBoth: "Lütfen aşağıdaki listeden Diyanet kayıtlarına göre ülke, eyalet/il, ilçe ve API kaynağı seçiniz.",
       statusNeedLocation: "Konum seçimi bekleniyor. Lütfen ülke, eyalet/il ve ilçe seçiniz.",
-      statusNeedApi: "{city} seçildi. Vakitleri getirmek için 20 farklı API kaynağından birini seçiniz.",
+      statusNeedApi: "{city} seçildi. Vakitleri getirmek için Diyanet veri kaynağından birini seçiniz.",
       apiWaitingBoth: "Konum ve API seçimi bekleniyor",
       apiWaitingLocation: "Ülke, eyalet/il ve ilçe seçimi bekleniyor",
       apiWaitingApi: "API seçimi bekleniyor",
@@ -1009,7 +994,7 @@ details.nav-item > summary:hover{background:#163b30}
       fetchErr: "Vakitler alınamadı. Bağlantınızı kontrol edip “Vakitleri yenile” düğmesine dokunun.",
       hijriPrefix: "Hicri: ",
       prayers: { Fajr: "İmsak", Sunrise: "Güneş", Dhuhr: "Öğle", Asr: "İkindi", Maghrib: "Akşam", Isha: "Yatsı" },
-      locationCardTitle: "Konum ve API Seçimi (Diyanet · 20 Farklı API)",
+      locationCardTitle: "Konum ve API Seçimi (Diyanet · Diyanet veri kaynakları)",
       countrySelectLabel: "Ülke (Diyanet):",
       stateSelectLabel: "Eyalet / İl (Diyanet):",
       districtSelectLabel: "İlçe / Şehir (Diyanet):",
@@ -1024,38 +1009,24 @@ details.nav-item > summary:hover{background:#163b30}
       idVerifyInvalid: "Lütfen geçerli bir sayısal Diyanet ID giriniz.",
       idVerifyNotFound: "Diyanet kaydında #{id} numaralı ilçe bulunamadı.",
       idVerifyOk: "Doğrulandı: {country} (#{cid}) → {state} (#{sid}) → {district} (#{did})",
-      apiSelectLabel: "Vakit API Kaynağı Seçimi (20 Farklı API):",
+      apiSelectLabel: "Vakit API Kaynağı Seçimi (Diyanet veri kaynakları):",
       apiOptions: {
-        imsakiyem: "1. İmsakiyem API (T.C. Diyanet Resmi İlçe Verisi)",
-        aladhan: "2. AlAdhan API (Diyanet Hesaplama Yöntemi - Method 13)",
-        emushaf: "3. EzanVakti eMushaf API (Diyanet Tablosu)",
-        vakit_vercel: "4. Vakit Vercel API (Turkey / Diyanet)",
-        islamicapi: "5. IslamicAPI (Diyanet Hesaplama Yöntemi)",
-        ummahapi: "6. UmmahAPI Prayer Times Servisi",
-        pawan_krd: "7. Pawan.krd PrayerTimes REST API",
-        islamic_network_pray: "8. Islamic Network Pray API",
-        muslimsalat: "9. MuslimSalat JSON API",
-        prayzone: "10. Pray.zone Islamic Prayer API",
-        namazvakti_tr: "11. NamazVakti.com.tr Açık Veri API",
-        collectapi_pray: "12. CollectAPI Namaz Vakitleri Servisi",
-        nosyapi_ezan: "13. NosyAPI Ezan Vakitleri Servisi",
-        awqatsalah_diyanet: "14. Diyanet AwqatSalah Resmi API",
-        mawaqit_api: "15. Mawaqit Cami Vakitleri REST API",
-        sunnahsource_pray: "16. SunnahSource Salah Times API",
-        alislam_salat: "17. Al-Islam Salat Times API",
-        salat_times_org: "18. SalatTimes.org REST API",
-        adhanjs_calc: "19. Adhan.js Astronomik Motor (Diyanet 18°/17°)",
-        praytimes_calc: "20. PrayTimes.org Astronomik Motor (Diyanet)"
-      },
+        auto: "1. Otomatik Diyanet kaynak seçimi",
+        imsakiyem: "2. İmsakiyem (Diyanet verisi)",
+        emushaf: "3. eMushaf (Diyanet verisi)",
+        mtopal: "4. MTopal (Diyanet verisi)",
+        prayertime: "5. PrayerTime.info (Diyanet yöntemi)",
+        aladhan: "6. AlAdhan (Diyanet Method 13)"
+      }
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
       lblApiParams: "Diyanet ID / Konum:",
       lblApiUpdated: "Son Güncelleme:",
       copyBtn: "Kopyala",
       copiedBtn: "Kopyalandı!",
-      hadithCardTitle: "Hadis-i Şerif (20 Farklı API)",
+      hadithCardTitle: "Hadis-i Şerif (Diyanet veri kaynakları)",
       refreshHadithBtn: "Yeni Hadis",
-      hadithApiSelectLabel: "Hadis API Kaynağı Seçimi (20 Farklı API):",
+      hadithApiSelectLabel: "Hadis API Kaynağı Seçimi (Diyanet veri kaynakları):",
       selectHadithApiOption: "— Hadis API kaynağını seçiniz —",
       hadithPlaceholder: "Lütfen yukarıdaki listeden 20 Hadis API kaynağından birini seçiniz.",
       hadithFetching: "Türkçe hadis alınıyor…",
@@ -1088,9 +1059,9 @@ details.nav-item > summary:hover{background:#163b30}
         alhadith_api: "19. Al-Hadith Open REST API",
         hadithapi_com: "20. HadithAPI.com Public REST API"
       },
-      duaCardTitle: "Dua & Ayet (20 Farklı API)",
+      duaCardTitle: "Dua & Ayet (Diyanet veri kaynakları)",
       refreshDuaBtn: "Yeni Dua",
-      duaApiSelectLabel: "Dua API Kaynağı Seçimi (20 Farklı API):",
+      duaApiSelectLabel: "Dua API Kaynağı Seçimi (Diyanet veri kaynakları):",
       selectDuaApiOption: "— Dua API kaynağını seçiniz —",
       duaPlaceholder: "Lütfen yukarıdaki listeden 20 Dua API kaynağından birini seçiniz.",
       duaFetching: "Türkçe dua / ayet meali alınıyor…",
@@ -1162,10 +1133,10 @@ details.nav-item > summary:hover{background:#163b30}
       selectApiOption: "— Select Prayer Times API —",
       promptBoth: "Select country, state/province, district and prayer API below",
       promptLocationOnly: "Select country, state/province and district below",
-      promptApiOnly: "Select one of the 20 distinct prayer APIs below",
+      promptApiOnly: "Select one of the verified Diyanet sources below",
       statusNeedBoth: "Please select country, state/province, district (Diyanet) and an API source below.",
       statusNeedLocation: "Waiting for location selection. Please select country, state/province and district.",
-      statusNeedApi: "{city} selected. Choose one of the 20 distinct API sources to load times.",
+      statusNeedApi: "{city} selected. Choose a Diyanet data source to load times.",
       apiWaitingBoth: "Waiting for location and API selection",
       apiWaitingLocation: "Waiting for country, state and district selection",
       apiWaitingApi: "Waiting for API selection",
@@ -1181,7 +1152,7 @@ details.nav-item > summary:hover{background:#163b30}
       fetchErr: "Could not fetch prayer times. Check your connection and tap “Refresh times”.",
       hijriPrefix: "Hijri: ",
       prayers: { Fajr: "Fajr (Imsak)", Sunrise: "Sunrise", Dhuhr: "Dhuhr", Asr: "Asr", Maghrib: "Maghrib", Isha: "Isha" },
-      locationCardTitle: "Location & API Selection (Diyanet · 20 Distinct APIs)",
+      locationCardTitle: "Location & API Selection (Diyanet · Diyanet data sources)",
       countrySelectLabel: "Country (Diyanet):",
       stateSelectLabel: "State / Province (Diyanet):",
       districtSelectLabel: "District / City (Diyanet):",
@@ -1196,38 +1167,24 @@ details.nav-item > summary:hover{background:#163b30}
       idVerifyInvalid: "Please enter a valid numeric Diyanet ID.",
       idVerifyNotFound: "District #{id} was not found in Diyanet records.",
       idVerifyOk: "Verified: {country} (#{cid}) → {state} (#{sid}) → {district} (#{did})",
-      apiSelectLabel: "Prayer Times API Source (20 Distinct APIs):",
+      apiSelectLabel: "Prayer Times API Source (Diyanet data sources):",
       apiOptions: {
-        imsakiyem: "1. Imsakiyem API (Official Diyanet District Data)",
-        aladhan: "2. AlAdhan API (Diyanet Calculation - Method 13)",
-        emushaf: "3. EzanVakti eMushaf API (Diyanet Table)",
-        vakit_vercel: "4. Vakit Vercel API (Turkey / Diyanet)",
-        islamicapi: "5. IslamicAPI (Diyanet Calculation Method)",
-        ummahapi: "6. UmmahAPI Prayer Times Service",
-        pawan_krd: "7. Pawan.krd PrayerTimes REST API",
-        islamic_network_pray: "8. Islamic Network Pray API",
-        muslimsalat: "9. MuslimSalat JSON API",
-        prayzone: "10. Pray.zone Islamic Prayer API",
-        namazvakti_tr: "11. NamazVakti.com.tr Open Data API",
-        collectapi_pray: "12. CollectAPI Prayer Times Service",
-        nosyapi_ezan: "13. NosyAPI Adhan Times Service",
-        awqatsalah_diyanet: "14. Diyanet AwqatSalah Official API",
-        mawaqit_api: "15. Mawaqit Mosque Times REST API",
-        sunnahsource_pray: "16. SunnahSource Salah Times API",
-        alislam_salat: "17. Al-Islam Salat Times API",
-        salat_times_org: "18. SalatTimes.org REST API",
-        adhanjs_calc: "19. Adhan.js Astronomical Engine (Diyanet 18°/17°)",
-        praytimes_calc: "20. PrayTimes.org Astronomical Engine (Diyanet)"
-      },
+        auto: "1. Automatic Diyanet source selection",
+        imsakiyem: "2. Imsakiyem (Diyanet data)",
+        emushaf: "3. eMushaf (Diyanet data)",
+        mtopal: "4. MTopal (Diyanet data)",
+        prayertime: "5. PrayerTime.info (Diyanet method)",
+        aladhan: "6. AlAdhan (Diyanet Method 13)"
+      }
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
       lblApiParams: "Diyanet ID / Location:",
       lblApiUpdated: "Last Updated:",
       copyBtn: "Copy",
       copiedBtn: "Copied!",
-      hadithCardTitle: "Hadith (20 Distinct APIs)",
+      hadithCardTitle: "Hadith (Diyanet data sources)",
       refreshHadithBtn: "New Hadith",
-      hadithApiSelectLabel: "Hadith API Source (20 Distinct APIs):",
+      hadithApiSelectLabel: "Hadith API Source (Diyanet data sources):",
       selectHadithApiOption: "— Select Hadith API Source —",
       hadithPlaceholder: "Please select one of the 20 Hadith API sources above.",
       hadithFetching: "Fetching English hadith…",
@@ -1260,9 +1217,9 @@ details.nav-item > summary:hover{background:#163b30}
         alhadith_api: "19. Al-Hadith Open REST API",
         hadithapi_com: "20. HadithAPI.com Public REST API"
       },
-      duaCardTitle: "Dua & Verse (20 Distinct APIs)",
+      duaCardTitle: "Dua & Verse (Diyanet data sources)",
       refreshDuaBtn: "New Dua",
-      duaApiSelectLabel: "Dua API Source (20 Distinct APIs):",
+      duaApiSelectLabel: "Dua API Source (Diyanet data sources):",
       selectDuaApiOption: "— Select Dua API Source —",
       duaPlaceholder: "Please select one of the 20 Dua API sources above.",
       duaFetching: "Fetching English dua / verse…",
@@ -1370,27 +1327,13 @@ details.nav-item > summary:hover{background:#163b30}
       idVerifyOk: "Geverifieerd: {country} (#{cid}) → {state} (#{sid}) → {district} (#{did})",
       apiSelectLabel: "Gebedstijden API-bron (20 Verschillende API's):",
       apiOptions: {
-        imsakiyem: "1. Imsakiyem API (Officiële Diyanet Districtsdata)",
-        aladhan: "2. AlAdhan API (Diyanet Berekening - Methode 13)",
-        emushaf: "3. EzanVakti eMushaf API (Diyanet Tabel)",
-        vakit_vercel: "4. Vakit Vercel API (Turkey / Diyanet)",
-        islamicapi: "5. IslamicAPI (Diyanet Berekeningsmethode)",
-        ummahapi: "6. UmmahAPI Prayer Times Service",
-        pawan_krd: "7. Pawan.krd PrayerTimes REST API",
-        islamic_network_pray: "8. Islamic Network Pray API",
-        muslimsalat: "9. MuslimSalat JSON API",
-        prayzone: "10. Pray.zone Islamic Prayer API",
-        namazvakti_tr: "11. NamazVakti.com.tr Open Data API",
-        collectapi_pray: "12. CollectAPI Gebedstijden Service",
-        nosyapi_ezan: "13. NosyAPI Adhan Tijden Service",
-        awqatsalah_diyanet: "14. Diyanet AwqatSalah Officiële API",
-        mawaqit_api: "15. Mawaqit Moskeetijden REST API",
-        sunnahsource_pray: "16. SunnahSource Salah Times API",
-        alislam_salat: "17. Al-Islam Salat Times API",
-        salat_times_org: "18. SalatTimes.org REST API",
-        adhanjs_calc: "19. Adhan.js Astronomische Engine (Diyanet 18°/17°)",
-        praytimes_calc: "20. PrayTimes.org Astronomische Engine (Diyanet)"
-      },
+        auto: "1. Automatische Diyanet-bronselectie",
+        imsakiyem: "2. Imsakiyem (Diyanet-gegevens)",
+        emushaf: "3. eMushaf (Diyanet-gegevens)",
+        mtopal: "4. MTopal (Diyanet-gegevens)",
+        prayertime: "5. PrayerTime.info (Diyanet-methode)",
+        aladhan: "6. AlAdhan (Diyanet-methode 13)"
+      }
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
       lblApiParams: "Diyanet ID / Locatie:",
