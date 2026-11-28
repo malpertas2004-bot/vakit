@@ -1511,15 +1511,25 @@ const DIYANET_ALL_LOCATIONS = [];
 
   function normalizeImsakiyemLocation(item, countryId, kind = "district") {
     const id = String(item?._id ?? item?.id ?? item?.state_id ?? item?.district_id ?? "").trim();
-    const rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.SehirAdi ?? item?.IlceAdi ?? item?.name ?? item?.title ?? "").trim();
-    const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.SehirAdiEn ?? item?.IlceAdiEn ?? item?.english_name ?? rawTr).trim();
+    const rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.SehirAdi ?? item?.IlceAdi ?? "").trim();
+    const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.SehirAdiEn ?? item?.IlceAdiEn ?? item?.english_name ?? item?.name ?? item?.title ?? rawTr).trim();
     if (!id || (!rawTr && !rawEn) || isNonAdministrativeLocationName(rawTr, rawEn)) return null;
+
+    const geo = item?.coordinates || item?.coordinate || item?.location || item?.geo || {};
+    const latRaw = item?.latitude ?? item?.lat ?? item?.Latitude ?? geo?.latitude ?? geo?.lat;
+    const lngRaw = item?.longitude ?? item?.lng ?? item?.lon ?? item?.Longitude ?? geo?.longitude ?? geo?.lng ?? geo?.lon;
+    const latitude = latRaw !== undefined && latRaw !== null && String(latRaw).trim() !== "" ? Number(latRaw) : NaN;
+    const longitude = lngRaw !== undefined && lngRaw !== null && String(lngRaw).trim() !== "" ? Number(lngRaw) : NaN;
+    const hasCoords = Number.isFinite(latitude) && Number.isFinite(longitude)
+      && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+
     return {
       id, countryId: String(countryId || item?.country_id || ""),
       nameTr: rawTr || rawEn, nameEn: rawEn || rawTr,
       nameNl: String(item?.name_nl ?? item?.nameNl ?? "").trim(),
-      tz: item?.timezone || item?.time_zone || item?.tz || "",
+      tz: item?.timezone || item?.time_zone || item?.tz || item?.timezone_id || "",
       iso2: String(item?.iso2 || item?.iso_code || item?.country_code || "").toUpperCase(),
+      ...(hasCoords ? { lat: latitude, lng: longitude } : {}),
       sourceIds: { imsakiyem: id }, locationKind: kind, displayNames: {}
     };
   }
@@ -2834,8 +2844,11 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function resolveCityCoords(districtObj, signal) {
-    if (Number.isFinite(districtObj?.lat) && Number.isFinite(districtObj?.lng)) {
-      return { lat: districtObj.lat, lng: districtObj.lng };
+    const cachedLat = Number(districtObj?.lat);
+    const cachedLng = Number(districtObj?.lng);
+    if (Number.isFinite(cachedLat) && Number.isFinite(cachedLng)
+      && cachedLat >= -90 && cachedLat <= 90 && cachedLng >= -180 && cachedLng <= 180) {
+      return { lat: cachedLat, lng: cachedLng };
     }
 
     const names = [...new Set([
@@ -2853,15 +2866,38 @@ const DIYANET_ALL_LOCATIONS = [];
     const expectedIso = getSelectedCountryIso2();
     const countryKeys = new Set(countryNames.map(asciiFoldKey).filter(Boolean));
     const stateKeys = new Set(stateNames.map(asciiFoldKey).filter(Boolean));
-    const queries = [];
+    const querySet = new Set();
     for (const name of names.slice(0, 3)) {
-      queries.push(name);
-      for (const country of countryNames.slice(0, 1)) queries.push(name + ", " + country);
+      querySet.add([name, ...stateNames.slice(0, 1), ...countryNames.slice(0, 1)].filter(Boolean).join(", "));
+      querySet.add([name, ...countryNames.slice(0, 1)].filter(Boolean).join(", "));
     }
+    const queries = [...querySet];
+
+    const scoreCandidate = (hit, fields) => {
+      const code = String(fields.countryCode || "").toUpperCase();
+      const hitCountry = asciiFoldKey(fields.country || "");
+      const hitAdmin = asciiFoldKey(fields.admin || "");
+      const hitCity = asciiFoldKey(fields.city || "");
+      const wantedCity = asciiFoldKey(names[0]);
+      const sameCountry = (expectedIso && code === expectedIso) || (countryKeys.size && countryKeys.has(hitCountry));
+      if (!sameCountry) return null;
+      const sameCity = hitCity === wantedCity || asciiFoldKey(fields.name || "") === wantedCity;
+      const sameState = stateKeys.size && stateKeys.has(hitAdmin);
+      const score = 100 + (sameCity ? 45 : 0) + (sameState ? 25 : 0)
+        + (Number(fields.population) > 0 ? Math.min(5, Math.log10(Number(fields.population))) : 0);
+      const lat = Number(fields.lat);
+      const lng = Number(fields.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      return { score, lat, lng, timezone: fields.timezone || "" };
+    };
 
     let best = null;
-    let bestScore = -Infinity;
-    for (const query of [...new Set(queries)]) {
+    const consider = candidate => {
+      if (candidate && (!best || candidate.score > best.score)) best = candidate;
+    };
+
+    // Primary keyless geocoder.
+    for (const query of queries) {
       if (signal?.aborted) throw new Error("Aborted");
       try {
         const { data } = await fetchJsonWithTimeout(
@@ -2870,63 +2906,90 @@ const DIYANET_ALL_LOCATIONS = [];
           { signal, timeoutMs: 4800 }
         );
         const hits = Array.isArray(data?.results) ? data.results : [];
-        const countryMatches = hits.filter(hit => {
-          const code = String(hit?.country_code || "").toUpperCase();
-          const name = asciiFoldKey(hit?.country || "");
-          return (expectedIso && code === expectedIso) || (countryKeys.size && countryKeys.has(name));
-        });
-        const candidates = countryMatches.length ? countryMatches : hits;
-        for (const hit of candidates) {
-          const code = String(hit?.country_code || "").toUpperCase();
-          const hitCountry = asciiFoldKey(hit?.country || "");
-          const hitAdmin = asciiFoldKey(hit?.admin1 || "");
-          const wantedCity = asciiFoldKey(names[0]);
-          const wantedState = stateKeys;
-          const sameCountry = (expectedIso && code === expectedIso) || countryKeys.has(hitCountry);
-          const sameCity = asciiFoldKey(hit?.name || "") === wantedCity;
-          const sameState = wantedState.has(hitAdmin);
-          const score = (sameCountry ? 100 : -80) + (sameCity ? 40 : 0) + (sameState ? 15 : 0) + (Number(hit?.population) ? Math.min(5, Math.log10(Number(hit.population))) : 0);
-          if (score > bestScore) { best = hit; bestScore = score; }
+        for (const hit of hits) {
+          consider(scoreCandidate(hit, {
+            countryCode: hit?.country_code,
+            country: hit?.country,
+            admin: hit?.admin1,
+            city: hit?.name,
+            name: hit?.name,
+            population: hit?.population,
+            lat: hit?.latitude,
+            lng: hit?.longitude,
+            timezone: hit?.timezone
+          }));
         }
-        if (best && countryMatches.length) break;
+        if (best?.score >= 145) break;
       } catch (error) {
         if (signal?.aborted) throw error;
       }
     }
 
-    if (best && bestScore > 0) {
-      districtObj.lat = Number(best.latitude);
-      districtObj.lng = Number(best.longitude);
-      if (best.timezone) state.zone = best.timezone;
-      return { lat: districtObj.lat, lng: districtObj.lng };
+    // Photon is an additional public, keyless geocoder with CORS support.
+    if (!best) {
+      for (const query of queries) {
+        if (signal?.aborted) throw new Error("Aborted");
+        try {
+          const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=8&lang=en";
+          const { data } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 5500 });
+          const features = Array.isArray(data?.features) ? data.features : [];
+          for (const feature of features) {
+            const props = feature?.properties || {};
+            const coordinates = feature?.geometry?.coordinates || [];
+            consider(scoreCandidate(feature, {
+              countryCode: props.countrycode || props.country_code,
+              country: props.country,
+              admin: props.state || props.county,
+              city: props.city || props.name,
+              name: props.name,
+              population: props.population,
+              lat: coordinates[1],
+              lng: coordinates[0]
+            }));
+          }
+          if (best) break;
+        } catch (error) {
+          if (signal?.aborted) throw error;
+        }
+      }
     }
 
-    // Public, keyless fallback. Country is sent explicitly to avoid picking
-    // a same-named city in another country.
+    if (best) {
+      districtObj.lat = best.lat;
+      districtObj.lng = best.lng;
+      if (best.timezone) state.zone = best.timezone;
+      return { lat: best.lat, lng: best.lng };
+    }
+
+    // Nominatim last fallback: use one full address string rather than city alone.
     try {
       const params = new URLSearchParams({
         format: "jsonv2",
-        city: names[0],
+        q: [names[0], stateNames[0], countryNames[0]].filter(Boolean).join(", "),
         limit: "5",
         addressdetails: "1"
       });
-      if (countryNames[0]) params.set("country", countryNames[0]);
       const { data } = await fetchJsonWithTimeout(
         "https://nominatim.openstreetmap.org/search?" + params.toString(),
-        { signal, timeoutMs: 5500 }
+        { signal, timeoutMs: 6000 }
       );
       const hits = Array.isArray(data) ? data : [];
-      const hit = hits[0];
-      if (hit && Number.isFinite(Number(hit.lat)) && Number.isFinite(Number(hit.lon))) {
-        districtObj.lat = Number(hit.lat);
-        districtObj.lng = Number(hit.lon);
+      const safe = hits.find(hit => {
+        const address = hit?.address || {};
+        const hitCountry = asciiFoldKey(address.country || "");
+        const code = String(address.country_code || "").toUpperCase();
+        return (expectedIso && code === expectedIso) || (countryKeys.size && countryKeys.has(hitCountry));
+      });
+      if (safe && Number.isFinite(Number(safe.lat)) && Number.isFinite(Number(safe.lon))) {
+        districtObj.lat = Number(safe.lat);
+        districtObj.lng = Number(safe.lon);
         return { lat: districtObj.lat, lng: districtObj.lng };
       }
     } catch (error) {
       if (signal?.aborted) throw error;
     }
 
-    throw new Error("Bu şehir için ülke ile eşleşen koordinat bulunamadı. Şehir tabanlı API veya MTopal/Diyanet kaynağını seçin.");
+    throw new Error("Bu konum için koordinat bulunamadı. Ülke ve şehir adını kontrol edin; ardından başka bir açık vakit kaynağı deneyin.");
   }
 
   function validateMappedTimes(mapped) {
