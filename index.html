@@ -567,6 +567,9 @@ details.nav-item > summary:hover{background:#163b30}
   .lang-btn{padding:6px 11px;font-size:12px}
 }
 
+  /* User-requested visual cleanup. */
+  #cityCountBadge, #liveDot, #zikrCurrentPhrase, #diyanetSourceGroup { display:none !important; }
+
   /* Hide technical prayer API diagnostics and the separate language panel. */
   #apiInfoBox,
   #hadithCard .api-info,
@@ -595,7 +598,6 @@ details.nav-item > summary:hover{background:#163b30}
       <div class="clock-item">
         <span class="clock-label" id="localClockLabel">Yerel saat</span>
         <div class="clock" aria-label="Yerel saat">
-          <span class="live-dot" id="liveDot" aria-hidden="true"></span>
           <span id="clock">--:--:--</span>
         </div>
       </div>
@@ -627,7 +629,7 @@ details.nav-item > summary:hover{background:#163b30}
       <h2 id="locationCardTitle">Konum ve Vakit Kayna&#287;&#305; Se&ccedil;imi</h2>
       <div class="head-tools">
         <span class="badge lang-pill" id="locLangBadge">T&uuml;rk&ccedil;e (TR)</span>
-        <span class="badge" id="cityCountBadge">Diyanet</span>
+        <span class="badge" id="cityCountBadge" aria-hidden="true" hidden>Diyanet</span>
       </div>
     </div>
 
@@ -653,8 +655,6 @@ details.nav-item > summary:hover{background:#163b30}
           <option value="auto" selected>Otomatik · Çalışan kaynağı bul</option>
           <option value="aladhan">AlAdhan · Prayer Times API</option>
           <option value="ummahapi">UmmahAPI · Prayer Times API</option>
-          <option value="qasra">QASRA · Salah API</option>
-          <option value="imsakiyem">İmsakiyem · Diyanet API</option>
         </select>
       </div>
       <div class="loc-row prayer-options-row">
@@ -750,7 +750,7 @@ details.nav-item > summary:hover{background:#163b30}
         <span class="badge lang-pill" id="hadithLangBadge">Türkçe (TR)</span>
 <span id="hadithProviderCredit" class="provider-credit" style="display:none"></span>
 
-        <span class="badge" id="hadithTimerBadge">05:00</span>
+        <span class="badge" id="hadithTimerBadge">15:00</span>
         <button type="button" class="small-btn" id="refreshHadithBtn">Yeni Hadis</button>
       </div>
     </div>
@@ -775,7 +775,7 @@ details.nav-item > summary:hover{background:#163b30}
       <div class="head-tools">
         <span class="badge lang-pill" id="quranLangBadge">Türkçe (TR)</span>
 
-        <span class="badge" id="quranTimerBadge">05:00</span>
+        <span class="badge" id="quranTimerBadge">15:00</span>
         <button type="button" class="small-btn" id="refreshQuranBtn">Yeni Ayet</button>
       </div>
     </div>
@@ -801,7 +801,7 @@ details.nav-item > summary:hover{background:#163b30}
     <div class="control-grid">
 <div class="zikr-counter" aria-live="polite" aria-atomic="true">
         <div class="zikr-count" id="zikrCount">0</div>
-        <div class="field-label" id="zikrCurrentPhrase">Sübhanallah</div>
+        <div class="field-label" id="zikrCurrentPhrase" hidden>Sübhanallah</div>
       </div>
       <div class="actions zikr-actions">
         <button type="button" class="primary" id="zikrTapBtn">+1 · Say</button>
@@ -984,11 +984,12 @@ details.nav-item > summary:hover{background:#163b30}
   </nav>
 
   <footer class="foot">
-    <span id="footZone">Saat dilimi: Europe/Amsterdam &middot; Diyanet</span><br>
-    <span id="footSourceLabel">Kaynak:</span>
-    <a id="diyanetLink" href="https://namazvakitleri.diyanet.gov.tr/tr-TR" target="_blank" rel="noopener noreferrer">Diyanet &#304;&#351;leri Ba&#351;kanl&#305;&#287;&#305;</a>
-    <span id="prayerApiCredit" style="display:none"></span>
-    &middot;
+    <span id="footZone">Saat dilimi: Europe/Amsterdam</span><br>
+    <span id="diyanetSourceGroup" hidden>
+      <span id="footSourceLabel">Kaynak:</span>
+      <a id="diyanetLink" href="https://namazvakitleri.diyanet.gov.tr/tr-TR" target="_blank" rel="noopener noreferrer">Diyanet &#304;&#351;leri Ba&#351;kanl&#305;&#287;&#305;</a>
+      <span id="prayerApiCredit" style="display:none"></span>
+    </span>
     <button type="button" class="reset-link" id="resetPrefsBtn">Ayarlar&#305; S&#305;f&#305;rla</button>
   </footer>
 </main>
@@ -1041,7 +1042,7 @@ details.nav-item > summary:hover{background:#163b30}
   ];
   const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"];
   const UMMAH_HADITH_COLLECTIONS = ["bukhari", "muslim", "abudawud", "tirmidhi", "ibnmajah", "nasai", "malik", "nawawi", "qudsi", "dehlawi"];
-  const QUOTE_ROTATE_MS = 300000; // 5 minutes
+  const QUOTE_ROTATE_MS = 900000; // 15 minutes
   const FETCH_TIMEOUT_MS = 9500;
 
   const $ = id => document.getElementById(id);
@@ -1186,7 +1187,7 @@ details.nav-item > summary:hover{background:#163b30}
       },
       lblVolume: "Ses",
       footZone: "Saat dilimi: {zone} · {location}",
-      footZoneEmpty: "Saat dilimi: {zone} · Diyanet",
+      footZoneEmpty: "Saat dilimi: {zone}",
       footSourceLabel: "Kaynak:",
       diyanetOrg: "Diyanet İşleri Başkanlığı",
       resetPrefsBtn: "Ayarları Sıfırla",
@@ -3592,7 +3593,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const distName = getLocalizedLocationName(state.selectedDistrict, "district");
     if (!silentHourly || !state.todayData) $("status").textContent = t("fetchingFor", { city: distName });
 
-    const providerOrder = ["imsakiyem", "aladhan", "ummahapi", "qasra"];
+    const providerOrder = ["aladhan", "ummahapi"];
     const requestedMode = state.selectedApiMode;
     const attempts = requestedMode === "auto"
       ? providerOrder
