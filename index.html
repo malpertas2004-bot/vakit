@@ -897,12 +897,12 @@ details.nav-item > summary:hover{background:#163b30}
       selectStateOption: "— Eyalet / İl seçiniz —",
       selectDistrictOption: "— İlçe / Şehir seçiniz —",
       selectApiOption: "— Vakit API kaynağını seçiniz —",
-      promptBoth: "Aşağıdan ülke, eyalet/il, ilçe ve vakit API kaynağını seçiniz",
+      promptBoth: "Aşağıdan ülke, eyalet/il ve ilçe seçiniz",
       promptLocationOnly: "Aşağıdan ülke, eyalet/il ve ilçe seçiniz",
       promptApiOnly: "Aşağıdan Diyanet veri kaynağından birini seçiniz",
-      statusNeedBoth: "Lütfen aşağıdaki listeden Diyanet kayıtlarına göre ülke, eyalet/il, ilçe ve API kaynağı seçiniz.",
+      statusNeedBoth: "Lütfen aşağıdaki listeden Diyanet kayıtlarına göre ülke, eyalet/il ve ilçe seçiniz.",
       statusNeedLocation: "Konum seçimi bekleniyor. Lütfen ülke, eyalet/il ve ilçe seçiniz.",
-      statusNeedApi: "{city} seçildi. Vakitleri getirmek için Diyanet veri kaynağından birini seçiniz.",
+      statusNeedApi: "{city} seçildi. Diyanet vakitleri otomatik getirilecek.",
       apiWaitingBoth: "Konum ve API seçimi bekleniyor",
       apiWaitingLocation: "Ülke, eyalet/il ve ilçe seçimi bekleniyor",
       apiWaitingApi: "API seçimi bekleniyor",
@@ -933,7 +933,8 @@ details.nav-item > summary:hover{background:#163b30}
       idVerifyInvalid: "Lütfen geçerli bir sayısal Diyanet ID giriniz.",
       idVerifyNotFound: "Diyanet kaydında #{id} numaralı ilçe bulunamadı.",
       idVerifyOk: "Doğrulandı: {country} (#{cid}) → {state} (#{sid}) → {district} (#{did})",
-      apiSelectLabel: "Vakit API Kaynağı Seçimi (Diyanet veri kaynakları):",
+      apiSelectLabel: "Vakit kaynağı (otomatik):",
+      religiousLangLabel: "Hadis ve Kur’an dili:",
       apiOptions: {
         auto: "1. Otomatik kaynak seçimi (Diyanet verisi / Diyanet yöntemi)",
         imsakiyem: "2. İmsakiyem (Diyanet verisi)",
@@ -988,15 +989,15 @@ details.nav-item > summary:hover{background:#163b30}
       refreshQuranBtn: "Yeni Ayet",
       quranApiSelectLabel: "Dua API Kaynağı Seçimi (Diyanet veri kaynakları):",
       selectDuaApiOption: "— Dua API kaynağını seçiniz —",
-      duaPlaceholder: "Lütfen yukarıdaki listeden 20 Dua API kaynağından birini seçiniz.",
-      duaFetching: "Türkçe dua / ayet meali alınıyor…",
-      duaFetchErr: "Canlı API bağlantı hatası ({msg}). Lütfen “Yeni Dua” düğmesine basın.",
-      lblQuranProvider: "Dua API Kaynağı:",
+      quranPlaceholder: "Rastgele bir Kur’an ayeti hazırlanıyor…",
+      quranFetching: "Rastgele Kur’an ayeti alınıyor…",
+      quranFetchErr: "Canlı API bağlantı hatası ({msg}). Lütfen “Yeni Dua” düğmesine basın.",
+      lblQuranProvider: "Meal / tercüme kaynağı:",
       lblQuranStatus: "Durum & Gecikme:",
-      lblQuranRef: "Dua / Ayet & Dil:",
+      lblQuranRef: "Sure / Ayet / Dil:",
       lblQuranUpdated: "Son Güncelleme:",
-      duaWaitingStatus: "Dua API seçimi bekleniyor",
-      duaWaitingUrl: "Dua API seçimi bekleniyor...",
+      quranWaitingStatus: "Kur’an ayeti kaynağı hazırlanıyor",
+      quranWaitingUrl: "Açık Kur’an tercüme kaynağı bekleniyor...",
       duaApiOptions: {
         alquran_cloud: "1. AlQuran Cloud API",
         fawaz_quran_cdn: "2. FawazAhmed0 Quran CDN API",
@@ -1056,12 +1057,12 @@ details.nav-item > summary:hover{background:#163b30}
       selectStateOption: "— Select State / Province —",
       selectDistrictOption: "— Select District / City —",
       selectApiOption: "— Select Prayer Times API —",
-      promptBoth: "Select country, state/province, district and prayer API below",
+      promptBoth: "Select country, state/province and district below",
       promptLocationOnly: "Select country, state/province and district below",
       promptApiOnly: "Select one of the verified Diyanet sources below",
-      statusNeedBoth: "Please select country, state/province, district (Diyanet) and an API source below.",
+      statusNeedBoth: "Please select country, state/province and district (Diyanet) below.",
       statusNeedLocation: "Waiting for location selection. Please select country, state/province and district.",
-      statusNeedApi: "{city} selected. Choose a Diyanet data source to load times.",
+      statusNeedApi: "{city} selected. Diyanet prayer times will load automatically.",
       apiWaitingBoth: "Waiting for location and API selection",
       apiWaitingLocation: "Waiting for country, state and district selection",
       apiWaitingApi: "Waiting for API selection",
@@ -1092,7 +1093,8 @@ details.nav-item > summary:hover{background:#163b30}
       idVerifyInvalid: "Please enter a valid numeric Diyanet ID.",
       idVerifyNotFound: "District #{id} was not found in Diyanet records.",
       idVerifyOk: "Verified: {country} (#{cid}) → {state} (#{sid}) → {district} (#{did})",
-      apiSelectLabel: "Prayer Times API Source (Diyanet data sources):",
+      apiSelectLabel: "Prayer-time source (automatic):",
+      religiousLangLabel: "Hadith and Quran language:",
       apiOptions: {
         auto: "1. Automatic source selection (Diyanet data / Diyanet method)",
         imsakiyem: "2. Imsakiyem (Diyanet data)",
@@ -1147,15 +1149,15 @@ details.nav-item > summary:hover{background:#163b30}
       refreshQuranBtn: "New Verse",
       quranApiSelectLabel: "Dua API Source (Diyanet data sources):",
       selectDuaApiOption: "— Select Dua API Source —",
-      duaPlaceholder: "Please select one of the 20 Dua API sources above.",
-      duaFetching: "Fetching English dua / verse…",
-      duaFetchErr: "Live API connection error ({msg}). Please click “New Dua” again.",
-      lblQuranProvider: "Dua API Source:",
+      quranPlaceholder: "Preparing a random Quran verse…",
+      quranFetching: "Fetching a random Quran verse…",
+      quranFetchErr: "Live API connection error ({msg}). Please click “New Dua” again.",
+      lblQuranProvider: "Quran translation source:",
       lblQuranStatus: "Status & Latency:",
-      lblQuranRef: "Dua / Verse & Language:",
+      lblQuranRef: "Surah / Verse / Language:",
       lblQuranUpdated: "Last Updated:",
-      duaWaitingStatus: "Waiting for Dua API selection",
-      duaWaitingUrl: "Waiting for Dua API selection...",
+      quranWaitingStatus: "Preparing Quran translation source",
+      quranWaitingUrl: "Waiting for open Quran translation source...",
       duaApiOptions: {
         alquran_cloud: "1. AlQuran Cloud API",
         fawaz_quran_cdn: "2. FawazAhmed0 Quran CDN API",
@@ -1215,12 +1217,12 @@ details.nav-item > summary:hover{background:#163b30}
       selectStateOption: "— Kies provincie / deelstaat —",
       selectDistrictOption: "— Kies gemeente / stad —",
       selectApiOption: "— Kies Gebedstijden API —",
-      promptBoth: "Selecteer hieronder land, provincie, stad en gebedstijden-API",
+      promptBoth: "Selecteer hieronder land, provincie en stad",
       promptLocationOnly: "Selecteer hieronder land, provincie en stad",
       promptApiOnly: "Selecteer hieronder een van de 20 API-bronnen",
-      statusNeedBoth: "Kies hieronder land, provincie, stad (Diyanet) en een API-bron.",
+      statusNeedBoth: "Kies hieronder land, provincie en stad (Diyanet).",
       statusNeedLocation: "Wachten op locatieselectie. Kies land, provincie en stad.",
-      statusNeedApi: "{city} geselecteerd. Kies een van de 20 API-bronnen om tijden te laden.",
+      statusNeedApi: "{city} geselecteerd. Diyanet-gebedstijden worden automatisch geladen.",
       apiWaitingBoth: "Wachten op locatie- en API-selectie",
       apiWaitingLocation: "Wachten op land-, provincie- en stadsselectie",
       apiWaitingApi: "Wachten op API-selectie",
@@ -1251,7 +1253,8 @@ details.nav-item > summary:hover{background:#163b30}
       idVerifyInvalid: "Voer een geldig numeriek Diyanet-ID in.",
       idVerifyNotFound: "District #{id} is niet gevonden in Diyanet.",
       idVerifyOk: "Geverifieerd: {country} (#{cid}) → {state} (#{sid}) → {district} (#{did})",
-      apiSelectLabel: "Gebedstijden API-bron (20 Verschillende API's):",
+      apiSelectLabel: "Gebedstijdenbron (automatisch):",
+      religiousLangLabel: "Taal voor hadith en Koran:",
       apiOptions: {
         auto: "1. Automatische bronselectie (Diyanet-gegevens / Diyanet-methode)",
         imsakiyem: "2. Imsakiyem (Diyanet-gegevens)",
@@ -1306,15 +1309,15 @@ details.nav-item > summary:hover{background:#163b30}
       refreshQuranBtn: "Nieuwe Dua",
       quranApiSelectLabel: "Dua API-bron (20 Verschillende API's):",
       selectDuaApiOption: "— Kies Dua API-bron —",
-      duaPlaceholder: "Selecteer hierboven een van de 20 Dua API-bronnen.",
-      duaFetching: "Nederlandse dua / vers ophalen…",
-      duaFetchErr: "Live API-verbindingsfout ({msg}). Klik opnieuw op “Nieuwe Dua”.",
-      lblQuranProvider: "Dua API-bron:",
+      quranPlaceholder: "Een willekeurig Koranvers wordt klaargemaakt…",
+      quranFetching: "Een willekeurig Koranvers ophalen…",
+      quranFetchErr: "Live API-verbindingsfout ({msg}). Klik opnieuw op “Nieuwe Dua”.",
+      lblQuranProvider: "Bron van Koranvertaling:",
       lblQuranStatus: "Status & Latentie:",
-      lblQuranRef: "Dua / Vers & Taal:",
+      lblQuranRef: "Soera / Vers / Taal:",
       lblQuranUpdated: "Laatst bijgewerkt:",
-      duaWaitingStatus: "Wachten op Dua API-selectie",
-      duaWaitingUrl: "Wachten op Dua API-selectie...",
+      quranWaitingStatus: "Koranvertaling wordt voorbereid",
+      quranWaitingUrl: "Wachten op open Koranvertaling...",
       duaApiOptions: {
         alquran_cloud: "1. AlQuran Cloud API",
         fawaz_quran_cdn: "2. FawazAhmed0 Quran CDN API",
@@ -1406,7 +1409,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   const inflight = {
     prayer: null,
     hadith: null,
-    dua: null
+    quran: null
   };
 
   function renewSignal(domain) {
@@ -2679,7 +2682,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchFromPrayerTimeInfo(p, districtObj, signal) {
     const countryName = state.selectedCountry?.nameEn || state.selectedCountry?.nameNl || state.selectedCountry?.nameTr || "";
-    const cityName = state.selectedState?.nameEn || state.selectedState?.nameNl || state.selectedState?.nameTr || districtObj.nameEn || districtObj.nameNl || districtObj.nameTr || "";
+    const cityName = String(state.selectedCountry?.id) === "184"
+      ? (districtObj.nameEn || districtObj.nameNl || districtObj.nameTr || "")
+      : (state.selectedState?.nameEn || state.selectedState?.nameNl || state.selectedState?.nameTr || districtObj.nameEn || districtObj.nameNl || districtObj.nameTr || "");
     const slug = value => asciiFoldKey(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const url = "https://prayertime.info/api/" + slug(countryName) + "/" + slug(cityName) + ".json";
     const result = await fetchJsonWithTimeout(url, { signal, timeoutMs: 3800 });
@@ -2694,7 +2699,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchFromSalahTable(p, districtObj, signal) {
     const countryName = state.selectedCountry?.nameEn || state.selectedCountry?.nameNl || state.selectedCountry?.nameTr || "";
-    const cityName = state.selectedState?.nameEn || state.selectedState?.nameNl || state.selectedState?.nameTr || districtObj.nameEn || districtObj.nameNl || districtObj.nameTr || "";
+    const cityName = String(state.selectedCountry?.id) === "184"
+      ? (districtObj.nameEn || districtObj.nameNl || districtObj.nameTr || "")
+      : (state.selectedState?.nameEn || state.selectedState?.nameNl || state.selectedState?.nameTr || districtObj.nameEn || districtObj.nameNl || districtObj.nameTr || "");
     const slug = value => asciiFoldKey(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const url = "https://salahtable.com/api/times/" + slug(countryName) + "/" + slug(cityName) + "?method=diyanet";
     const result = await fetchJsonWithTimeout(url, { signal, timeoutMs: 3800 });
@@ -2753,7 +2760,19 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (signal.aborted) return;
     if (!res || !res.mapped) {
       const message = state.lang === "tr" ? "Diyanet vakit kaynakları geçici olarak yanıt vermedi. Lütfen tekrar deneyin." : state.lang === "nl" ? "De Diyanet-bronnen zijn tijdelijk niet beschikbaar. Probeer het opnieuw." : "Diyanet prayer-time sources are temporarily unavailable. Please try again.";
-      throw new Error(message);
+      state.lastStatusType = "error";
+      state.lastStatusMeta = { msg: message };
+      $("status").textContent = message;
+      $("liveDot").classList.remove("synced");
+      updateApiInfoUI({
+        providerName: "Diyanet data sources",
+        httpStatus: "No valid source",
+        paramsSummary: buildDiyanetIdSummary(),
+        updatedAt: formatClock(),
+        endpointUrl: "-"
+      }, true);
+      if (!state.todayData) renderEmptyPrayerPlaceholder(true);
+      return;
     }
     state.todayData = { key, city: distName, times: PRAYER_ORDER.map(k => ({ name: I18N[state.lang].prayers[k], time: res.mapped[k], key: k })) };
     state.lastRenderedEmptySig = "";
@@ -3347,7 +3366,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function loadRandomQuran() {
-    const signal = renewSignal("dua");
+    const signal = renewSignal("quran");
     state.nextQuranAt = Date.now() + QUOTE_ROTATE_MS;
     state.selectedQuranApi = "random";
     const targetLang = state.contentLang || "tr";
@@ -3887,7 +3906,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("quranTranslateBtn").addEventListener("click", () => openGoogleTranslate("quranText"));
     bindCopyButton("copyApiUrl", "infoApiUrl");
     bindCopyButton("copyHadithUrl", "hadithApiUrl");
-    bindCopyButton("copyQuranUrl", "quranApiUrl");
 
     $("enableSound").addEventListener("click", async () => {
       const audio = $("adhan");
