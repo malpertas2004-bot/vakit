@@ -512,6 +512,21 @@ details.nav-item > summary:hover{background:#163b30}
 }
 .lang-btn:hover{color:var(--white)}
 .lang-btn.active{background:var(--gold);color:#13261f}
+.calendar-switch{display:flex;justify-content:center;gap:6px;margin:8px 0 2px}
+.calendar-btn{padding:6px 13px;font-size:12px;border-radius:999px;background:var(--panel-alt);border-color:var(--line);color:var(--muted)}
+.calendar-btn.active{background:var(--gold);border-color:var(--gold);color:#13261f}
+.prayer-options-row{margin-top:10px}
+#prayerMethodHint{grid-column:1/-1;margin:0 2px}
+.zikr-counter{background:#091d17;border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center}
+.zikr-count{font-size:clamp(38px,11vw,58px);font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--gold-bright)}
+.zikr-actions{margin-top:2px;justify-content:center}
+.zikr-actions .primary{min-width:145px;flex:1}
+.live-stream-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.live-stream-item{min-width:0;background:#091d17;border:1px solid var(--line);border-radius:14px;padding:10px;display:grid;gap:9px}
+.live-stream-item h3{margin:2px 0;font-size:14px;color:var(--gold)}
+.live-player-wrap{aspect-ratio:16/9;width:100%;overflow:hidden;border-radius:10px;background:#000}
+.live-player{width:100%;height:100%;border:0;display:block}
+@media(max-width:540px){.live-stream-grid{grid-template-columns:1fr}}
 .content-lang-panel{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:16px 0 12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md)}
 .content-lang-title{font-size:13px;font-weight:700;color:var(--muted)}
 .content-lang-options{display:inline-flex;flex-wrap:wrap;gap:6px}
@@ -563,6 +578,10 @@ details.nav-item > summary:hover{background:#163b30}
     <div class="mark" id="topMark">NAMAZ VAK&#304;TLER&#304; &middot; D&#304;YANET</div>
     <h1 id="cityTitle" class="unselected">&Uuml;lke, Eyalet/&#304;l ve &#304;l&ccedil;e Se&ccedil;iniz</h1>
     <div class="date" id="today">Yerel tarih y&uuml;kleniyor&hellip;</div>
+    <div class="calendar-switch" role="group" aria-label="Takvim türü">
+      <button type="button" class="calendar-btn active" id="calendarGregorianBtn" data-calendar="gregorian" aria-pressed="true">Miladi</button>
+      <button type="button" class="calendar-btn" id="calendarHijriBtn" data-calendar="hijri" aria-pressed="false">Hicri</button>
+    </div>
     <div class="hijri" id="hijri"></div>
     <div class="clock-group" aria-label="Saatler">
       <div class="clock-item">
@@ -636,8 +655,35 @@ details.nav-item > summary:hover{background:#163b30}
           <option value="azan_quran_et">Azan Prayer Times API</option>
           <option value="deen2u">Deen2u Islamic Times API</option>
                   <option value="salahtable">SalahTable Prayer Times API</option>
+          <option value="islamic_app">islamic.app Prayer Times API</option>
+          <option value="esalah">eSalah Prayer Times API</option>
+          <option value="waqtazan">Waqtazan Prayer Times API</option>
+          <option value="vakit_vercel">Vakit Vercel GPS API</option>
 </select>
       </div>
+      <div class="loc-row prayer-options-row">
+        <div>
+          <label class="field-label" for="prayerMethodSelect" id="prayerMethodLabel">Hesaplama yöntemi:</label>
+          <select id="prayerMethodSelect" aria-label="Namaz vakti hesaplama yöntemi"></select>
+        </div>
+        <div>
+          <label class="field-label" for="prayerSchoolSelect" id="prayerSchoolLabel">İkindi mezhebi:</label>
+          <select id="prayerSchoolSelect" aria-label="İkindi vakti mezhebi">
+            <option value="shafii">Şafii / Standart</option>
+            <option value="hanafi">Hanefi</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="highLatitudeSelect" id="highLatitudeLabel">Yüksek enlem kuralı:</label>
+          <select id="highLatitudeSelect" aria-label="Yüksek enlem kuralı">
+            <option value="recommended">Önerilen</option>
+            <option value="MiddleOfNight">Gecenin ortası</option>
+            <option value="SeventhOfNight">Gecenin yedide biri</option>
+            <option value="TwilightAngle">Açı temelli</option>
+          </select>
+        </div>
+      </div>
+      <p class="status" id="prayerMethodHint">Yalnızca seçili API’nin desteklediği yöntemler gösterilir.</p>
     </div>
 
     <div class="api-info" id="apiInfoBox" aria-live="polite">
@@ -678,6 +724,7 @@ details.nav-item > summary:hover{background:#163b30}
       <h2 id="hadithCardTitle">Hadis-i Şerif</h2>
       <div class="head-tools">
         <span class="badge lang-pill" id="hadithLangBadge">Türkçe (TR)</span>
+        <span class="badge" id="hadithApiPoolBadge">9 API kaynağı</span>
         <span class="badge" id="hadithTimerBadge">05:00</span>
         <button type="button" class="small-btn" id="refreshHadithBtn">Yeni Hadis</button>
       </div>
@@ -702,6 +749,7 @@ details.nav-item > summary:hover{background:#163b30}
       <h2 id="quranCardTitle">Kur’an-ı Kerim</h2>
       <div class="head-tools">
         <span class="badge lang-pill" id="quranLangBadge">Türkçe (TR)</span>
+        <span class="badge" id="quranApiPoolBadge">12 API kaynağı</span>
         <span class="badge" id="quranTimerBadge">05:00</span>
         <button type="button" class="small-btn" id="refreshQuranBtn">Yeni Ayet</button>
       </div>
@@ -720,6 +768,57 @@ details.nav-item > summary:hover{background:#163b30}
       <div class="api-url-box"><span class="api-url-text" id="quranApiUrl">-</span></div>
     </div>
   </section>
+  <section class="card" id="zikrCard" aria-labelledby="zikrTitle">
+    <div class="card-head">
+      <h2 id="zikrTitle">Zikirmatik</h2>
+      <span class="badge" id="zikrCountLabel">Tekrar sayısı</span>
+    </div>
+    <div class="control-grid">
+      <div>
+        <label class="field-label" for="zikrPhraseSelect" id="zikrPhraseLabel">Zikir seçimi:</label>
+        <select id="zikrPhraseSelect">
+          <option value="subhanallah">Sübhanallah</option>
+          <option value="alhamdulillah">Elhamdülillah</option>
+          <option value="allahuakbar">Allahu ekber</option>
+          <option value="tahlil">Lâ ilâhe illallah</option>
+          <option value="istighfar">Estağfirullah</option>
+        </select>
+      </div>
+      <div class="zikr-counter" aria-live="polite" aria-atomic="true">
+        <div class="zikr-count" id="zikrCount">0</div>
+        <div class="field-label" id="zikrCurrentPhrase">Sübhanallah</div>
+      </div>
+      <div class="actions zikr-actions">
+        <button type="button" class="primary" id="zikrTapBtn">+1 · Say</button>
+        <button type="button" id="zikrResetBtn">Sıfırla</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="liveStreamsCard" aria-labelledby="liveStreamsTitle">
+    <div class="card-head">
+      <h2 id="liveStreamsTitle">Mekke ve Medine canlı yayınları</h2>
+      <span class="badge">Resmî kanallar</span>
+    </div>
+    <div class="live-stream-grid">
+      <article class="live-stream-item">
+        <h3 id="liveMakkahTitle">Mekke · Mescid-i Haram</h3>
+        <div class="live-player-wrap">
+          <iframe class="live-player" loading="lazy" title="Mekke Mescid-i Haram canlı yayın" src="https://www.youtube.com/embed/live_stream?channel=UCos52azQNBgW63_9uDJoPDA&amp;modestbranding=1&amp;rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+        <a class="link-pill" href="https://www.youtube.com/channel/UCos52azQNBgW63_9uDJoPDA/live" target="_blank" rel="noopener noreferrer" id="liveMakkahLink">YouTube’da aç</a>
+      </article>
+      <article class="live-stream-item">
+        <h3 id="liveMadinahTitle">Medine · Mescid-i Nebevî</h3>
+        <div class="live-player-wrap">
+          <iframe class="live-player" loading="lazy" title="Medine Mescid-i Nebevî canlı yayın" src="https://www.youtube.com/embed/live_stream?channel=UCROKYPep-UuODNwyipe6JMw&amp;modestbranding=1&amp;rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+        <a class="link-pill" href="https://www.youtube.com/channel/UCROKYPep-UuODNwyipe6JMw/live" target="_blank" rel="noopener noreferrer" id="liveMadinahLink">YouTube’da aç</a>
+      </article>
+    </div>
+    <p class="status" id="liveStreamNote">Yayınlar Suudi Arabistan Yayın Kurumunun resmî Kur’an ve Sünnet TV kanallarından alınır. Akış açılmazsa YouTube bağlantısını kullanın.</p>
+  </section>
+
   <!-- Resources Section -->
   <section class="card" id="resourcesCard" aria-labelledby="resourcesCardTitle">
     <details class="resources-root" id="resourcesDetails">
@@ -896,6 +995,36 @@ details.nav-item > summary:hover{background:#163b30}
   const DB_STORE = "tracks";
   const DEFAULT_ZONE = "Europe/Amsterdam";
   const PRAYER_ORDER = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
+  const PRAYER_METHOD_PROVIDER_KEY = { aladhan: "aladhan", islamic_app: "islamic", ummahapi: "ummah", deen2u: "deen2u", salahtable: "salahtable", esalah: "esalah" };
+  const PRAYER_METHODS = [
+    { value: "auto", tr: "Servis varsayılanı / otomatik", en: "Provider default / automatic", nl: "Standaard van provider / automatisch", aladhan: "", islamic: "", ummah: "", deen2u: "auto", salahtable: "", esalah: "" },
+    { value: "jafari", tr: "Caferî / Şiî", en: "Jafari / Shia Ithna-Ashari", nl: "Jafari / Shia Ithna-Ashari", aladhan: 0, islamic: 0, ummah: "Jafari", esalah: "jafari" },
+    { value: "karachi", tr: "Karaçi", en: "Karachi", nl: "Karachi", aladhan: 1, islamic: 1, ummah: "Karachi", deen2u: "karachi", salahtable: "karachi", esalah: "karachi" },
+    { value: "isna", tr: "ISNA / Kuzey Amerika", en: "ISNA / North America", nl: "ISNA / Noord-Amerika", aladhan: 2, islamic: 2, ummah: "ISNA", deen2u: "isna", salahtable: "isna", esalah: "isna" },
+    { value: "mwl", tr: "Müslüman Dünya Birliği", en: "Muslim World League", nl: "Moslim Wereld Liga", aladhan: 3, islamic: 3, ummah: "MuslimWorldLeague", deen2u: "mwl", salahtable: "mwl", esalah: "mwl" },
+    { value: "ummalqura", tr: "Ümmü’l-Kurâ (Mekke)", en: "Umm al-Qura (Makkah)", nl: "Umm al-Qura (Mekka)", aladhan: 4, islamic: 4, ummah: "UmmAlQura", deen2u: "ummalqura", salahtable: "ummalqura", esalah: "umm-al-qura" },
+    { value: "egypt", tr: "Mısır Genel Ölçüm Kurumu", en: "Egyptian General Authority", nl: "Egyptische Algemene Autoriteit", aladhan: 5, islamic: 5, ummah: "Egyptian", deen2u: "egypt", salahtable: "egyptian", esalah: "egyptian" },
+    { value: "tehran", tr: "Tahran Jeofizik Enstitüsü", en: "Tehran Institute of Geophysics", nl: "Tehran Institute of Geophysics", aladhan: 7, islamic: 7, ummah: "Tehran", deen2u: "tehran" },
+    { value: "gulf", tr: "Körfez Bölgesi", en: "Gulf Region", nl: "Golfregio", aladhan: 8, islamic: 8, ummah: "Gulf", deen2u: "uae" },
+    { value: "kuwait", tr: "Kuveyt", en: "Kuwait", nl: "Koeweit", aladhan: 9, islamic: 9, ummah: "Kuwait", deen2u: "kuwait", salahtable: "kuwait" },
+    { value: "qatar", tr: "Katar", en: "Qatar", nl: "Qatar", aladhan: 10, islamic: 10, ummah: "Qatar", deen2u: "qatar", salahtable: "qatar" },
+    { value: "singapore", tr: "Singapur / MUIS", en: "Singapore / MUIS", nl: "Singapore / MUIS", aladhan: 11, islamic: 11, ummah: "Singapore", deen2u: "muis", salahtable: "singapore" },
+    { value: "uoif", tr: "Fransa İslam Organizasyonları Birliği", en: "UOIF / France", nl: "UOIF / Frankrijk", aladhan: 12, islamic: 12, ummah: "UOIF", salahtable: "uoif" },
+    { value: "diyanet", tr: "Diyanet İşleri Başkanlığı", en: "Diyanet / Turkey", nl: "Diyanet / Turkije", aladhan: 13, islamic: 13, ummah: "Diyanet", deen2u: "diyanet", salahtable: "diyanet" },
+    { value: "russia", tr: "Rusya Müslümanları Dinî İdaresi", en: "Russia", nl: "Rusland", aladhan: 14, islamic: 14, ummah: "Russia" },
+    { value: "moonsighting", tr: "Hilal Gözlem Komitesi", en: "Moonsighting Committee", nl: "Maanwaarnemingscommissie", aladhan: 15, islamic: 15, ummah: "MoonsightingCommittee", salahtable: "moonsighting" },
+    { value: "dubai", tr: "Dubai", en: "Dubai", nl: "Dubai", aladhan: 16, islamic: 16, ummah: "Dubai", salahtable: "dubai" },
+    { value: "jakim", tr: "Malezya JAKIM", en: "JAKIM / Malaysia", nl: "JAKIM / Maleisië", aladhan: 17, ummah: "JAKIM", deen2u: "jakim", salahtable: "jakim" },
+    { value: "tunisia", tr: "Tunus", en: "Tunisia", nl: "Tunesië", aladhan: 18, ummah: "Tunisia" },
+    { value: "algeria", tr: "Cezayir", en: "Algeria", nl: "Algerije", aladhan: 19, ummah: "Algeria" },
+    { value: "kemenag", tr: "Endonezya KEMENAG", en: "KEMENAG / Indonesia", nl: "KEMENAG / Indonesië", aladhan: 20, ummah: "KEMENAG", deen2u: "kemenag" },
+    { value: "morocco", tr: "Fas", en: "Morocco", nl: "Marokko", aladhan: 21, ummah: "Morocco" },
+    { value: "portugal", tr: "Lizbon / Portekiz", en: "Lisbon / Portugal", nl: "Lissabon / Portugal", aladhan: 22, ummah: "Lisbon" },
+    { value: "jordan", tr: "Ürdün", en: "Jordan", nl: "Jordanië", aladhan: 23, ummah: "Jordan", deen2u: "jordan" },
+    { value: "palestine", tr: "Filistin", en: "Palestine", nl: "Palestina", ummah: "Palestine" },
+    { value: "brunei", tr: "Brunei", en: "Brunei", nl: "Brunei", deen2u: "brunei" },
+    { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië", salahtable: "malaysia" }
+  ];
   const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"];
   const QUOTE_ROTATE_MS = 300000; // 5 minutes
   const FETCH_TIMEOUT_MS = 9500;
@@ -912,6 +1041,30 @@ details.nav-item > summary:hover{background:#163b30}
       topMark: "NAMAZ VAKİTLERİ · DİYANET",
       deviceClockLabel: "Cihaz saati",
       localClockLabel: "Yerel saat",
+      calendarGregorian: "Miladi",
+      calendarHijri: "Hicri",
+      prayerMethodLabel: "Hesaplama yöntemi:",
+      prayerSchoolLabel: "İkindi mezhebi:",
+      highLatitudeLabel: "Yüksek enlem kuralı:",
+      prayerMethodHint: "Yalnızca seçilen API’nin desteklediği hesaplama yöntemleri listelenir. Vakitleri yerel cami veya dinî otoriteyle karşılaştırın.",
+      prayerMethodAuto: "Servis varsayılanı / otomatik",
+      prayerSchoolShafii: "Şafii / Standart",
+      prayerSchoolHanafi: "Hanefi",
+      highLatitudeRecommended: "Önerilen",
+      highLatitudeMiddle: "Gecenin ortası",
+      highLatitudeSeventh: "Gecenin yedide biri",
+      highLatitudeAngle: "Açı temelli",
+      zikrTitle: "Zikirmatik",
+      zikrPhraseLabel: "Zikir seçimi:",
+      zikrCountLabel: "Tekrar sayısı",
+      zikrTapBtn: "+1 · Say",
+      zikrResetBtn: "Sıfırla",
+      zikrPhrases: { subhanallah: "Sübhanallah", alhamdulillah: "Elhamdülillah", allahuakbar: "Allahu ekber", tahlil: "Lâ ilâhe illallah", istighfar: "Estağfirullah" },
+      liveStreamsTitle: "Mekke ve Medine canlı yayınları",
+      liveMakkahTitle: "Mekke · Mescid-i Haram",
+      liveMadinahTitle: "Medine · Mescid-i Nebevî",
+      liveFallback: "YouTube’da aç",
+      liveStreamNote: "Yayınlar Suudi Arabistan Yayın Kurumunun resmî Kur’an ve Sünnet TV kanallarından alınır. Akış açılmazsa YouTube bağlantısını kullanın.",
       pageSuffix: "Namaz Vakitleri — DİYANET",
       unselectedTitle: "Ülke, Eyalet/İl ve İlçe Seçiniz",
       selectCountryOption: "— Ülke seçiniz —",
@@ -964,7 +1117,11 @@ details.nav-item > summary:hover{background:#163b30}
         pawan_krd: "Pawan.krd PrayerTimes API",
         azan_quran_et: "Azan Prayer Times API",
         deen2u: "Deen2u Islamic Times API",
-        salahtable: "SalahTable Prayer Times API"
+        salahtable: "SalahTable Prayer Times API",
+        islamic_app: "islamic.app Prayer Times API",
+        esalah: "eSalah Prayer Times API",
+        waqtazan: "Waqtazan Prayer Times API",
+        vakit_vercel: "Vakit Vercel GPS API"
       },
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
@@ -1023,6 +1180,30 @@ details.nav-item > summary:hover{background:#163b30}
       topMark: "PRAYER TIMES · DIYANET",
       deviceClockLabel: "Device time",
       localClockLabel: "Local time",
+      calendarGregorian: "Gregorian",
+      calendarHijri: "Hijri",
+      prayerMethodLabel: "Calculation method:",
+      prayerSchoolLabel: "Asr school:",
+      highLatitudeLabel: "High-latitude rule:",
+      prayerMethodHint: "Only methods supported by the selected API are shown. Compare times with your local mosque or religious authority.",
+      prayerMethodAuto: "Provider default / automatic",
+      prayerSchoolShafii: "Shafi / Standard",
+      prayerSchoolHanafi: "Hanafi",
+      highLatitudeRecommended: "Recommended",
+      highLatitudeMiddle: "Middle of the night",
+      highLatitudeSeventh: "One seventh of the night",
+      highLatitudeAngle: "Angle based",
+      zikrTitle: "Dhikr counter",
+      zikrPhraseLabel: "Dhikr:",
+      zikrCountLabel: "Repetitions",
+      zikrTapBtn: "+1 · Count",
+      zikrResetBtn: "Reset",
+      zikrPhrases: { subhanallah: "SubhanAllah", alhamdulillah: "Alhamdulillah", allahuakbar: "Allahu Akbar", tahlil: "La ilaha illallah", istighfar: "Astaghfirullah" },
+      liveStreamsTitle: "Makkah and Madinah live streams",
+      liveMakkahTitle: "Makkah · Masjid al-Haram",
+      liveMadinahTitle: "Madinah · Prophet’s Mosque",
+      liveFallback: "Open on YouTube",
+      liveStreamNote: "Streams are embedded from the official Saudi Quran TV and Sunnah TV channels. Use the YouTube link if a stream does not load.",
       pageSuffix: "Prayer Times — DIYANET",
       unselectedTitle: "Select Country, State & District",
       selectCountryOption: "— Select Country —",
@@ -1075,7 +1256,11 @@ details.nav-item > summary:hover{background:#163b30}
         pawan_krd: "Pawan.krd PrayerTimes API",
         azan_quran_et: "Azan Prayer Times API",
         deen2u: "Deen2u Islamic Times API",
-        salahtable: "SalahTable Prayer Times API"
+        salahtable: "SalahTable Prayer Times API",
+        islamic_app: "islamic.app Prayer Times API",
+        esalah: "eSalah Prayer Times API",
+        waqtazan: "Waqtazan Prayer Times API",
+        vakit_vercel: "Vakit Vercel GPS API"
       },
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
@@ -1134,6 +1319,30 @@ details.nav-item > summary:hover{background:#163b30}
       topMark: "GEBEDSTIJDEN · DIYANET",
       deviceClockLabel: "Apparaattijd",
       localClockLabel: "Lokale tijd",
+      calendarGregorian: "Gregoriaans",
+      calendarHijri: "Hidjri",
+      prayerMethodLabel: "Berekeningsmethode:",
+      prayerSchoolLabel: "Asr-school:",
+      highLatitudeLabel: "Regel voor hoge breedtegraden:",
+      prayerMethodHint: "Alleen methoden die door de gekozen API worden ondersteund, worden getoond. Vergelijk tijden met uw lokale moskee of religieuze autoriteit.",
+      prayerMethodAuto: "Standaard van provider / automatisch",
+      prayerSchoolShafii: "Shafi / Standaard",
+      prayerSchoolHanafi: "Hanafi",
+      highLatitudeRecommended: "Aanbevolen",
+      highLatitudeMiddle: "Midden van de nacht",
+      highLatitudeSeventh: "Een zevende van de nacht",
+      highLatitudeAngle: "Op basis van hoek",
+      zikrTitle: "Dhikr-teller",
+      zikrPhraseLabel: "Dhikr:",
+      zikrCountLabel: "Herhalingen",
+      zikrTapBtn: "+1 · Tel",
+      zikrResetBtn: "Resetten",
+      zikrPhrases: { subhanallah: "SubhanAllah", alhamdulillah: "Alhamdulillah", allahuakbar: "Allahu Akbar", tahlil: "La ilaha illallah", istighfar: "Astaghfirullah" },
+      liveStreamsTitle: "Live-uitzendingen Mekka en Medina",
+      liveMakkahTitle: "Mekka · Masjid al-Haram",
+      liveMadinahTitle: "Medina · Profeetmoskee",
+      liveFallback: "Openen op YouTube",
+      liveStreamNote: "De streams zijn afkomstig van de officiële Saudi Quran TV- en Sunnah TV-kanalen. Gebruik de YouTube-link als een stream niet laadt.",
       pageSuffix: "Gebedstijden — DIYANET",
       unselectedTitle: "Kies Land, Provincie & Stad",
       selectCountryOption: "— Kies een land —",
@@ -1186,7 +1395,11 @@ details.nav-item > summary:hover{background:#163b30}
         pawan_krd: "Pawan.krd gebedstijden-API",
         azan_quran_et: "Azan gebedstijden-API",
         deen2u: "Deen2u Islamic Times API",
-        salahtable: "SalahTable gebedstijden-API"
+        salahtable: "SalahTable gebedstijden-API",
+        islamic_app: "islamic.app gebedstijden-API",
+        esalah: "eSalah gebedstijden-API",
+        waqtazan: "Waqtazan gebedstijden-API",
+        vakit_vercel: "Vakit Vercel GPS-API"
       },
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
@@ -1263,6 +1476,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     selectedApiMode: "",
     selectedHadithApi: "",
     selectedQuranApi: "",
+    prayerMethod: "auto",
+    prayerSchool: "shafii",
+    highLatitudeRule: "recommended",
+    calendarMode: "gregorian",
+    zikrCount: 0,
+    zikrPhrase: "subhanallah",
     todayData: null,
     soundEnabled: false,
     lastPlayedStamp: "",
@@ -1585,6 +1804,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           stateId: state.selectedState?.id || "",
           districtId: state.selectedDistrict?.id || "",
           apiMode: state.selectedApiMode || "",
+          prayerMethod: state.prayerMethod || "auto",
+          prayerSchool: state.prayerSchool || "shafii",
+          highLatitudeRule: state.highLatitudeRule || "recommended",
+          calendarMode: state.calendarMode || "gregorian",
           volume: Number($("volume")?.value ?? 85)
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
