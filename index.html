@@ -680,13 +680,34 @@ details.nav-item > summary:hover{background:#163b30}
           <div class="actions"><button type="button" id="ummahUseDeviceLocationBtn">Cihaz konumunu kullan</button><button type="button" class="primary" id="ummahApplyCoordsBtn">Koordinatları uygula ve vakitleri getir</button></div>
         </div>
         <div id="qasraLocationFields" class="provider-location-panel control-grid" style="display:none">
-          <div class="loc-row">
-            <div style="grid-column:span 2"><label class="field-label" for="qasraSearchInput" id="qasraSearchLabel">Şehir ara (QASRA Geocoder):</label><input id="qasraSearchInput" type="text" placeholder="Ajmer" autocomplete="off"></div>
-            <div style="align-self:end"><button type="button" class="primary" id="qasraSearchBtn">Şehir ara</button></div>
+          <section class="control-grid">
+            <strong id="qasraNameSearchTitle">Yer adıyla ara</strong>
+            <div class="loc-row">
+              <div style="grid-column:span 2"><label class="field-label" for="qasraSearchInput" id="qasraSearchLabel">Yer adının başlangıcı:</label><input id="qasraSearchInput" type="text" placeholder="Ajmer" autocomplete="off"></div>
+              <div style="align-self:end"><button type="button" class="primary" id="qasraSearchBtn">Ara</button></div>
+            </div>
+            <div><label class="field-label" for="qasraResultsSelect" id="qasraResultsLabel">Eşleşen yerler (en fazla 10):</label><select id="qasraResultsSelect" disabled><option value="">Önce yer adı arayın</option></select></div>
+          </section>
+          <div class="divider" role="separator"></div>
+          <section class="control-grid">
+            <strong id="qasraCoordinateTitle">Koordinattan yer bul</strong>
+            <div class="loc-row">
+              <div><label class="field-label" for="qasraLatInput" id="qasraLatLabel">Enlem (latitude)</label><input id="qasraLatInput" type="number" step="any" min="-90" max="90" placeholder="26.45298"></div>
+              <div><label class="field-label" for="qasraLngInput" id="qasraLngLabel">Boylam (longitude)</label><input id="qasraLngInput" type="number" step="any" min="-180" max="180" placeholder="74.62349"></div>
+            </div>
+            <div class="actions">
+              <button type="button" id="qasraUseDeviceLocationBtn">Cihaz konumunu al</button>
+              <button type="button" class="primary" id="qasraReverseLookupBtn">Koordinattan yer bul</button>
+            </div>
+          </section>
+          <p class="status" id="qasraResolvedPlace">Henüz bir konum seçilmedi.</p>
+          <div>
+            <label class="field-label" for="qasraTimezoneInput" id="qasraTimezoneLabel">Seçilen yerin saat dilimi (IANA):</label>
+            <input id="qasraTimezoneInput" type="text" placeholder="Asia/Kolkata">
+            <p class="status" id="qasraTimezoneHint">Geocoder saat dilimi sağlamaz. Seçtiğiniz yerin saat dilimini girin.</p>
           </div>
-          <div><label class="field-label" for="qasraResultsSelect" id="qasraResultsLabel">Arama sonuçları:</label><select id="qasraResultsSelect" disabled><option value="">Önce şehir arayın</option></select></div>
-          <div><label class="field-label" for="qasraTimezoneInput" id="qasraTimezoneLabel">Saat dilimi (IANA):</label><input id="qasraTimezoneInput" type="text" placeholder="Asia/Kolkata"><p class="status" id="qasraTimezoneHint">Geocoder saat dilimi döndürmez. Şehrin IANA saat dilimini seçin.</p></div>
-          <p class="status">Konum arama ve vakit verisi: <a href="https://www.qasra.org" target="_blank" rel="noopener noreferrer">Quran &amp; Sunnah Research Academy, Ajmer (QASRA)</a>.</p>
+          <button type="button" class="primary" id="qasraUsePendingPlaceBtn" disabled>Bu konumu kullan ve vakitleri getir</button>
+          <p class="status">Konum bilgisi: <a href="https://www.qasra.org/geocoder" target="_blank" rel="noopener noreferrer">QASRA Geocoder</a> · Quran &amp; Sunnah Research Academy, Ajmer.</p>
         </div>
       </div>
 
@@ -1654,7 +1675,8 @@ const DIYANET_ALL_LOCATIONS = [];
     nextHadithAt: Date.now() + QUOTE_ROTATE_MS,
     nextQuranAt: Date.now() + QUOTE_ROTATE_MS,
     lastRenderedEmptySig: "",
-    qasraSearchResults: []
+    qasraSearchResults: [],
+    qasraPendingLocation: null
   };
 
   const adhanUrls = { Fajr: null, Dhuhr: null, Asr: null, Maghrib: null, Isha: null };
@@ -2966,7 +2988,8 @@ const mode=state.selectedApiMode||"auto",hierarchy=mode==="auto"||mode==="imsaki
 $("aladhanLocationFields").style.display=mode==="aladhan"?"":"none";$("ummahLocationFields").style.display=mode==="ummahapi"?"":"none";$("qasraLocationFields").style.display=mode==="qasra"?"":"none";
 const tr=state.lang==="tr",nl=state.lang==="nl";$("aladhanCountryLabel").textContent=tr?"Ülke:":nl?"Land:":"Country:";$("aladhanStateLabel").textContent=tr?"Eyalet / İl (isteğe bağlı):":nl?"Staat / provincie (optioneel):":"State / province (optional):";$("aladhanCityLabel").textContent=tr?"Şehir:":nl?"Stad:":"City:";
 $("aladhanApplyLocationBtn").textContent=tr?"Konumu uygula ve vakitleri getir":nl?"Locatie toepassen en tijden laden":"Apply location and load prayer times";$("ummahUseDeviceLocationBtn").textContent=tr?"Cihaz konumunu kullan":nl?"Apparaatlocatie gebruiken":"Use device location";$("ummahApplyCoordsBtn").textContent=tr?"Koordinatları uygula ve vakitleri getir":nl?"Coördinaten toepassen en tijden laden":"Apply coordinates and load times";
-$("qasraSearchBtn").textContent=tr?"Şehir ara":nl?"Stad zoeken":"Search city";$("qasraSearchLabel").textContent=tr?"Şehir ara (QASRA Geocoder):":nl?"Stad zoeken (QASRA Geocoder):":"Search city (QASRA Geocoder):";$("qasraResultsLabel").textContent=tr?"Arama sonuçları:":nl?"Zoekresultaten:":"Search results:";$("qasraTimezoneLabel").textContent=tr?"Saat dilimi (IANA):":nl?"Tijdzone (IANA):":"Time zone (IANA):";
+$("qasraSearchBtn").textContent=tr?"Ara":nl?"Zoeken":"Search";$("qasraSearchLabel").textContent=tr?"Yer adının başlangıcı:":nl?"Begin van plaatsnaam:":"Place-name prefix:";$("qasraResultsLabel").textContent=tr?"Eşleşen yerler (en fazla 10):":nl?"Overeenkomende plaatsen (maximaal 10):":"Matching places (up to 10):";$("qasraTimezoneLabel").textContent=tr?"Seçilen yerin saat dilimi (IANA):":nl?"Tijdzone van de gekozen plaats (IANA):":"Selected place time zone (IANA):";
+$("qasraNameSearchTitle").textContent=tr?"Yer adıyla ara":nl?"Zoeken op plaatsnaam":"Search by place name";$("qasraCoordinateTitle").textContent=tr?"Koordinattan yer bul":nl?"Plaats zoeken via coördinaten":"Find place from coordinates";$("qasraLatLabel").textContent=tr?"Enlem (latitude)":nl?"Breedtegraad (latitude)":"Latitude";$("qasraLngLabel").textContent=tr?"Boylam (longitude)":nl?"Lengtegraad (longitude)":"Longitude";$("qasraUseDeviceLocationBtn").textContent=tr?"Cihaz konumunu al":nl?"Apparaatlocatie ophalen":"Use device location";$("qasraReverseLookupBtn").textContent=tr?"Koordinattan yer bul":nl?"Plaats zoeken via coördinaten":"Find place from coordinates";$("qasraUsePendingPlaceBtn").textContent=tr?"Bu konumu kullan ve vakitleri getir":nl?"Deze locatie gebruiken en tijden laden":"Use this location and load prayer times";
 if(!$("ummahTimezoneInput").value)$("ummahTimezoneInput").value=currentDeviceTimezone();
 }
 function setCustomLocation(countryName,stateName,cityName,extra={}){
@@ -3016,7 +3039,10 @@ if(state.selectedApiMode==="aladhan"){$("aladhanCountryInput").value=saved?.alad
 if(saved?.providerLat===null||saved?.providerLat===undefined||saved?.providerLng===null||saved?.providerLng===undefined)return;const lat=Number(saved.providerLat),lng=Number(saved.providerLng);if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180)return;
 const country=saved?.providerCountryName||"",region=saved?.providerStateName||"",city=saved?.providerCityName||(state.selectedApiMode==="ummahapi"?"GPS location":"");if(!city)return;
 const zone=validTimezone(saved?.providerTimezone)||currentDeviceTimezone();setCustomLocation(country,region,city,{id:state.selectedApiMode+"-saved-location",lat,lng,tz:zone});state.zone=zone;
-$("ummahLatInput").value=String(lat);$("ummahLngInput").value=String(lng);$("ummahTimezoneInput").value=zone;$("qasraTimezoneInput").value=zone;
+$("ummahLatInput").value=String(lat);$("ummahLngInput").value=String(lng);$("ummahTimezoneInput").value=zone;
+if(state.selectedApiMode==="qasra"){$("qasraLatInput").value=String(lat);$("qasraLngInput").value=String(lng);}
+$("qasraTimezoneInput").value=zone;
+if(state.selectedApiMode==="qasra"){state.qasraPendingLocation={name:city,state:region,country,lat,lng,source:"saved"};$("qasraResolvedPlace").textContent=[city,region,country].filter(Boolean).join(" · ");$("qasraUsePendingPlaceBtn").disabled=false;}
 }
 async function switchPrayerApiMode(nextMode){
 const valid=["auto","aladhan","ummahapi","qasra","imsakiyem"],mode=valid.includes(nextMode)?nextMode:"auto",oldCountry=state.selectedCountry,oldState=state.selectedState,oldDistrict=state.selectedDistrict;
@@ -4985,6 +5011,9 @@ populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs()
     $("qasraSearchBtn").addEventListener("click",searchQasraPlaces);
     $("qasraSearchInput").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();searchQasraPlaces();}});
     $("qasraResultsSelect").addEventListener("change",selectQasraPlace);
+    $("qasraReverseLookupBtn").addEventListener("click",reverseQasraCoordinates);
+    $("qasraUseDeviceLocationBtn").addEventListener("click",useQasraDeviceLocation);
+    $("qasraUsePendingPlaceBtn").addEventListener("click",applyQasraPendingLocation);
 
         $("prayerMethodSelect").addEventListener("change", e => {
       state.prayerMethod = e.target.value || "auto";
