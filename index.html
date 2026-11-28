@@ -4226,13 +4226,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     clearApiResponseDetails("hadithMeta");
 
     const providers = ["hadeethenc","fawaz","kafela","zikr","imuslim","sunnetimiz","ummah","randomhadith","sahihbukhari"];
-    if (state.preferredHadithProvider !== "random") {
-      const preferredIndex = providers.indexOf(state.preferredHadithProvider);
-      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
-    }
     for (let i = providers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [providers[i], providers[j]] = [providers[j], providers[i]];
+    }
+    if (state.preferredHadithProvider !== "random") {
+      const preferredIndex = providers.indexOf(state.preferredHadithProvider);
+      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
     }
 
     try {
@@ -4678,13 +4678,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     clearApiResponseDetails("quranMeta");
 
     const providers = ["fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","imuslim","telawa","ayahquran","quranproject","surahpk","quranonline"];
-    if (state.preferredQuranProvider !== "random") {
-      const preferredIndex = providers.indexOf(state.preferredQuranProvider);
-      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
-    }
     for (let i = providers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [providers[i], providers[j]] = [providers[j], providers[i]];
+    }
+    if (state.preferredQuranProvider !== "random") {
+      const preferredIndex = providers.indexOf(state.preferredQuranProvider);
+      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
     }
 
     try {
