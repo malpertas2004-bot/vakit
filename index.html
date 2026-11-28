@@ -5235,6 +5235,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("zikrPhraseSelect").addEventListener("change", e => {
       if (!I18N.tr.zikrPhrases[e.target.value]) return;
       state.zikrPhrase = e.target.value;
+      state.zikrCount = 0;
       saveZikrPrefs();
       updateZikrUI();
     });
