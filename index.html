@@ -236,6 +236,8 @@ button.mini-btn{padding:5px 9px;font-size:11.5px;border-radius:8px}
   border-color:rgba(110,231,183,.35);
 }
 .head-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.api-source-select{max-width:190px;padding:7px 9px;font-size:12px;border-radius:9px;min-width:125px}
+.api-source-select:focus{border-color:var(--gold)}
 
 /* Form Controls */
 .control-grid{display:grid;gap:10px}
@@ -695,6 +697,14 @@ details.nav-item > summary:hover{background:#163b30}
             <option value="1">Caferî (gün batımı–imsak)</option>
           </select>
         </div>
+        <div>
+          <label class="field-label" for="shafaqModeSelect" id="shafaqModeLabel">Alacakaranlık (Şafak):</label>
+          <select id="shafaqModeSelect">
+            <option value="general">Genel</option>
+            <option value="ahmer">Kızıl</option>
+            <option value="abyad">Beyaz</option>
+          </select>
+        </div>
       </div>
       <div class="loc-row prayer-options-row" id="customMethodSettingsRow" style="display:none">
         <div>
@@ -752,6 +762,18 @@ details.nav-item > summary:hover{background:#163b30}
       <div class="head-tools">
         <span class="badge lang-pill" id="hadithLangBadge">Türkçe (TR)</span>
         <span class="badge" id="hadithApiPoolBadge">9 API kaynağı</span>
+        <select id="hadithApiSelect" class="api-source-select" aria-label="Hadis API sağlayıcısı">
+          <option value="random">Otomatik / Rastgele</option>
+          <option value="hadeethenc">HadeethEnc</option>
+          <option value="fawaz">FawazAhmed0 Hadith API</option>
+          <option value="kafela">Kafela Hadith API</option>
+          <option value="zikr">Zikr e Quran</option>
+          <option value="imuslim">i-muslim</option>
+          <option value="sunnetimiz">Sünnetimiz</option>
+          <option value="ummah">UmmahAPI</option>
+          <option value="randomhadith">Random Hadith</option>
+          <option value="sahihbukhari">Sahih al-Bukhari API</option>
+        </select>
         <span class="badge" id="hadithTimerBadge">05:00</span>
         <button type="button" class="small-btn" id="refreshHadithBtn">Yeni Hadis</button>
       </div>
@@ -777,6 +799,21 @@ details.nav-item > summary:hover{background:#163b30}
       <div class="head-tools">
         <span class="badge lang-pill" id="quranLangBadge">Türkçe (TR)</span>
         <span class="badge" id="quranApiPoolBadge">12 API kaynağı</span>
+        <select id="quranApiSelect" class="api-source-select" aria-label="Kur’an API sağlayıcısı">
+          <option value="random">Otomatik / Rastgele</option>
+          <option value="fawaz">FawazAhmed0 Quran API</option>
+          <option value="quranenc">QuranEnc</option>
+          <option value="quranpedia">Quranpedia</option>
+          <option value="alqurancloud">AlQuran Cloud</option>
+          <option value="ummahapi">UmmahAPI</option>
+          <option value="zikr">Zikr e Quran</option>
+          <option value="imuslim">i-muslim</option>
+          <option value="telawa">Telawa</option>
+          <option value="ayahquran">Ayah Quran</option>
+          <option value="quranproject">The Quran Project</option>
+          <option value="surahpk">Surah.pk</option>
+          <option value="quranonline">QuranOnline</option>
+        </select>
         <span class="badge" id="quranTimerBadge">05:00</span>
         <button type="button" class="small-btn" id="refreshQuranBtn">Yeni Ayet</button>
       </div>
@@ -1081,11 +1118,16 @@ details.nav-item > summary:hover{background:#163b30}
       prayerMethodAuto: "Servis varsayılanı / otomatik",
       customFajrAngleLabel: "İmsak açısı (derece):",
       customMaghribSettingLabel: "Akşam: gün batımından sonra dakika (boş = varsayılan):",
+      apiAuto: "Otomatik / Rastgele",
       customIshaSettingLabel: "Yatsı açısı / dakika:",
       prayerTuneLabel: "Dakika düzeltmesi (9 değer):",
       midnightModeLabel: "Gece yarısı hesabı:",
       midnightStandard: "Standart (gün batımı–gün doğumu)",
       midnightJafari: "Caferî (gün batımı–imsak)",
+      shafaqModeLabel: "Şafak türü:",
+      shafaqGeneral: "Genel",
+      shafaqAhmer: "Kızıl şafak",
+      shafaqAbyad: "Beyaz şafak",
       prayerSchoolShafii: "Şafii / Standart",
       prayerSchoolHanafi: "Hanefi",
       highLatitudeRecommended: "Önerilen",
@@ -1227,11 +1269,16 @@ details.nav-item > summary:hover{background:#163b30}
       prayerMethodAuto: "Provider default / automatic",
       customFajrAngleLabel: "Fajr angle (degrees):",
       customMaghribSettingLabel: "Maghrib: minutes after sunset (blank = default):",
+      apiAuto: "Automatic / Random",
       customIshaSettingLabel: "Isha angle / minutes:",
       prayerTuneLabel: "Minute adjustments (9 values):",
       midnightModeLabel: "Midnight calculation:",
       midnightStandard: "Standard (sunset–sunrise)",
       midnightJafari: "Jafari (sunset–Fajr)",
+      shafaqModeLabel: "Shafaq type:",
+      shafaqGeneral: "General",
+      shafaqAhmer: "Ahmer (red)",
+      shafaqAbyad: "Abyad (white)",
       prayerSchoolShafii: "Shafi / Standard",
       prayerSchoolHanafi: "Hanafi",
       highLatitudeRecommended: "Recommended",
@@ -1373,11 +1420,16 @@ details.nav-item > summary:hover{background:#163b30}
       prayerMethodAuto: "Standaard van provider / automatisch",
       customFajrAngleLabel: "Fajr-hoek (graden):",
       customMaghribSettingLabel: "Maghrib: minuten na zonsondergang (leeg = standaard):",
+      apiAuto: "Automatisch / Willekeurig",
       customIshaSettingLabel: "Isha-hoek / minuten:",
       prayerTuneLabel: "Minuutcorrecties (9 waarden):",
       midnightModeLabel: "Berekening van middernacht:",
       midnightStandard: "Standaard (zonsondergang–zonsopgang)",
       midnightJafari: "Jafari (zonsondergang–Fajr)",
+      shafaqModeLabel: "Type schemering:",
+      shafaqGeneral: "Algemeen",
+      shafaqAhmer: "Ahmer (rood)",
+      shafaqAbyad: "Abyad (wit)",
       prayerSchoolShafii: "Shafi / Standaard",
       prayerSchoolHanafi: "Hanafi",
       highLatitudeRecommended: "Aanbevolen",
@@ -1528,6 +1580,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     selectedApiMode: "",
     selectedHadithApi: "",
     selectedQuranApi: "",
+    preferredHadithProvider: "random",
+    preferredQuranProvider: "random",
+    shafaqMode: "general",
     prayerMethod: "auto",
     prayerSchool: "shafii",
     highLatitudeRule: "recommended",
@@ -1861,6 +1916,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           stateId: state.selectedState?.id || "",
           districtId: state.selectedDistrict?.id || "",
           apiMode: state.selectedApiMode || "",
+          preferredHadithProvider: state.preferredHadithProvider,
+          preferredQuranProvider: state.preferredQuranProvider,
+          shafaqMode: state.shafaqMode,
           prayerMethod: state.prayerMethod || "auto",
           prayerSchool: state.prayerSchool || "shafii",
           highLatitudeRule: state.highLatitudeRule || "recommended",
@@ -2928,6 +2986,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("midnightModeSelect").options[1].textContent = t("midnightJafari");
     $("prayerTuneInput").value = state.prayerTune;
     $("midnightModeSelect").value = state.midnightMode;
+    $("shafaqModeSelect").disabled = !(mode === "aladhan" && state.prayerMethod === "moonsighting");
+    $("shafaqModeLabel").textContent = t("shafaqModeLabel");
+    $("shafaqModeSelect").options[0].textContent = t("shafaqGeneral");
+    $("shafaqModeSelect").options[1].textContent = t("shafaqAhmer");
+    $("shafaqModeSelect").options[2].textContent = t("shafaqAbyad");
+    $("shafaqModeSelect").value = state.shafaqMode;
     $("customFajrAngleLabel").textContent = t("customFajrAngleLabel");
     $("customMaghribSettingLabel").textContent = t("customMaghribSettingLabel");
     $("customIshaSettingLabel").textContent = t("customIshaSettingLabel");
@@ -3005,7 +3069,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       school: state.prayerSchool === "hanafi" ? "1" : "0"
     });
     if (method.aladhan !== "" && method.aladhan !== undefined) params.set("method", String(method.aladhan));
-    if (state.prayerMethod === "moonsighting") params.set("shafaq", "general");
+    if (state.prayerMethod === "moonsighting") params.set("shafaq", state.shafaqMode || "general");
     if (state.prayerMethod === "custom") {
       const maghrib = state.customMaghribSetting === "" ? "null" : String(state.customMaghribSetting);
       params.set("methodSettings", [String(state.customFajrAngle), maghrib, String(state.customIshaSetting)].join(","));
@@ -4162,6 +4226,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     clearApiResponseDetails("hadithMeta");
 
     const providers = ["hadeethenc","fawaz","kafela","zikr","imuslim","sunnetimiz","ummah","randomhadith","sahihbukhari"];
+    if (state.preferredHadithProvider !== "random") {
+      const preferredIndex = providers.indexOf(state.preferredHadithProvider);
+      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
+    }
     for (let i = providers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [providers[i], providers[j]] = [providers[j], providers[i]];
@@ -4610,6 +4678,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     clearApiResponseDetails("quranMeta");
 
     const providers = ["fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","imuslim","telawa","ayahquran","quranproject","surahpk","quranonline"];
+    if (state.preferredQuranProvider !== "random") {
+      const preferredIndex = providers.indexOf(state.preferredQuranProvider);
+      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
+    }
     for (let i = providers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [providers[i], providers[j]] = [providers[j], providers[i]];
@@ -4978,6 +5050,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("copyApiUrl").textContent = t("copyBtn");
 
     $("hadithCardTitle").textContent = t("hadithCardTitle");
+    $("hadithApiSelect").options[0].textContent = t("apiAuto");
+    $("quranApiSelect").options[0].textContent = t("apiAuto");
     $("hadithApiPoolBadge").textContent = state.lang === "tr" ? "9 API kaynağı" : state.lang === "nl" ? "9 API-bronnen" : "9 API sources";
     $("quranApiPoolBadge").textContent = state.lang === "tr" ? "12 API kaynağı" : state.lang === "nl" ? "12 API-bronnen" : "12 API sources";
     $("hadithLangBadge").textContent = contentLanguageBadge();
@@ -5239,6 +5313,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       Persistence.savePrefs();
       if (state.selectedDistrict && state.selectedApiMode === "aladhan") loadTimes({ silentHourly: false });
     });
+    $("shafaqModeSelect").addEventListener("change", e => {
+      state.shafaqMode = ["general","ahmer","abyad"].includes(e.target.value) ? e.target.value : "general";
+      populatePrayerMethodOptions();
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "aladhan" && state.prayerMethod === "moonsighting") loadTimes({ silentHourly: false });
+    });
     $("customFajrAngle").addEventListener("change", e => {
       state.customFajrAngle = Math.max(0, Math.min(30, Number(e.target.value) || 18));
       Persistence.savePrefs();
@@ -5277,6 +5357,16 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       });
     });
 
+    $("hadithApiSelect").addEventListener("change", e => {
+      state.preferredHadithProvider = e.target.value;
+      Persistence.savePrefs();
+      loadRandomHadith();
+    });
+    $("quranApiSelect").addEventListener("change", e => {
+      state.preferredQuranProvider = e.target.value;
+      Persistence.savePrefs();
+      loadRandomQuran();
+    });
     $("refreshHadithBtn").addEventListener("click", () => loadRandomHadith());
     $("refreshQuranBtn").addEventListener("click", () => loadRandomQuran());
     bindCopyButton("copyApiUrl", "infoApiUrl");
@@ -5369,6 +5459,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0, Math.min(60, Number(saved.customIshaSetting)));
     if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\d+(,-?\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
     if (["0","1"].includes(String(saved?.midnightMode))) state.midnightMode = String(saved.midnightMode);
+    if (["general","ahmer","abyad"].includes(saved?.shafaqMode)) state.shafaqMode = saved.shafaqMode;
+    const hadithProviderIds = ["random","hadeethenc","fawaz","kafela","zikr","imuslim","sunnetimiz","ummah","randomhadith","sahihbukhari"];
+    const quranProviderIds = ["random","fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","imuslim","telawa","ayahquran","quranproject","surahpk","quranonline"];
+    if (hadithProviderIds.includes(saved?.preferredHadithProvider)) state.preferredHadithProvider = saved.preferredHadithProvider;
+    if (quranProviderIds.includes(saved?.preferredQuranProvider)) state.preferredQuranProvider = saved.preferredQuranProvider;
     if (saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`)) {
       state.selectedApiMode = saved.apiMode;
       $("apiSelect").value = saved.apiMode;
@@ -5382,6 +5477,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     await Persistence.restoreAllAudioTracks();
     applyLanguageUI(false);
+    $("hadithApiSelect").value = state.preferredHadithProvider;
+    $("quranApiSelect").value = state.preferredQuranProvider;
     renderEmptyPrayerPlaceholder(true);
     await loadCountries();
 
@@ -5391,7 +5488,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       $("apiSelect").value = saved.apiMode;
     }
     populatePrayerMethodOptions();
-    if (saved?.countryId) {
+    $("hadithApiSelect").value = state.preferredHadithProvider;
+    $("quranApiSelect").value = state.preferredQuranProvider;
+    if (saved?.countryId {
       const cObj = state.countries.find(c => c.id === String(saved.countryId));
       if (cObj) {
         state.selectedCountry = cObj;
