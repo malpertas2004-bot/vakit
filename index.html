@@ -683,6 +683,19 @@ details.nav-item > summary:hover{background:#163b30}
           </select>
         </div>
       </div>
+      <div class="loc-row prayer-options-row" id="aladhanAdvancedRow" style="display:none">
+        <div>
+          <label class="field-label" for="prayerTuneInput" id="prayerTuneLabel">Dakika düzeltmesi (9 değer):</label>
+          <input id="prayerTuneInput" type="text" inputmode="numeric" placeholder="0,0,0,0,0,0,0,0,0">
+        </div>
+        <div>
+          <label class="field-label" for="midnightModeSelect" id="midnightModeLabel">Gece yarısı hesabı:</label>
+          <select id="midnightModeSelect">
+            <option value="0">Standart (gün batımı–gün doğumu)</option>
+            <option value="1">Caferî (gün batımı–imsak)</option>
+          </select>
+        </div>
+      </div>
       <div class="loc-row prayer-options-row" id="customMethodSettingsRow" style="display:none">
         <div>
           <label class="field-label" for="customFajrAngle" id="customFajrAngleLabel">Fajr açısı (derece):</label>
@@ -990,6 +1003,7 @@ details.nav-item > summary:hover{background:#163b30}
     <span id="footZone">Saat dilimi: Europe/Amsterdam &middot; Diyanet</span><br>
     <span id="footSourceLabel">Kaynak:</span>
     <a id="diyanetLink" href="https://namazvakitleri.diyanet.gov.tr/tr-TR" target="_blank" rel="noopener noreferrer">Diyanet &#304;&#351;leri Ba&#351;kanl&#305;&#287;&#305;</a>
+    <span id="prayerApiCredit" style="display:none"></span>
     &middot;
     <button type="button" class="reset-link" id="resetPrefsBtn">Ayarlar&#305; S&#305;f&#305;rla</button>
   </footer>
@@ -1023,6 +1037,7 @@ details.nav-item > summary:hover{background:#163b30}
     { value: "kuwait", tr: "Kuveyt", en: "Kuwait", nl: "Koeweit", aladhan: 9, islamic: 9, ummah: "Kuwait", deen2u: "kuwait", salahtable: "kuwait" },
     { value: "qatar", tr: "Katar", en: "Qatar", nl: "Qatar", aladhan: 10, islamic: 10, ummah: "Qatar", deen2u: "qatar", salahtable: "qatar" },
     { value: "singapore", tr: "Singapur / MUIS", en: "Singapore / MUIS", nl: "Singapore / MUIS", aladhan: 11, islamic: 11, ummah: "Singapore", deen2u: "muis", salahtable: "singapore" },
+    { value: "muis", tr: "Singapur İslam Dinî Konseyi (MUIS)", en: "Majlis Ugama Islam Singapura (MUIS)", nl: "Islamitische Raad van Singapore (MUIS)", salahtable: "muis" },
     { value: "uoif", tr: "Fransa İslam Organizasyonları Birliği", en: "UOIF / France", nl: "UOIF / Frankrijk", aladhan: 12, islamic: 12, ummah: "UOIF", salahtable: "uoif" },
     { value: "diyanet", tr: "Diyanet İşleri Başkanlığı", en: "Diyanet / Turkey", nl: "Diyanet / Turkije", aladhan: 13, islamic: 13, ummah: "Diyanet", deen2u: "diyanet", salahtable: "diyanet" },
     { value: "russia", tr: "Rusya Müslümanları Dinî İdaresi", en: "Russia", nl: "Rusland", aladhan: 14, islamic: 14, ummah: "Russia" },
@@ -1067,6 +1082,10 @@ details.nav-item > summary:hover{background:#163b30}
       customFajrAngleLabel: "İmsak açısı (derece):",
       customMaghribSettingLabel: "Akşam: gün batımından sonra dakika (boş = varsayılan):",
       customIshaSettingLabel: "Yatsı açısı / dakika:",
+      prayerTuneLabel: "Dakika düzeltmesi (9 değer):",
+      midnightModeLabel: "Gece yarısı hesabı:",
+      midnightStandard: "Standart (gün batımı–gün doğumu)",
+      midnightJafari: "Caferî (gün batımı–imsak)",
       prayerSchoolShafii: "Şafii / Standart",
       prayerSchoolHanafi: "Hanefi",
       highLatitudeRecommended: "Önerilen",
@@ -1209,6 +1228,10 @@ details.nav-item > summary:hover{background:#163b30}
       customFajrAngleLabel: "Fajr angle (degrees):",
       customMaghribSettingLabel: "Maghrib: minutes after sunset (blank = default):",
       customIshaSettingLabel: "Isha angle / minutes:",
+      prayerTuneLabel: "Minute adjustments (9 values):",
+      midnightModeLabel: "Midnight calculation:",
+      midnightStandard: "Standard (sunset–sunrise)",
+      midnightJafari: "Jafari (sunset–Fajr)",
       prayerSchoolShafii: "Shafi / Standard",
       prayerSchoolHanafi: "Hanafi",
       highLatitudeRecommended: "Recommended",
@@ -1351,6 +1374,10 @@ details.nav-item > summary:hover{background:#163b30}
       customFajrAngleLabel: "Fajr-hoek (graden):",
       customMaghribSettingLabel: "Maghrib: minuten na zonsondergang (leeg = standaard):",
       customIshaSettingLabel: "Isha-hoek / minuten:",
+      prayerTuneLabel: "Minuutcorrecties (9 waarden):",
+      midnightModeLabel: "Berekening van middernacht:",
+      midnightStandard: "Standaard (zonsondergang–zonsopgang)",
+      midnightJafari: "Jafari (zonsondergang–Fajr)",
       prayerSchoolShafii: "Shafi / Standaard",
       prayerSchoolHanafi: "Hanafi",
       highLatitudeRecommended: "Aanbevolen",
@@ -1507,6 +1534,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     customFajrAngle: 18,
     customMaghribSetting: "",
     customIshaSetting: 17,
+    prayerTune: "",
+    midnightMode: "0",
     calendarMode: "gregorian",
     zikrCount: 0,
     zikrPhrase: "subhanallah",
@@ -1838,6 +1867,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           customFajrAngle: state.customFajrAngle,
           customMaghribSetting: state.customMaghribSetting,
           customIshaSetting: state.customIshaSetting,
+          prayerTune: state.prayerTune,
+          midnightMode: state.midnightMode,
           calendarMode: state.calendarMode || "gregorian",
           volume: Number($("volume")?.value ?? 85)
         };
@@ -2890,6 +2921,13 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("prayerSchoolSelect").disabled = !schoolModes.includes(mode);
     $("highLatitudeSelect").disabled = !["ummahapi", "aladhan"].includes(mode);
     $("customMethodSettingsRow").style.display = mode === "aladhan" && state.prayerMethod === "custom" ? "" : "none";
+    $("aladhanAdvancedRow").style.display = mode === "aladhan" ? "" : "none";
+    $("prayerTuneLabel").textContent = t("prayerTuneLabel");
+    $("midnightModeLabel").textContent = t("midnightModeLabel");
+    $("midnightModeSelect").options[0].textContent = t("midnightStandard");
+    $("midnightModeSelect").options[1].textContent = t("midnightJafari");
+    $("prayerTuneInput").value = state.prayerTune;
+    $("midnightModeSelect").value = state.midnightMode;
     $("customFajrAngleLabel").textContent = t("customFajrAngleLabel");
     $("customMaghribSettingLabel").textContent = t("customMaghribSettingLabel");
     $("customIshaSettingLabel").textContent = t("customIshaSettingLabel");
@@ -2974,6 +3012,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
     const latitudeModes = { MiddleOfNight: "1", SeventhOfNight: "2", TwilightAngle: "3" };
     if (latitudeModes[state.highLatitudeRule]) params.set("latitudeAdjustmentMethod", latitudeModes[state.highLatitudeRule]);
+    if (state.prayerTune) {
+      if (!/^-?\\d+(,-?\\d+){8}$/.test(state.prayerTune)) throw new Error("Tune must contain exactly 9 comma-separated integer offsets.");
+      params.set("tune", state.prayerTune);
+    }
+    params.set("midnightMode", state.midnightMode === "1" ? "1" : "0");
     const url = "https://api.aladhan.com/v1/timingsByCity/" + compactDate + "?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
     if (j.code !== 200 || !j.data?.timings) throw new Error("AlAdhan data error");
@@ -3087,9 +3130,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       lng: String(coords.lng),
       date: dateKey(localParts()),
       timezone: state.zone || "UTC",
-      madhab: state.prayerSchool === "hanafi" ? "Hanafi" : "Shafi",
-      highLatitudeRule: state.highLatitudeRule
+      madhab: state.prayerSchool === "hanafi" ? "Hanafi" : "Shafi"
     });
+    if (state.highLatitudeRule !== "recommended") params.set("highLatitudeRule", state.highLatitudeRule);
     if (method.ummah) params.set("method", method.ummah);
     const url = "https://www.ummahapi.com/api/prayer-times?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
@@ -4546,6 +4589,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (provider === "alqurancloud") return fetchAlQuranCloud(ref,lang,signal);
     if (provider === "ummahapi") return fetchUmmahApiQuran(ref,lang,signal);
     if (provider === "zikr") return fetchZikrQuran(ref,lang,signal);
+    if (provider === "imuslim") return fetchIMuslimQuran(ref,lang,signal);
+    if (provider === "telawa") return fetchTelawaQuran(ref,signal);
+    if (provider === "ayahquran") return fetchAyahQuran(ref,signal);
+    if (provider === "quranproject") return fetchQuranProject(ref,lang,signal);
+    if (provider === "surahpk") return fetchSurahPk(ref,lang,signal);
+    if (provider === "quranonline") return fetchQuranOnline(ref,signal);
     throw new Error("Unknown Quran provider");
   }
 
@@ -4798,6 +4847,18 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
+  function getSalahTableCityPageUrl() {
+    if (!state.selectedCountry || !state.selectedDistrict) return "";
+    const slug = value => String(value || "").normalize("NFKD")
+      .replace(/[\\u0300-\\u036f]/g, "").replace(/ı/g, "i").toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const countryKey = asciiFoldKey(state.selectedCountry.nameEn || state.selectedCountry.nameTr || "");
+    const aliases = { "united arab emirates":"united-arab-emirates", "uae":"united-arab-emirates", "turkiye":"turkey", "turkey":"turkey", "united kingdom":"united-kingdom", "uk":"united-kingdom", "united states":"united-states", "usa":"united-states", "saudi arabia":"saudi-arabia" };
+    const countrySlug = aliases[countryKey] || slug(state.selectedCountry.nameEn || state.selectedCountry.nameTr);
+    const citySlug = slug(state.selectedDistrict.nameEn || state.selectedDistrict.nameTr);
+    return countrySlug && citySlug ? "https://salahtable.com/" + countrySlug + "/" + citySlug : "";
+  }
+
   function updateCityHeaderAndFooter() {
     const titleEl = $("cityTitle");
     $("selectionCard").classList.toggle("needs-selection", !state.selectedDistrict || !state.selectedApiMode);
@@ -4834,6 +4895,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
           : "https://namazvakitleri.diyanet.gov.tr/en-US";
       }
       $("diyanetLink").textContent = t("diyanetOrg");
+    }
+
+    const credit = $("prayerApiCredit");
+    credit.replaceChildren();
+    const creditUrl = state.selectedApiMode === "salahtable" ? getSalahTableCityPageUrl() : "";
+    if (creditUrl) {
+      credit.appendChild(document.createTextNode(" · "));
+      const creditLink = document.createElement("a");
+      creditLink.href = creditUrl;
+      creditLink.target = "_blank";
+      creditLink.rel = "noopener noreferrer";
+      creditLink.textContent = state.lang === "tr" ? "SalahTable vakitleri" : state.lang === "nl" ? "SalahTable gebedstijden" : "SalahTable prayer times";
+      credit.appendChild(creditLink);
+      credit.style.display = "inline";
+    } else {
+      credit.style.display = "none";
     }
 
     if (!state.todayData) {
@@ -5146,6 +5223,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       Persistence.savePrefs();
       if (state.selectedDistrict && state.selectedApiMode) loadTimes({ silentHourly: false });
     });
+    $("prayerTuneInput").addEventListener("change", e => {
+      const raw = e.target.value.trim().replace(/\\s+/g, "");
+      if (raw && !/^-?\\d+(,-?\\d+){8}$/.test(raw)) {
+        $("prayerTuneInput").setAttribute("aria-invalid", "true");
+        return;
+      }
+      $("prayerTuneInput").removeAttribute("aria-invalid");
+      state.prayerTune = raw;
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "aladhan") loadTimes({ silentHourly: false });
+    });
+    $("midnightModeSelect").addEventListener("change", e => {
+      state.midnightMode = e.target.value === "1" ? "1" : "0";
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "aladhan") loadTimes({ silentHourly: false });
+    });
     $("customFajrAngle").addEventListener("change", e => {
       state.customFajrAngle = Math.max(0, Math.min(30, Number(e.target.value) || 18));
       Persistence.savePrefs();
@@ -5274,6 +5367,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (Number.isFinite(Number(saved?.customFajrAngle))) state.customFajrAngle = Math.max(0, Math.min(30, Number(saved.customFajrAngle)));
     if (saved?.customMaghribSetting === "" || Number.isFinite(Number(saved?.customMaghribSetting))) state.customMaghribSetting = saved.customMaghribSetting;
     if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0, Math.min(60, Number(saved.customIshaSetting)));
+    if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\\d+(,-?\\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
+    if (["0","1"].includes(String(saved?.midnightMode))) state.midnightMode = String(saved.midnightMode);
     if (saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`)) {
       state.selectedApiMode = saved.apiMode;
       $("apiSelect").value = saved.apiMode;
