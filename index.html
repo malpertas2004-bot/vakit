@@ -4270,7 +4270,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const signal = renewSignal("hadith");
     state.nextHadithAt = Date.now() + QUOTE_ROTATE_MS;
     state.selectedHadithApi = "random";
-    const sourceLang = state.contentLang || "tr";
+    const sourceLang = state.lang || "tr";
     const started = performance.now();
     $("hadithText").textContent = t("hadithFetching");
     renderHadithCommentary("");
@@ -4532,35 +4532,43 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function fetchUmmahApiQuran(ref, lang, signal) {
-    const url = "https://www.ummahapi.com/api/quran/surah/" + ref.surah + "/ayah/" + ref.verse;
-    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 7000 });
-    const record = response.data?.data || response.data;
-    const translations = record?.translations || {};
-    const keys = lang === "tr" ? ["turkish"]
-      : lang === "en" ? ["sahih_international","english","pickthall","yusuf_ali"]
-      : ["sahih_international","english"];
+    const url = "https://ummahapi.com/api/quran/random";
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
+    const payload = response.data?.data || response.data;
+    const verse = payload?.verse || payload;
+    const translations = verse?.translations || {};
+    const candidates = lang === "tr"
+      ? [["turkish", "tr"]]
+      : lang === "nl"
+        ? [["dutch", "nl"], ["english", "en"], ["sahih_international", "en"], ["pickthall", "en"]]
+        : [["sahih_international", "en"], ["english", "en"], ["pickthall", "en"], ["yusuf_ali", "en"]];
     let text = "";
-    let usedLang = lang;
-    for (const key of keys) {
-      const candidate = translations[key] ?? record?.[key];
-      if (typeof candidate === "string" && candidate.length > 5) {
+    let sourceLanguage = lang;
+    for (const [key, language] of candidates) {
+      const candidate = translations[key] ?? verse?.[key];
+      if (typeof candidate === "string" && candidate.trim().length > 5) {
         text = candidate;
-        usedLang = key === "turkish" ? "tr" : "en";
+        sourceLanguage = language;
         break;
       }
       if (candidate && typeof candidate === "object") {
-        const found = findRawApiText(candidate, ["text","translation","content"]);
+        const found = findRawApiText(candidate, ["text", "translation", "content"]);
         if (found?.text) {
           text = found.text;
-          usedLang = key === "turkish" ? "tr" : "en";
+          sourceLanguage = language;
           break;
         }
       }
     }
-    if (!text) throw new Error("UmmahAPI did not return a matching verse translation");
+    if (!text && typeof verse?.arabic === "string") {
+      text = verse.arabic;
+      sourceLanguage = "ar";
+    }
+    if (!text) throw new Error("UmmahAPI did not return a readable Quran verse.");
+    const refKey = String(verse?.verse_key || verse?.reference || "");
     return {
-      text, url, raw: response.data, sourceLanguage: usedLang,
-      source: usedLang === "tr" ? "UmmahAPI Turkish translation" : "UmmahAPI Saheeh International",
+      text, url, raw: verse, sourceLanguage, ref: refKey,
+      source: "UmmahAPI · " + (verse?.surah?.name_english || verse?.surah?.name || "Quran") + (refKey ? " " + refKey : ""),
       provider: "UmmahAPI Quran"
     };
   }
@@ -4701,22 +4709,14 @@ const DIYANET_ALL_LOCATIONS = [];
     const signal = renewSignal("quran");
     state.nextQuranAt = Date.now() + QUOTE_ROTATE_MS;
     state.selectedQuranApi = "random";
-    const sourceLang = state.contentLang || "tr";
+    const sourceLang = state.lang || "tr";
     const ref = pickRandomQuranReference();
     const started = performance.now();
     $("quranText").textContent = t("quranFetching");
     renderQuranCommentary("");
     clearApiResponseDetails("quranMeta");
 
-    const providers = ["fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","imuslim","telawa","ayahquran","quranproject","surahpk","quranonline"];
-    for (let i = providers.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [providers[i], providers[j]] = [providers[j], providers[i]];
-    }
-    if (state.preferredQuranProvider !== "random") {
-      const preferredIndex = providers.indexOf(state.preferredQuranProvider);
-      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
-    }
+    const providers = ["ummahapi", "fawaz"];
 
     try {
       let result = null;
@@ -4753,12 +4753,13 @@ const DIYANET_ALL_LOCATIONS = [];
       if (signal.aborted) return;
 
       const ms = Math.round(performance.now() - started);
+      const displayedRef = result.ref || (ref.surah + ":" + ref.verse);
       $("quranText").textContent = displayText;
-      $("quranSource").textContent = "Kur’an · " + ref.surah + ":" + ref.verse + " · " + (result.source || result.provider || "Quran API");
+      $("quranSource").textContent = "Kur’an · " + displayedRef + " · " + (result.source || result.provider || "Quran API");
       $("quranApiProvider").textContent = result.provider || result.source || "Quran API";
       $("quranApiStatus").textContent = "200 OK · " + ms + " ms";
       $("quranApiStatus").className = "api-val ok";
-      $("quranApiRef").textContent = ref.surah + ":" + ref.verse + " · " + state.lang.toUpperCase();
+      $("quranApiRef").textContent = displayedRef + " · " + state.lang.toUpperCase();
       $("quranApiUpdated").textContent = formatClock();
       $("quranApiUrl").textContent = result.url || "-";
     } catch (error) {
