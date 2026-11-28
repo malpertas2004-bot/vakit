@@ -1526,6 +1526,8 @@ const DIYANET_ALL_LOCATIONS = [];
 
     return {
       id, countryId: String(countryId || item?.country_id || ""),
+      // Keep the API's own location label unchanged; UI language must not translate it.
+      apiName: genericName || rawTr || rawEn,
       nameTr: rawTr, nameEn: rawEn || (!rawTr ? genericName : ""),
       nameNl: String(item?.name_nl ?? item?.nameNl ?? "").trim(),
       sourceNameLang: item?.language || item?.lang || (rawTr && !rawEn ? "tr" : "en"),
@@ -1537,32 +1539,9 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function localizeLocationRecords(records) {
-    const target = state.lang;
-    const queue = (records || []).filter(Boolean);
-    let cursor = 0;
-    async function worker() {
-      while (cursor < queue.length) {
-        const record = queue[cursor++];
-        const direct = target === "tr" ? record.nameTr : target === "nl" ? record.nameNl : record.nameEn;
-        record.displayNames = record.displayNames || {};
-        if (direct) { record.displayNames[target] = direct; continue; }
-        const raw = record.nameEn || record.nameTr || "";
-        if (!raw) continue;
-        const from = ["tr","en","nl"].includes(record.sourceNameLang) ? record.sourceNameLang : (record.nameEn ? "en" : "tr");
-        const key = from + "|" + target + "|" + raw;
-        try {
-          let translated = LOCATION_TRANSLATION_CACHE.get(key);
-          if (!translated) {
-            translated = await translateReligiousText(raw, from, target);
-            LOCATION_TRANSLATION_CACHE.set(key, translated);
-          }
-          record.displayNames[target] = translated || raw;
-        } catch (_) {
-          record.displayNames[target] = raw;
-        }
-      }
-    }
-    await Promise.all(Array.from({length:Math.min(5, queue.length)}, () => worker()));
+    // Country, state/province and city labels are API data, not translatable UI text.
+    // Keep this compatibility function as a no-op for existing callers.
+    return Array.isArray(records) ? records : [];
   }
 
   /* O(1) Local Index for Instant Diyanet District ID Lookup */
@@ -1789,19 +1768,11 @@ const DIYANET_ALL_LOCATIONS = [];
     return matches.length === 1 ? matches[0] : null;
   }
 
-  function getLocalizedLocationName(obj, type = "") {
+  function getLocalizedLocationName(obj) {
     if (!obj) return "";
-    const fallback = state.lang === "tr"
-      ? (obj.nameTr || obj.nameEn || obj.name || "")
-      : state.lang === "nl"
-        ? (obj.nameNl || obj.nameEn || obj.nameTr || obj.name || "")
-        : (obj.nameEn || obj.nameTr || obj.name || "");
-    const display = obj.displayNames?.[state.lang] || fallback;
-    if (state.lang === "tr") {
-      const isNativeTurkishLocation = type === "country" || isTurkeyCountry(state.selectedCountry);
-      return isNativeTurkishLocation ? formatTurkishName(display) : formatTurkishForeignLocationName(display);
-    }
-    return formatLatinName(display);
+    // Always display the original label supplied by the location API.
+    // Changing the interface language must not rename or transliterate places.
+    return String(obj.apiName || obj.name || obj.nameTr || obj.nameEn || obj.nameNl || "");
   }
 
   const getApiQueryEn = obj => fixTurkishText(obj?.nameEn || obj?.nameTr || "");
@@ -2517,6 +2488,7 @@ const DIYANET_ALL_LOCATIONS = [];
       ...prev,
       ...extra,
       id: prev?.id || sourceId,
+      apiName: prev?.apiName || extra?.apiName || rawTr || rawEn || bestTr || bestEn,
       nameTr: bestTr,
       nameEn: bestEn,
       nameNl: bestNl,
@@ -2589,6 +2561,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const rawEn = isImsakiyem
       ? (item?.name_en || item?.nameEn || fallbackName)
       : (item?.IlceAdiEn || fallbackName);
+    const apiName = String(fallbackName || rawTr || rawEn || "").trim();
     if (!id || (!String(rawTr || "").trim() && !String(rawEn || "").trim())) return null;
     const cleanTr = String(countryId) === "2"
       ? formatTurkishName(rawTr || rawEn)
@@ -2598,6 +2571,7 @@ const DIYANET_ALL_LOCATIONS = [];
     return {
       id,
       countryId: String(countryId),
+      apiName: apiName || cleanTr || cleanEn,
       nameTr: cleanTr || cleanEn,
       nameEn: cleanEn || cleanTr,
       nameNl: formatLatinName(item?.name_nl || item?.nameNl || cleanEn || cleanTr),
@@ -2623,6 +2597,7 @@ const DIYANET_ALL_LOCATIONS = [];
         region = {
           id: `region-${countryObj.id}-${regionKey}`,
           countryId: String(countryObj.id),
+          apiName: childRecord.apiName,
           nameTr: childRecord.nameTr,
           nameEn: childRecord.nameEn,
           nameNl: childRecord.nameNl || childRecord.nameEn,
@@ -2635,6 +2610,7 @@ const DIYANET_ALL_LOCATIONS = [];
     }
 
     region.countryId = String(countryObj.id);
+    region.apiName = region.apiName || childRecord.apiName || childRecord.nameEn || childRecord.nameTr || "";
     const districts = Array.isArray(region.fallbackDistricts) ? [...region.fallbackDistricts] : [];
     const childKeys = new Set([
       childRecord.nameTr,
@@ -2655,6 +2631,7 @@ const DIYANET_ALL_LOCATIONS = [];
       const existing = districts[existingIndex];
       districts[existingIndex] = {
         ...existing,
+        apiName: existing.apiName || childRecord.apiName || "",
         sourceIds: { ...(existing.sourceIds || {}), ...(childRecord.sourceIds || {}) },
         nameAliases: [...new Set([
           ...(existing.nameAliases || []),
@@ -2712,6 +2689,7 @@ const DIYANET_ALL_LOCATIONS = [];
         state.states = [{
           id: "turkey-country-root", countryId: String(countryObj.id),
           nameTr: "Türkiye", nameEn: "Turkey", nameNl: "Turkije",
+          apiName: "Türkiye",
           isTurkeyRoot: true,
           fallbackDistricts: apiRegions.map(region => ({
             ...region, countryId: String(countryObj.id), isTurkishProvinceCity: true,
