@@ -3319,6 +3319,265 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     };
   }
 
+  async function fetchFromUmmahApi(districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const method = getSelectedPrayerMethod();
+    const params = new URLSearchParams({
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      date: dateKey(localParts()),
+      timezone: state.zone || "UTC",
+      madhab: state.prayerSchool === "hanafi" ? "Hanafi" : "Shafi"
+    });
+    if (state.highLatitudeRule !== "recommended") params.set("highLatitudeRule", state.highLatitudeRule);
+    if (method.ummah) params.set("method", method.ummah);
+    const url = "https://ummahapi.com/api/prayer-times?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
+    const record = j?.data || j;
+    const tm = record?.prayer_times || record?.times || record?.timings;
+    if (!tm) throw new Error("UmmahAPI response did not contain prayer_times");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(tm.Fajr || tm.fajr),
+      Sunrise: cleanTime(tm.Sunrise || tm.sunrise),
+      Dhuhr: cleanTime(tm.Dhuhr || tm.dhuhr),
+      Asr: cleanTime(tm.Asr || tm.asr),
+      Maghrib: cleanTime(tm.Maghrib || tm.maghrib),
+      Isha: cleanTime(tm.Isha || tm.isha)
+    });
+    return {
+      mapped, hijri: record?.hijri?.date || "",
+      sourceLabel: "UmmahAPI · " + (method[state.lang] || method.en),
+      providerName: "UmmahAPI Prayer Times",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromAzanEt(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const params = new URLSearchParams({
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      date: dateKey(p),
+      timezone: state.zone || "UTC",
+      method: "Turkey"
+    });
+    const url = "https://azan.quran.et/v1/prayer-times?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 6500 });
+    const record = j?.data || j;
+    const tm = record?.times || record?.timings;
+    if (!tm) throw new Error("Azan API did not return times");
+    const local = key => tm[key]?.local || tm[key]?.time || tm[key];
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(local("fajr")), Sunrise: cleanTime(local("sunrise")),
+      Dhuhr: cleanTime(local("dhuhr")), Asr: cleanTime(local("asr")),
+      Maghrib: cleanTime(local("maghrib")), Isha: cleanTime(local("isha"))
+    });
+    return {
+      mapped, hijri: record?.hijri?.date || "",
+      sourceLabel: "Azan Prayer Times API (Turkey method)",
+      providerName: "Azan Prayer Times API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromDeen2u(p, districtObj, signal) {
+    const method = getSelectedPrayerMethod();
+    const params = new URLSearchParams({
+      city: getApiQueryEn(districtObj),
+      date: dateKey(p),
+      days: "1",
+      method: method.deen2u || "auto",
+      asr: state.prayerSchool === "hanafi" ? "hanafi" : "shafii",
+      tz: state.zone || "UTC"
+    });
+    const countryIso = getSelectedCountryIso2();
+    if (countryIso) params.set("country", countryIso);
+    const url = "https://deen2u.com/api/v1/prayer-times?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
+    const days = Array.isArray(j?.days) ? j.days : Array.isArray(j?.data?.days) ? j.data.days : [];
+    const day = days.find(item => item?.date === dateKey(p)) || days[0] || j?.data || j;
+    const tm = day?.times || j?.times || j?.data?.times;
+    if (!tm) throw new Error("Deen2u city lookup did not return prayer times");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(tm.fajr || tm.Fajr), Sunrise: cleanTime(tm.sunrise || tm.Sunrise),
+      Dhuhr: cleanTime(tm.dhuhr || tm.Dhuhr), Asr: cleanTime(tm.asr || tm.Asr),
+      Maghrib: cleanTime(tm.maghrib || tm.Maghrib), Isha: cleanTime(tm.isha || tm.Isha)
+    });
+    const note = Array.isArray(day?.notes) ? day.notes.join(" · ") : (day?.note || "");
+    return {
+      mapped, hijri: day?.hijri || "",
+      sourceLabel: "Deen2u Islamic Times API · city lookup",
+      providerName: "Deen2u Islamic Times API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms" + (note ? " · " + note : ""),
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromSalahTable(p, districtObj, signal) {
+    const slug = value => String(value || "").normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/ı/g, "i").toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const countryAliases = {
+      "united arab emirates": "united-arab-emirates", "uae": "united-arab-emirates",
+      "turkiye": "turkey", "turkey": "turkey", "united kingdom": "united-kingdom",
+      "uk": "united-kingdom", "united states": "united-states", "usa": "united-states",
+      "saudi arabia": "saudi-arabia"
+    };
+    const countryName = asciiFoldKey(state.selectedCountry?.nameEn || state.selectedCountry?.nameTr || "");
+    const cityName = districtObj?.nameEn || districtObj?.nameTr || "";
+    const countrySlug = countryAliases[countryName] || slug(state.selectedCountry?.nameEn || state.selectedCountry?.nameTr);
+    const citySlug = slug(cityName);
+    if (!countrySlug || !citySlug) throw new Error("SalahTable country/city slug could not be resolved");
+    const method = getSelectedPrayerMethod();
+    const params = new URLSearchParams({ school: state.prayerSchool === "hanafi" ? "hanafi" : "shafi" });
+    if (method.salahtable) params.set("method", method.salahtable);
+    const url = "https://salahtable.com/api/times/" + countrySlug + "/" + citySlug + "?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 6000 });
+    const record = j?.data || j;
+    const week = Array.isArray(record?.week) ? record.week : [];
+    const day = week.find(item => String(item?.date || item?.gregorian_date || item?.iso?.fajr || "").startsWith(dateKey(p))) || record?.today;
+    if (!day) throw new Error("SalahTable did not return the selected date");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(day.fajr || day.imsak), Sunrise: cleanTime(day.sunrise),
+      Dhuhr: cleanTime(day.dhuhr), Asr: cleanTime(day.asr),
+      Maghrib: cleanTime(day.maghrib), Isha: cleanTime(day.isha)
+    });
+    return {
+      mapped, hijri: day?.hijri || "",
+      sourceLabel: "SalahTable Prayer Times API",
+      providerName: "SalahTable Prayer Times API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromIslamicApp(p, districtObj, signal) {
+    const date = String(p.day).padStart(2, "0") + "-" + String(p.month).padStart(2, "0") + "-" + p.year;
+    const method = getSelectedPrayerMethod();
+    const params = new URLSearchParams({
+      city: getApiQueryEn(districtObj),
+      school: state.prayerSchool === "hanafi" ? "1" : "0"
+    });
+    const countryIso = getSelectedCountryIso2();
+    if (countryIso) params.set("country", countryIso);
+    if (state.zone) params.set("timezone", state.zone);
+    if (method.islamic !== "" && method.islamic !== undefined) params.set("method", String(method.islamic));
+    const url = "https://api.islamic.app/v1/timings/" + date + "?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
+    const record = j?.data || j;
+    const tm = record?.timings;
+    if (j?.code !== 200 || !tm) throw new Error("islamic.app city lookup did not return prayer times");
+    const responseCountry = String(record?.meta?.country_code || record?.meta?.countryCode || "").toUpperCase();
+    if (countryIso && responseCountry && responseCountry !== countryIso) throw new Error("islamic.app resolved a city in a different country");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(tm.Fajr), Sunrise: cleanTime(tm.Sunrise), Dhuhr: cleanTime(tm.Dhuhr),
+      Asr: cleanTime(tm.Asr), Maghrib: cleanTime(tm.Maghrib), Isha: cleanTime(tm.Isha)
+    });
+    const h = record?.date?.hijri;
+    return {
+      mapped, hijri: h ? (h.day + " " + (h.month?.en || "") + " " + h.year).trim() : "",
+      sourceLabel: "islamic.app · city/country lookup",
+      providerName: "islamic.app Prayer Times API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromESalah(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const method = getSelectedPrayerMethod();
+    const params = new URLSearchParams({
+      lat: String(coords.lat), lng: String(coords.lng), date: dateKey(p),
+      timezone: state.zone || "UTC",
+      madhab: state.prayerSchool === "hanafi" ? "hanafi" : "standard"
+    });
+    if (method.esalah) params.set("method", method.esalah);
+    const url = "https://esalah.com/api/v1/times?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 6500 });
+    const tm = j?.times || j?.data?.times;
+    if (!tm) throw new Error("eSalah did not return prayer times");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(tm.Fajr), Sunrise: cleanTime(tm.Sunrise), Dhuhr: cleanTime(tm.Dhuhr),
+      Asr: cleanTime(tm.Asr), Maghrib: cleanTime(tm.Maghrib), Isha: cleanTime(tm.Isha)
+    });
+    const h = j?.hijri || j?.data?.hijri;
+    return {
+      mapped, hijri: h?.formatted?.en || (h ? h.day + " " + h.month + " " + h.year : ""),
+      sourceLabel: "eSalah Prayer Times API",
+      providerName: "eSalah Prayer Times API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromSimpleSolat(p, districtObj, signal) {
+    if (String(state.selectedCountry?.id) !== "2") throw new Error("SimpleSolat açık Diyanet verisi yalnızca Türkiye için kullanılabilir.");
+    const coords = await resolveCityCoords(districtObj, signal);
+    const url = "https://api.simplesolat.com/v2/prayer-times/by-location";
+    const result = await fetchJsonPostWithTimeout(
+      url,
+      { lat: coords.lat, lng: coords.lng, date: dateKey(p) },
+      { signal, timeoutMs: 5000 }
+    );
+    const payload = result.data;
+    const authority = String(payload?.authority || "");
+    if (payload?.source !== "official" || !/diyanet/i.test(authority) || String(payload?.country || "") !== "TR") {
+      throw new Error("SimpleSolat did not confirm an official Turkey Diyanet timetable");
+    }
+    const row = Array.isArray(payload?.data)
+      ? payload.data.find(item => String(item?.date || "") === dateKey(p))
+      : payload?.data;
+    if (!row) throw new Error("SimpleSolat did not return the selected date");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(row.imsak || row.fajr), Sunrise: cleanTime(row.syuruk || row.sunrise),
+      Dhuhr: cleanTime(row.dhuhr), Asr: cleanTime(row.asr),
+      Maghrib: cleanTime(row.maghrib), Isha: cleanTime(row.isha)
+    });
+    return {
+      mapped, hijri: "",
+      sourceLabel: "SimpleSolat · official Turkey Diyanet data",
+      providerName: "SimpleSolat",
+      endpointUrl: url,
+      httpStatus: result.status + " OK · " + result.ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromZikrPrayer(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const params = new URLSearchParams({ lat: String(coords.lat), lng: String(coords.lng), date: dateKey(p) });
+    const url = "https://zikrequran.com/api/prayer-times?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 6500 });
+    const record = j?.data || j;
+    const tm = record?.timings || record?.times;
+    if (j?.success === false || !tm) throw new Error("Zikr e Quran did not return prayer times");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(tm.Fajr || tm.fajr || tm.imsak),
+      Sunrise: cleanTime(tm.Sunrise || tm.sunrise || tm.syuruk),
+      Dhuhr: cleanTime(tm.Dhuhr || tm.dhuhr || tm.ogle),
+      Asr: cleanTime(tm.Asr || tm.asr || tm.ikindi),
+      Maghrib: cleanTime(tm.Maghrib || tm.maghrib || tm.aksam),
+      Isha: cleanTime(tm.Isha || tm.isha || tm.yatsi)
+    });
+    return {
+      mapped, hijri: record?.hijri?.date || "",
+      sourceLabel: "Zikr e Quran · Prayer Times API",
+      providerName: "Zikr e Quran Prayer Times API",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
   function updateApiInfoUI(info, isError = false) {
     $("infoApiProvider").textContent = info.providerName;
     $("infoApiStatus").textContent = info.httpStatus;
