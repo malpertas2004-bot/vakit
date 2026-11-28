@@ -542,12 +542,10 @@ details.nav-item > summary:hover{background:#163b30}
   .lang-btn{padding:6px 11px;font-size:12px}
 }
 
-  /* Reader UI: hide API diagnostics and the separate content-language panel. */
+  /* Hide technical prayer API diagnostics and the separate language panel. */
   #apiInfoBox,
   #hadithCard .api-info,
   #quranCard .api-info,
-  #hadithCard .quote-source,
-  #quranCard .quote-source,
   .content-lang-panel,
   #hadithLangBadge,
   #quranLangBadge { display: none !important; }
@@ -622,7 +620,8 @@ details.nav-item > summary:hover{background:#163b30}
           <option value="pawan_krd">Pawan.krd PrayerTimes API</option>
           <option value="azan_quran_et">Azan Prayer Times API</option>
           <option value="deen2u">Deen2u Islamic Times API</option>
-        </select>
+                  <option value="salahtable">SalahTable Prayer Times API</option>
+</select>
       </div>
     </div>
 
@@ -947,7 +946,8 @@ details.nav-item > summary:hover{background:#163b30}
         ummahapi: "UmmahAPI Prayer Times",
         pawan_krd: "Pawan.krd PrayerTimes API",
         azan_quran_et: "Azan Prayer Times API",
-        deen2u: "Deen2u Islamic Times API"
+        deen2u: "Deen2u Islamic Times API",
+        salahtable: "SalahTable Prayer Times API"
       },
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
@@ -1055,7 +1055,8 @@ details.nav-item > summary:hover{background:#163b30}
         ummahapi: "UmmahAPI Prayer Times",
         pawan_krd: "Pawan.krd PrayerTimes API",
         azan_quran_et: "Azan Prayer Times API",
-        deen2u: "Deen2u Islamic Times API"
+        deen2u: "Deen2u Islamic Times API",
+        salahtable: "SalahTable Prayer Times API"
       },
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
@@ -1120,10 +1121,10 @@ details.nav-item > summary:hover{background:#163b30}
       selectApiOption: "— Kies Gebedstijden API —",
       promptBoth: "Selecteer hieronder land, provincie, stad en gebedstijden-API",
       promptLocationOnly: "Selecteer hieronder land, provincie en stad",
-      promptApiOnly: "Selecteer hieronder een van de 20 API-bronnen",
+      promptApiOnly: "Selecteer hieronder een gebedstijdenbron",
       statusNeedBoth: "Kies hieronder land, provincie, stad (Diyanet) en een API-bron.",
       statusNeedLocation: "Wachten op locatieselectie. Kies land, provincie en stad.",
-      statusNeedApi: "{city} geselecteerd. Kies een van de 20 API-bronnen om tijden te laden.",
+      statusNeedApi: "{city} geselecteerd. Kies een gebedstijdenbron om tijden te laden.",
       apiWaitingBoth: "Wachten op locatie- en API-selectie",
       apiWaitingLocation: "Wachten op land-, provincie- en stadsselectie",
       apiWaitingApi: "Wachten op API-selectie",
@@ -1163,7 +1164,8 @@ details.nav-item > summary:hover{background:#163b30}
         ummahapi: "UmmahAPI gebedstijden",
         pawan_krd: "Pawan.krd gebedstijden-API",
         azan_quran_et: "Azan gebedstijden-API",
-        deen2u: "Deen2u Islamic Times API"
+        deen2u: "Deen2u Islamic Times API",
+        salahtable: "SalahTable gebedstijden-API"
       },
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
@@ -2507,7 +2509,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   /* ==========================================================================
-     9. GEOCODING & 20 DISTINCT PRAYER TIMES APIs
+     9. GEOCODING & PRAYER TIME PROVIDERS
      ========================================================================== */
   async function resolveCityCoords(districtObj, signal) {
     if (typeof districtObj.lat === "number" && typeof districtObj.lng === "number") {
@@ -2526,8 +2528,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         if (hit.timezone) state.zone = hit.timezone;
         return { lat: districtObj.lat, lng: districtObj.lng };
       }
-    } catch (_) {}
-    return { lat: 52.3676, lng: 4.9041 };
+    } catch (error) {
+      if (signal && signal.aborted) throw error;
+    }
+    throw new Error("Bu konum için koordinat bulunamadı; farklı bir vakit kaynağı deneyin.");
   }
 
   function validateMappedTimes(mapped) {
@@ -2675,10 +2679,18 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchFromUmmahApi(districtObj, signal) {
     const coords = await resolveCityCoords(districtObj, signal);
-    const url = `https://ummahapi.com/api/prayer-times?lat=${coords.lat}&lng=${coords.lng}&method=13`;
+    const params = new URLSearchParams({
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      date: dateKey(localParts()),
+      method: "Diyanet",
+      timezone: state.zone || "UTC"
+    });
+    const url = "https://www.ummahapi.com/api/prayer-times?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal });
-    const tm = j?.data?.times || j?.data?.timings || j?.times;
-    if (!tm) throw new Error("UmmahAPI format mismatch");
+    const record = j?.data || j;
+    const tm = record?.prayer_times || record?.times || record?.timings;
+    if (!tm) throw new Error("UmmahAPI response did not contain prayer_times");
     const mapped = validateMappedTimes({
       Fajr: cleanTime(tm.Fajr || tm.fajr),
       Sunrise: cleanTime(tm.Sunrise || tm.sunrise),
@@ -2688,12 +2700,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       Isha: cleanTime(tm.Isha || tm.isha)
     });
     return {
-      mapped,
-      hijri: "",
-      sourceLabel: "UmmahAPI Prayer Times",
+      mapped, hijri: record?.hijri?.date || "",
+      sourceLabel: "UmmahAPI Prayer Times (Diyanet method)",
       providerName: "UmmahAPI Prayer Times",
       endpointUrl: url,
-      httpStatus: `${status} OK · ${ms} ms`,
+      httpStatus: String(status) + " OK · " + ms + " ms",
       paramsSummary: buildDiyanetIdSummary()
     };
   }
@@ -2747,21 +2758,29 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchFromAzanEt(p, districtObj, signal) {
     const coords = await resolveCityCoords(districtObj, signal);
-    const url = "https://azan.quran.et/v1/prayer-times?lat=" + coords.lat
-      + "&lng=" + coords.lng + "&date=" + dateKey(p)
-      + "&timezone=" + encodeURIComponent(state.zone || "UTC") + "&method=Turkey";
+    const params = new URLSearchParams({
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      date: dateKey(p),
+      timezone: state.zone || "UTC",
+      method: "Turkey"
+    });
+    const url = "https://azan.quran.et/v1/prayer-times?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
-    const tm = j?.times || j?.data?.times || j?.timings || j?.data?.timings || j?.data || j;
+    const record = j?.data || j;
+    const tm = record?.times || record?.timings;
+    if (!tm) throw new Error("Azan API did not return times");
+    const local = key => tm[key]?.local || tm[key]?.time || tm[key];
     const mapped = validateMappedTimes({
-      Fajr: cleanTime(tm.Fajr || tm.fajr || tm.imsak),
-      Sunrise: cleanTime(tm.Sunrise || tm.sunrise || tm.shurooq),
-      Dhuhr: cleanTime(tm.Dhuhr || tm.dhuhr),
-      Asr: cleanTime(tm.Asr || tm.asr),
-      Maghrib: cleanTime(tm.Maghrib || tm.maghrib),
-      Isha: cleanTime(tm.Isha || tm.isha)
+      Fajr: cleanTime(local("fajr")),
+      Sunrise: cleanTime(local("sunrise")),
+      Dhuhr: cleanTime(local("dhuhr")),
+      Asr: cleanTime(local("asr")),
+      Maghrib: cleanTime(local("maghrib")),
+      Isha: cleanTime(local("isha"))
     });
     return {
-      mapped, hijri: j?.hijri?.date || j?.data?.hijri?.date || "",
+      mapped, hijri: record?.hijri?.date || "",
       sourceLabel: "Azan Prayer Times API (Turkey method)",
       providerName: "Azan Prayer Times API", endpointUrl: url,
       httpStatus: String(status) + " OK · " + ms + " ms",
@@ -2771,11 +2790,18 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   async function fetchFromDeen2u(p, districtObj, signal) {
     const coords = await resolveCityCoords(districtObj, signal);
-    const url = "https://deen2u.com/api/v1/prayer-times?lat=" + coords.lat
-      + "&lon=" + coords.lng + "&date=" + dateKey(p)
-      + "&days=1&method=auto&tz=" + encodeURIComponent(state.zone || "UTC");
+    const params = new URLSearchParams({
+      lat: String(coords.lat),
+      lon: String(coords.lng),
+      date: dateKey(p),
+      days: "1",
+      method: "auto",
+      tz: state.zone || "UTC"
+    });
+    const url = "https://deen2u.com/api/v1/prayer-times?" + params.toString();
     const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
-    const day = Array.isArray(j?.days) ? j.days[0] : (Array.isArray(j?.data?.days) ? j.data.days[0] : null);
+    const days = Array.isArray(j?.days) ? j.days : Array.isArray(j?.data?.days) ? j.data.days : [];
+    const day = days.find(item => item?.date === dateKey(p)) || days[0] || j?.data || j;
     const tm = day?.times || j?.times || j?.data?.times;
     if (!tm) throw new Error("Deen2u response did not contain prayer times");
     const mapped = validateMappedTimes({
@@ -2795,7 +2821,54 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     };
   }
 
-
+  async function fetchFromSalahTable(p, districtObj, signal) {
+    const slug = value => String(value || "")
+      .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/ı/g, "i").toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const countryAliases = {
+      "united arab emirates": "united-arab-emirates",
+      "uae": "united-arab-emirates",
+      "turkiye": "turkey",
+      "turkey": "turkey",
+      "united kingdom": "united-kingdom",
+      "uk": "united-kingdom",
+      "united states": "united-states",
+      "usa": "united-states",
+      "saudi arabia": "saudi-arabia"
+    };
+    const countryName = asciiFoldKey(state.selectedCountry?.nameEn || state.selectedCountry?.nameTr || "");
+    const cityName = districtObj?.nameEn || districtObj?.nameTr || "";
+    const countrySlug = countryAliases[countryName] || slug(state.selectedCountry?.nameEn || state.selectedCountry?.nameTr);
+    const citySlug = slug(cityName);
+    if (!countrySlug || !citySlug) throw new Error("SalahTable country/city slug could not be resolved");
+    const url = "https://salahtable.com/api/times/" + countrySlug + "/" + citySlug;
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7500 });
+    const record = j?.data || j;
+    const week = Array.isArray(record?.week) ? record.week : [];
+    const targetDate = dateKey(p);
+    const day = week.find(item => {
+      const candidate = String(item?.date || item?.gregorian_date || item?.iso?.fajr || "");
+      return candidate.startsWith(targetDate);
+    }) || week[0] || record?.today;
+    if (!day) throw new Error("SalahTable did not return the requested city schedule");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(day.fajr),
+      Sunrise: cleanTime(day.sunrise),
+      Dhuhr: cleanTime(day.dhuhr),
+      Asr: cleanTime(day.asr),
+      Maghrib: cleanTime(day.maghrib),
+      Isha: cleanTime(day.isha)
+    });
+    return {
+      mapped, hijri: day?.hijri || "",
+      sourceLabel: "SalahTable Prayer Times API",
+      providerName: "SalahTable Prayer Times API",
+      endpointUrl: url,
+      httpStatus: String(status) + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
 
   function updateApiInfoUI(info, isError = false) {
     $("infoApiProvider").textContent = info.providerName;
@@ -2833,6 +2906,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       else if (mode === "pawan_krd") res = await fetchFromPawanKrd(p, state.selectedDistrict, signal);
       else if (mode === "azan_quran_et") res = await fetchFromAzanEt(p, state.selectedDistrict, signal);
       else if (mode === "deen2u") res = await fetchFromDeen2u(p, state.selectedDistrict, signal);
+      else if (mode === "salahtable") res = await fetchFromSalahTable(p, state.selectedDistrict, signal);
       else throw new Error("Invalid API selection");
 
       if (signal.aborted) return;
@@ -3337,10 +3411,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchFromKafelaHadith(selLang, signal) {
-    const endpoints = [
-      "https://api.kafela.net/v1/hadiths/random",
-      "https://api.kafela.net/v2/hadiths/random"
-    ];
+    const endpoints = ["https://api.kafela.net/v1/hadiths/random"];
     let lastError = null;
     for (const url of endpoints) {
       try {
@@ -3410,6 +3481,101 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     };
   }
 
+  async function fetchIMuslimHadith(selLang, signal) {
+    const languages = selLang === "tr" ? ["tr"] : selLang === "en" ? ["en"] : ["ar"];
+    const collections = selLang === "en" ? ["nawawi","qudsi"] :
+      ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah","malik","nawawi","qudsi"];
+    let lastError = null;
+    for (const lang of languages) {
+      for (let attempt=0;attempt<collections.length;attempt++) {
+        const collection = collections[(Math.floor(Math.random()*collections.length)+attempt)%collections.length];
+        const url = "https://i-muslim.com/api/v1/translations/hadith/" + collection + "/" + lang;
+        try {
+          const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
+          const data = response.data?.data || response.data;
+          const rows = Array.isArray(data?.items) ? data.items : [];
+          const authored = rows.filter(row=>row?.source==="authored" && typeof row?.text==="string" && row.text.trim().length>10);
+          if (!authored.length) continue;
+          const row = authored[Math.floor(Math.random()*authored.length)];
+          return {
+            text: row.text, raw: row, sourceLanguage: lang,
+            source: "i-muslim · " + collection,
+            ref: collection + " " + (row.number || row.hadith_number || ""),
+            liveUrl: url, provider: "i-muslim Hadith API"
+          };
+        } catch(error) {
+          if(signal && signal.aborted) throw error;
+          lastError=error;
+        }
+      }
+    }
+    throw lastError || new Error("i-muslim has no authored full-text hadith for this language");
+  }
+
+  async function fetchSunnetimizHadith(selLang, signal) {
+    const url = "https://sunnetimiz.com/api/v1/random";
+    const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
+    const record = response.data;
+    const field = selLang === "tr" && typeof record?.turkish === "string" ? "turkish" : "arabic";
+    const text = record?.[field];
+    if (typeof text !== "string" || !text.length) throw new Error("Sünnetimiz returned no hadith text");
+    return {
+      text, raw: record, sourceLanguage: field === "turkish" ? "tr" : "ar",
+      source: "Kaynak: Sünnetimiz.com",
+      ref: record?.ref || "", liveUrl: url, provider: "Sünnetimiz Hadith API"
+    };
+  }
+
+  async function fetchUmmahHadith(selLang, signal) {
+    const url = "https://www.ummahapi.com/api/hadith/random";
+    const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
+    const record = response.data?.data || response.data;
+    const field = selLang === "en" && typeof record?.english === "string" ? "english" : "arabic";
+    const text = record?.[field];
+    if (typeof text !== "string" || !text.length) throw new Error("UmmahAPI returned no hadith text");
+    return {
+      text, raw: record, sourceLanguage: field === "english" ? "en" : "ar",
+      source: record?.collection_name || "UmmahAPI",
+      ref: record?.collection + " " + (record?.hadithnumber || ""),
+      liveUrl: url, provider: "UmmahAPI Hadith"
+    };
+  }
+
+  async function fetchRandomHadithApi(selLang, signal) {
+    const url = "https://randomhadith.com/api";
+    const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
+    const record = response.data;
+    const choices = selLang === "en" ? [["text_en","en"],["text_ar","ar"]]
+      : selLang === "nl" ? [["text_ar","ar"],["text_en","en"]]
+      : [["text_ar","ar"],["text_en","en"]];
+    for (const [field,lang] of choices) {
+      if (typeof record?.[field] === "string" && record[field].length>10) {
+        return {
+          text: record[field], raw: record, sourceLanguage: lang,
+          source: record.book || "Random Hadith",
+          ref: record.hadith_no || record.id || "",
+          liveUrl: url, provider: "Random Hadith API"
+        };
+      }
+    }
+    throw new Error("Random Hadith returned no text");
+  }
+
+  async function fetchSahihHadithApi(selLang, signal) {
+    const books = ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah"];
+    const book = books[Math.floor(Math.random()*books.length)];
+    const url = "https://sahih-al-bukhari.com/api/v1/random?book=" + book;
+    const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
+    const record = response.data?.data || response.data;
+    const text = typeof record?.arabic === "string" ? record.arabic : "";
+    if (!text) throw new Error("Sahih al-Bukhari API returned no Arabic text");
+    return {
+      text, raw: record, sourceLanguage: "ar",
+      source: record?.reference || ("Sahih al-Bukhari API · " + book),
+      ref: record?.number || "", liveUrl: url, provider: "Sahih al-Bukhari Hadith API"
+    };
+  }
+
   async function loadRandomHadith() {
     const signal = renewSignal("hadith");
     state.nextHadithAt = Date.now() + QUOTE_ROTATE_MS;
@@ -3420,7 +3586,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     renderHadithCommentary("");
     clearApiResponseDetails("hadithMeta");
 
-    const providers = ["hadeethenc","fawaz","kafela","zikr"];
+    const providers = ["hadeethenc","fawaz","kafela","zikr","imuslim","sunnetimiz","ummah","randomhadith","sahihbukhari"];
     for (let i = providers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [providers[i], providers[j]] = [providers[j], providers[i]];
@@ -3444,6 +3610,16 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             result = await fetchFromKafelaHadith(sourceLang, signal);
           } else if (provider === "zikr") {
             result = await fetchFromZikrHadith(sourceLang, signal);
+          } else if (provider === "imuslim") {
+            result = await fetchIMuslimHadith(sourceLang, signal);
+          } else if (provider === "sunnetimiz") {
+            result = await fetchSunnetimizHadith(sourceLang, signal);
+          } else if (provider === "ummah") {
+            result = await fetchUmmahHadith(sourceLang, signal);
+          } else if (provider === "randomhadith") {
+            result = await fetchRandomHadithApi(sourceLang, signal);
+          } else if (provider === "sahihbukhari") {
+            result = await fetchSahihHadithApi(sourceLang, signal);
           }
           if (typeof result?.text === "string" && result.text.length > 0) break;
         } catch (error) {
@@ -3639,21 +3815,31 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchQuranpedia(ref, lang, signal) {
-    const listUrl = "https://api.quranpedia.net/translation-books/" + lang;
+    const base = "https://api.quranpedia.net/v1";
+    const listUrl = base + "/translation-books/" + lang;
     const listResponse = await fetchApiPayloadWithTimeout(listUrl, { signal, timeoutMs: 7000 });
     const listPayload = listResponse.data;
-    const list = Array.isArray(listPayload?.data) ? listPayload.data : Array.isArray(listPayload) ? listPayload : [];
-    const books = list.filter(item => !item?.language?.code || item.language.code === lang);
-    if (!books.length) throw new Error("Quranpedia has no translation book in " + lang);
+    const list = Array.isArray(listPayload?.data) ? listPayload.data
+      : Array.isArray(listPayload) ? listPayload : [];
+    const books = list.filter(item => {
+      const code = item?.language?.code || item?.language_code || item?.language;
+      return !code || String(code).toLowerCase().startsWith(lang);
+    });
+    if (!books.length) throw new Error("Quranpedia has no translation in " + lang);
     const selected = books[Math.floor(Math.random() * books.length)];
     if (selected?.id == null) throw new Error("Quranpedia book ID missing");
-    const url = "https://api.quranpedia.net/translation/" + selected.id + "/" + ref.surah + "/" + ref.verse;
+    const url = base + "/translation/" + selected.id + "/" + ref.surah + "/" + ref.verse;
     const verseResponse = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 7000 });
-    const record = verseResponse.data?.data || verseResponse.data;
-    const text = typeof record?.translation_text === "string" ? record.translation_text
-      : typeof record?.text === "string" ? record.text : "";
+    const rows = Array.isArray(verseResponse.data?.data) ? verseResponse.data.data
+      : Array.isArray(verseResponse.data) ? verseResponse.data : [verseResponse.data];
+    const row = rows.find(item => item?.["translation-content"] || item?.translation_text || item?.text);
+    const text = row?.["translation-content"] || row?.translation_text || row?.text || "";
     if (!text) throw new Error("Quranpedia returned no verse translation");
-    return { text, url, raw: verseResponse.data, sourceLanguage: lang, source: selected?.name || "Quranpedia", provider: "Quranpedia API" };
+    return {
+      text, url, raw: verseResponse.data, sourceLanguage: lang,
+      source: row?.book?.name || selected?.name || "Quranpedia",
+      provider: "Quranpedia API"
+    };
   }
 
   async function fetchAlQuranCloud(ref, lang, signal) {
@@ -3675,24 +3861,34 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const url = "https://www.ummahapi.com/api/quran/surah/" + ref.surah + "/ayah/" + ref.verse;
     const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 7000 });
     const record = response.data?.data || response.data;
-    const translations = record?.translations || record?.translation || {};
-    const candidates = [
-      translations?.[lang],
-      translations?.[lang === "tr" ? "turkish" : lang === "nl" ? "dutch" : "english"],
-      record?.[lang],
-      record?.[lang === "tr" ? "turkish" : lang === "nl" ? "dutch" : "english"]
-    ];
-    let text = candidates.find(value => typeof value === "string" && value.length > 5) || "";
-    if (!text) {
-      for (const candidate of candidates) {
-        if (candidate && typeof candidate === "object") {
-          text = findRawApiText(candidate, ["translation","text","content","translatedText"])?.text || "";
-          if (text) break;
+    const translations = record?.translations || {};
+    const keys = lang === "tr" ? ["turkish"]
+      : lang === "en" ? ["sahih_international","english","pickthall","yusuf_ali"]
+      : ["sahih_international","english"];
+    let text = "";
+    let usedLang = lang;
+    for (const key of keys) {
+      const candidate = translations[key] ?? record?.[key];
+      if (typeof candidate === "string" && candidate.length > 5) {
+        text = candidate;
+        usedLang = key === "turkish" ? "tr" : "en";
+        break;
+      }
+      if (candidate && typeof candidate === "object") {
+        const found = findRawApiText(candidate, ["text","translation","content"]);
+        if (found?.text) {
+          text = found.text;
+          usedLang = key === "turkish" ? "tr" : "en";
+          break;
         }
       }
     }
-    if (!text) throw new Error("UmmahAPI has no verse translation in " + lang);
-    return { text, url, raw: response.data, sourceLanguage: lang, source: "UmmahAPI Quran", provider: "UmmahAPI" };
+    if (!text) throw new Error("UmmahAPI did not return a matching verse translation");
+    return {
+      text, url, raw: response.data, sourceLanguage: usedLang,
+      source: usedLang === "tr" ? "UmmahAPI Turkish translation" : "UmmahAPI Saheeh International",
+      provider: "UmmahAPI Quran"
+    };
   }
 
   async function fetchZikrQuran(ref, lang, signal) {
@@ -3709,15 +3905,102 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return { text: found.text, url, raw: row, sourceLanguage: rawTextLanguage(found.field,lang), source: "Zikr e Quran", provider: "Zikr e Quran API" };
   }
 
-  async function fetchJamiUlIlmQuran(ref, lang, signal) {
-    if (!["en","ur","hi"].includes(lang)) throw new Error("Jami'ul Ilm has no edition in " + lang);
-    const url = "https://jamiulilm.com/api/quran-api/ayah/" + ref.surah + ":" + ref.verse + ".json";
-    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 7000 });
+  async function fetchIMuslimQuran(ref, lang, signal) {
+    const usedLang = lang === "nl" ? "en" : lang;
+    const url = "https://i-muslim.com/api/v1/translations/quran/" + usedLang + "/" + ref.surah;
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
+    const data = response.data?.data || response.data;
+    const rows = Array.isArray(data?.items) ? data.items
+      : Array.isArray(data?.verses) ? data.verses
+      : Array.isArray(data) ? data : [];
+    const row = rows.find(item => Number(item?.ayah || item?.number || item?.verse || item?.ayahNumber) === Number(ref.verse));
+    if (!row) throw new Error("i-muslim did not return the selected ayah");
+    const text = typeof row.text === "string" ? row.text
+      : typeof row.translation === "string" ? row.translation : "";
+    if (!text) throw new Error("i-muslim ayah has no text");
+    const attribution = row?.translator || row?.attribution || data?.translator || (usedLang === "tr" ? "Diyanet İşleri Başkanlığı" : "Saheeh International");
+    return {
+      text, url, raw: row, sourceLanguage: usedLang,
+      source: "i-muslim · " + attribution,
+      provider: "i-muslim Quran API"
+    };
+  }
+
+  async function fetchTelawaQuran(ref, signal) {
+    const url = "https://telawa.org/api/v1/ayahs/" + ref.surah + "/" + ref.verse;
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
     const record = response.data?.data || response.data;
-    const translations = record?.translations || {};
-    const text = typeof translations[lang] === "string" ? translations[lang] : "";
-    if (!text) throw new Error("Jami'ul Ilm has no verse translation in " + lang);
-    return { text, url, raw: response.data, sourceLanguage: lang, source: "Jami'ul Ilm Quran", provider: "Jami'ul Ilm Quran API" };
+    const found = findRawApiText(record, ["text_uthmani","arabic","text","ayah","content"]);
+    if (!found?.text) throw new Error("Telawa returned no ayah text");
+    return {
+      text: found.text, url, raw: response.data, sourceLanguage: "ar",
+      source: "Telawa Quran", provider: "Telawa Quran API"
+    };
+  }
+
+  async function fetchAyahQuran(ref, signal) {
+    const url = "https://ayahquran.com/api/v1/ayah/" + ref.surah + "/" + ref.verse;
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
+    const record = response.data?.data || response.data;
+    const text = typeof record?.text_uthmani === "string" ? record.text_uthmani
+      : typeof record?.arabic === "string" ? record.arabic : "";
+    if (!text) throw new Error("Ayah Quran returned no Uthmani text");
+    return {
+      text, url, raw: record, sourceLanguage: "ar",
+      source: "Quran data via Ayah Quran",
+      provider: "Ayah Quran API"
+    };
+  }
+
+  async function fetchQuranProject(ref, lang, signal) {
+    const url = "https://quranapi.pages.dev/api/" + ref.surah + "/" + ref.verse + ".json";
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
+    const record = response.data?.data || response.data;
+    const candidates = lang === "en" ? [["english","en"],["arabic1","ar"]]
+      : [["arabic1","ar"],["arabic2","ar"]];
+    for (const [field,sourceLanguage] of candidates) {
+      if (typeof record?.[field] === "string" && record[field].length > 5) {
+        return {
+          text: record[field], url, raw: record, sourceLanguage,
+          source: "The Quran Project",
+          provider: "The Quran Project API"
+        };
+      }
+    }
+    throw new Error("The Quran Project returned no matching language field");
+  }
+
+  async function fetchSurahPk(ref, lang, signal) {
+    const url = "https://www.surah.pk/api/v1/surahs/" + ref.surah + "/ayahs/" + ref.verse + ".json";
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
+    const record = response.data?.data || response.data;
+    const field = lang === "en" ? "en" : "ar";
+    const text = typeof record?.[field] === "string" ? record[field]
+      : typeof record?.ar === "string" ? record.ar : "";
+    if (!text) throw new Error("Surah.pk returned no text for this language");
+    return {
+      text, url, raw: record, sourceLanguage: field === "en" && record.en ? "en" : "ar",
+      source: field === "en" ? "Saheeh International" : "Arabic Uthmani",
+      provider: "Surah.pk Quran API"
+    };
+  }
+
+  async function fetchQuranOnline(ref, signal) {
+    const url = "https://quranonlineread.com/api/surah/" + ref.surah + ".json";
+    const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 8000 });
+    const record = response.data?.data || response.data;
+    const rows = Array.isArray(record?.ayahs) ? record.ayahs : [];
+    const row = rows.find(item => Number(item?.number || item?.ayah) === Number(ref.verse)
+      || String(item?.key || "") === ref.surah + ":" + ref.verse);
+    if (!row) throw new Error("QuranOnline did not return the selected ayah");
+    const text = typeof row.translation === "string" ? row.translation
+      : typeof row.arabic === "string" ? row.arabic : "";
+    if (!text) throw new Error("QuranOnline ayah text is empty");
+    return {
+      text, url, raw: row, sourceLanguage: typeof row.translation === "string" ? "en" : "ar",
+      source: "Pickthall",
+      provider: "QuranOnline JSON API"
+    };
   }
 
   async function fetchQuranFromProvider(provider, ref, lang, signal, source) {
@@ -3731,7 +4014,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (provider === "alqurancloud") return fetchAlQuranCloud(ref,lang,signal);
     if (provider === "ummahapi") return fetchUmmahApiQuran(ref,lang,signal);
     if (provider === "zikr") return fetchZikrQuran(ref,lang,signal);
-    if (provider === "jamiulilm") return fetchJamiUlIlmQuran(ref,lang,signal);
     throw new Error("Unknown Quran provider");
   }
 
@@ -3746,7 +4028,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     renderQuranCommentary("");
     clearApiResponseDetails("quranMeta");
 
-    const providers = ["fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","jamiulilm"];
+    const providers = ["fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","imuslim","telawa","ayahquran","quranproject","surahpk","quranonline"];
     for (let i = providers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [providers[i], providers[j]] = [providers[j], providers[i]];
