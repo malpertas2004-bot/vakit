@@ -4009,6 +4009,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
+  function contentLanguageBadge() {
+    return state.contentLang === "tr" ? "Türkçe (TR)" : state.contentLang === "nl" ? "Nederlands (NL)" : "English (EN)";
+  }
+
+  function updateReligiousLanguageUI() {
+    document.querySelectorAll(".religious-lang-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.contentLang === state.contentLang);
+    });
+    const badge = contentLanguageBadge();
+    $("hadithLangBadge").textContent = badge;
+    $("quranLangBadge").textContent = badge;
+  }
+
+  function openGoogleTranslate(textElementId) {
+    const text = $(textElementId)?.textContent?.trim() || "";
+    if (!text || /yükleniyor|fetching|ophalen/i.test(text)) return;
+    const target = state.contentLang || "tr";
+    const url = "https://translate.google.com/?sl=auto&tl=" + encodeURIComponent(target) + "&text=" + encodeURIComponent(text) + "&op=translate";
+    window.open(url, "_blank", "noopener");
+  }
   function applyLanguageUI(reloadQuotes = false) {
     document.documentElement.lang = state.lang;
     document.querySelectorAll(".lang-btn").forEach(btn => {
@@ -4044,48 +4064,24 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("copyApiUrl").textContent = t("copyBtn");
 
     $("hadithCardTitle").textContent = t("hadithCardTitle");
-    $("hadithLangBadge").textContent = t("langNameBadge");
+    $("hadithLangBadge").textContent = contentLanguageBadge();
     $("refreshHadithBtn").textContent = t("refreshHadithBtn");
-    $("hadithApiSelectLabel").textContent = t("hadithApiSelectLabel");
-    const hOpts = I18N[state.lang].hadithApiOptions;
-    Array.from($("hadithApiSelect").options).forEach(opt => {
-      if (opt.value === "") opt.textContent = t("selectHadithApiOption");
-      else if (hOpts[opt.value]) opt.textContent = hOpts[opt.value];
-    });
     $("lblHadithProvider").textContent = t("lblHadithProvider");
     $("lblHadithStatus").textContent = t("lblHadithStatus");
     $("lblHadithRef").textContent = t("lblHadithRef");
     $("lblHadithUpdated").textContent = t("lblHadithUpdated");
     $("copyHadithUrl").textContent = t("copyBtn");
-    if (!state.selectedHadithApi) {
-      $("hadithText").textContent = t("hadithPlaceholder");
-      renderHadithCommentary("");
-      clearApiResponseDetails("hadithMeta");
-      $("hadithApiStatus").textContent = t("hadithWaitingStatus");
-      $("hadithApiUrl").textContent = t("hadithWaitingUrl");
-    }
-
     $("quranCardTitle").textContent = t("quranCardTitle");
-    $("quranLangBadge").textContent = t("langNameBadge");
+    $("quranLangBadge").textContent = contentLanguageBadge();
     $("refreshQuranBtn").textContent = t("refreshQuranBtn");
-    $("quranApiSelectLabel").textContent = t("quranApiSelectLabel");
-    const dOpts = I18N[state.lang].duaApiOptions;
-    Array.from($("quranApiSelect").options).forEach(opt => {
-      if (opt.value === "") opt.textContent = t("selectDuaApiOption");
-      else if (dOpts[opt.value]) opt.textContent = dOpts[opt.value];
-    });
     $("lblQuranProvider").textContent = t("lblQuranProvider");
     $("lblQuranStatus").textContent = t("lblQuranStatus");
     $("lblQuranRef").textContent = t("lblQuranRef");
     $("lblQuranUpdated").textContent = t("lblQuranUpdated");
-    $("copyQuranUrl").textContent = t("copyBtn");
-    if (!state.selectedQuranApi) {
-      $("quranText").textContent = t("duaPlaceholder");
-      renderQuranCommentary("");
-      clearApiResponseDetails("quranMeta");
-      $("quranApiStatus").textContent = t("duaWaitingStatus");
-      $("quranApiUrl").textContent = t("duaWaitingUrl");
-    }
+    $("religiousLangLabel").textContent = t("religiousLangLabel");
+    updateReligiousLanguageUI();
+    if (!state.selectedHadithApi) { $("hadithText").textContent = t("hadithPlaceholder"); }
+    if (!state.selectedQuranApi) { $("quranText").textContent = t("quranPlaceholder"); }
 
     $("resourcesCardTitle").textContent = t("resourcesCardTitle");
     $("resGroupWeb").textContent = t("resGroupWeb");
@@ -4145,20 +4141,15 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
   function updateQuoteTimers(nowMs) {
     if (state.selectedHadithApi) {
-      const remH = Math.ceil((state.nextHadithAt - nowMs) / 1000);
-      $("hadithTimerBadge").textContent = formatRemainingSec(remH);
+      const remainingHadith = Math.ceil((state.nextHadithAt - nowMs) / 1000);
+      $("hadithTimerBadge").textContent = formatRemainingSec(remainingHadith);
       if (nowMs >= state.nextHadithAt) loadRandomHadith();
-    } else {
-      $("hadithTimerBadge").textContent = "05:00";
-    }
-
+    } else $("hadithTimerBadge").textContent = "05:00";
     if (state.selectedQuranApi) {
-      const remD = Math.ceil((state.nextQuranAt - nowMs) / 1000);
-      $("quranTimerBadge").textContent = formatRemainingSec(remD);
+      const remainingQuran = Math.ceil((state.nextQuranAt - nowMs) / 1000);
+      $("quranTimerBadge").textContent = formatRemainingSec(remainingQuran);
       if (nowMs >= state.nextQuranAt) loadRandomQuran();
-    } else {
-      $("quranTimerBadge").textContent = "05:00";
-    }
+    } else $("quranTimerBadge").textContent = "05:00";
   }
 
   function tick() {
@@ -4272,28 +4263,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     });
 
-    $("hadithApiSelect").addEventListener("change", e => {
-      state.selectedHadithApi = e.target.value;
-      Persistence.savePrefs();
-      if (state.selectedHadithApi) loadRandomHadith();
+    document.querySelectorAll(".religious-lang-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const nextLang = btn.dataset.contentLang;
+        if (!["tr","en","nl"].includes(nextLang) || nextLang === state.contentLang) return;
+        state.contentLang = nextLang;
+        Persistence.savePrefs();
+        updateReligiousLanguageUI();
+        loadRandomHadith();
+        loadRandomQuran();
+      });
     });
 
-    $("refreshHadithBtn").addEventListener("click", () => {
-      if (!state.selectedHadithApi) { $("hadithApiSelect").focus(); return; }
-      loadRandomHadith();
-    });
-
-    $("quranApiSelect").addEventListener("change", e => {
-      state.selectedQuranApi = e.target.value;
-      Persistence.savePrefs();
-      if (state.selectedQuranApi) loadRandomQuran();
-    });
-
-    $("refreshQuranBtn").addEventListener("click", () => {
-      if (!state.selectedQuranApi) { $("quranApiSelect").focus(); return; }
-      loadRandomQuran();
-    });
-
+    $("refreshHadithBtn").addEventListener("click", () => loadRandomHadith());
+    $("refreshQuranBtn").addEventListener("click", () => loadRandomQuran());
+    $("hadithTranslateBtn").addEventListener("click", () => openGoogleTranslate("hadithText"));
+    $("quranTranslateBtn").addEventListener("click", () => openGoogleTranslate("quranText"));
     bindCopyButton("copyApiUrl", "infoApiUrl");
     bindCopyButton("copyHadithUrl", "hadithApiUrl");
     bindCopyButton("copyQuranUrl", "quranApiUrl");
@@ -4373,6 +4358,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (saved?.lang && I18N[saved.lang]) {
       state.lang = saved.lang;
     }
+    if (["tr","en","nl"].includes(saved?.contentLang)) {
+      state.contentLang = saved.contentLang;
+    }
     if (typeof saved?.volume === "number") {
       $("volume").value = String(saved.volume);
       $("volumeValue").textContent = `${saved.volume}%`;
@@ -4412,16 +4400,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       renderEmptyPrayerPlaceholder(true);
     }
 
-    if (saved?.hadithApi && HADITH_PROVIDERS[saved.hadithApi]) {
-      state.selectedHadithApi = saved.hadithApi;
-      $("hadithApiSelect").value = saved.hadithApi;
-      loadRandomHadith();
-    }
-    if (saved?.duaApi && DUA_PROVIDERS[saved.duaApi]) {
-      state.selectedQuranApi = saved.duaApi;
-      $("quranApiSelect").value = saved.duaApi;
-      loadRandomQuran();
-    }
+    state.selectedHadithApi = "random";
+    state.selectedQuranApi = "random";
+    updateReligiousLanguageUI();
+    loadRandomHadith();
+    loadRandomQuran();
 
     tick();
     setInterval(tick, 250);
