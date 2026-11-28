@@ -4568,7 +4568,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const refKey = String(verse?.verse_key || verse?.reference || "");
     return {
       text, url, raw: verse, sourceLanguage, ref: refKey,
-      source: "UmmahAPI · " + (verse?.surah?.name_english || verse?.surah?.name || "Quran") + (refKey ? " " + refKey : ""),
+      source: "UmmahAPI · " + (payload?.surah?.name_english || payload?.surah?.name_translation || "Quran") + (refKey ? " " + refKey : ""),
       provider: "UmmahAPI Quran"
     };
   }
