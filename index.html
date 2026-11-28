@@ -2745,33 +2745,58 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function loadCountries() {
-    const sel=$("countrySelect");sel.disabled=true;sel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
+    const sel=$("countrySelect");
+    sel.disabled=true;
+    sel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
     let rows=[],countryLoadError=null;
-    // Use only the current v2 global country catalogue; do not call the legacy v1 API.
+    // Use one documented hierarchy and one ID catalogue for all levels.
     try{
-      const response=await fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/v2/locations/countries",{timeoutMs:12000});
+      const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/countries",{timeoutMs:12000});
       rows=getLocationApiRows(response.data);
     }catch(error){countryLoadError=error;}
     if(!rows.length){
-      state.countries=[];sel.innerHTML='<option value="" disabled selected>İmsakiyem ülke listesi alınamadı</option>';
-      $("status").textContent="İmsakiyem dünya ülke listesi alınamadı: "+String(countryLoadError?.message||"API boş liste döndürdü");
+      state.countries=[];
+      sel.innerHTML='<option value="" disabled selected>İmsakiyem ülke listesi alınamadı</option>';
+      $("status").textContent="İmsakiyem ülke listesi alınamadı: "+String(countryLoadError?.message||"API boş liste döndürdü");
       return [];
     }
     const unique=new Map();
     for(const item of rows){
-      const id=String(item?._id??item?.id??"").trim(),rawTr=String(item?.name_tr??item?.nameTr??item?.UlkeAdi??item?.name??"").trim();
-      const rawEn=String(item?.name_en??item?.nameEn??item?.UlkeAdiEn??item?.UlkeAdiEN??item?.english_name??rawTr).trim(),rawNl=String(item?.name_nl??item?.nameNl??rawEn).trim();
-      const code=String(item?.iso2??item?.iso_code??item?.country_code??item?.code??"").toUpperCase(),iso2=/^[A-Z]{2}$/.test(code)?code:(countryIso2FromName(rawEn)||countryIso2FromName(rawTr)||"");
+      const id=String(item?._id??item?.id??item?.country_id??"").trim();
+      const rawTr=String(item?.name_tr??item?.nameTr??item?.UlkeAdi??item?.name??item?.country_name??"").trim();
+      const rawEn=String(item?.name_en??item?.nameEn??item?.UlkeAdiEn??item?.UlkeAdiEN??item?.english_name??rawTr).trim();
+      const rawNl=String(item?.name_nl??item?.nameNl??rawEn).trim();
+      const code=String(item?.iso2??item?.iso_code??item?.country_code??item?.code??"").toUpperCase();
+      const iso2=/^[A-Z]{2}$/.test(code)?code:(countryIso2FromName(rawEn)||countryIso2FromName(rawTr)||"");
       if(!id||(!rawTr&&!rawEn)||isNonAdministrativeLocationName(rawTr,rawEn,rawNl))continue;
-      const identity=iso2?"iso-"+iso2:"name-"+countryApiNameKey(rawEn||rawTr);if(unique.has(identity))continue;
-      unique.set(identity,{id,countryId:id,nameTr:rawTr||rawEn,nameEn:rawEn||rawTr,nameNl:rawNl||rawEn||rawTr,apiName:rawTr||rawEn,
-        nameAliases:[...new Set([rawTr,rawEn,rawNl,...collectApiLocationNameAliases(item)].filter(Boolean))],iso2,sourceIds:{imsakiyem:id},catalogSource:"imsakiyem",locationKind:"country",tz:item?.timezone||item?.tz||""});
+      const identity=iso2?"iso-"+iso2:"id-"+id;
+      if(unique.has(identity))continue;
+      unique.set(identity,{
+        id,countryId:id,nameTr:rawTr||rawEn,nameEn:rawEn||rawTr,nameNl:rawNl||rawEn||rawTr,
+        apiName:rawTr||rawEn,
+        nameAliases:[...new Set([rawTr,rawEn,rawNl,...collectApiLocationNameAliases(item)].filter(Boolean))],
+        iso2,sourceIds:{imsakiyem:id},catalogSource:"imsakiyem",locationKind:"country",
+        tz:item?.timezone||item?.tz||""
+      });
     }
     const previous=state.selectedCountry;
-    state.countries=[...unique.values()].sort((a,b)=>getLocalizedLocationName(a,"country").localeCompare(getLocalizedLocationName(b,"country"),I18N[state.lang].locale,{sensitivity:"base"}));
-    if(previous)state.selectedCountry=state.countries.find(c=>(previous.iso2&&c.iso2===previous.iso2)||canonicalLocationNameKey(c.apiName)===canonicalLocationNameKey(previous.apiName||previous.nameEn||previous.nameTr))||null;
-    if(!state.countries.length){sel.disabled=true;sel.innerHTML='<option value="" disabled selected>İmsakiyem konum listesinde ülke bulunamadı</option>';return [];}
-    sel.disabled=false;renderCountrySelect();return state.countries;
+    state.countries=[...unique.values()].sort((a,b)=>
+      getLocalizedLocationName(a,"country").localeCompare(getLocalizedLocationName(b,"country"),I18N[state.lang].locale,{sensitivity:"base"})
+    );
+    if(previous){
+      state.selectedCountry=state.countries.find(c=>
+        (previous.iso2&&c.iso2===previous.iso2)||
+        canonicalLocationNameKey(c.apiName)===canonicalLocationNameKey(previous.apiName||previous.nameEn||previous.nameTr)
+      )||null;
+    }
+    if(!state.countries.length){
+      sel.disabled=true;
+      sel.innerHTML='<option value="" disabled selected>İmsakiyem konum listesinde ülke bulunamadı</option>';
+      return [];
+    }
+    sel.disabled=false;
+    renderCountrySelect();
+    return state.countries;
   }
 
     function renderCountrySelect() {
@@ -2826,51 +2851,126 @@ const DIYANET_ALL_LOCATIONS = [];
     };
   }
 
-  async function loadStatesForCountry(countryObj,preselectStateId=""){
-    const stateSel=$("stateSelect"),distSel=$("districtSelect");state.states=[];state.districts=[];state.selectedState=null;state.selectedDistrict=null;state._imsakiyemCountryDistrictCache=null;state._imsakiyemCountryDistrictCacheCountryId="";
-    stateSel.disabled=true;stateSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
-    distSel.disabled=true;distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';
-    const countryId=String(getLocationSourceId(countryObj,"imsakiyem")||countryObj?.id||"");if(!countryId)throw new Error("İmsakiyem ülke kimliği bulunamadı.");
+  function getImsakiyemRelationId(value) {
+    if(value&&typeof value==="object"){
+      value=value._id??value.id??value.country_id??value.state_id??value.district_id??"";
+    }
+    return String(value??"").trim();
+  }
 
+  function filterImsakiyemChildRows(rows,parentField,parentId,countryId="") {
+    const expectedParent=String(parentId||"").trim();
+    const expectedCountry=String(countryId||"").trim();
+    if(!expectedParent)return [];
+    return (Array.isArray(rows)?rows:[]).filter(item=>{
+      const parentValue=item?.[parentField] ??
+        (parentField==="state_id" ? item?.stateId??item?.state : item?.countryId??item?.country);
+      const actualParent=getImsakiyemRelationId(parentValue);
+      if(!actualParent||actualParent!==expectedParent)return false;
+      const countryValue=item?.country_id??item?.countryId??item?.country;
+      const actualCountry=getImsakiyemRelationId(countryValue);
+      return !expectedCountry||!actualCountry||actualCountry===expectedCountry;
+    });
+  }
+
+  async function loadStatesForCountry(countryObj,preselectStateId=""){
+    const stateSel=$("stateSelect"),distSel=$("districtSelect");
+    state.states=[];state.districts=[];state.selectedState=null;state.selectedDistrict=null;
+    state._imsakiyemCountryDistrictCache=null;state._imsakiyemCountryDistrictCacheCountryId="";
+    stateSel.disabled=true;
+    stateSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
+    distSel.disabled=true;
+    distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';
+    const countryId=String(getLocationSourceId(countryObj,"imsakiyem")||countryObj?.id||"");
+    if(!countryId)throw new Error("İmsakiyem ülke kimliği bulunamadı.");
+
+    let rows=[];
+    try{
+      const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/states?countryId="+encodeURIComponent(countryId),{timeoutMs:12000});
+      rows=filterImsakiyemChildRows(getLocationApiRows(response.data),"country_id",countryId,countryId);
+    }catch(error){
+      $("status").textContent="İmsakiyem "+(isTurkeyCountry(countryObj)?"Türkiye il":"eyalet/bölge")+" listesi alınamadı: "+String(error?.message||error);
+      renderStateSelect();
+      return [];
+    }
+
+    const unique=new Map();
+    for(const item of rows){
+      const normalized=normalizeImsakiyemLocation(item,countryId,"state");
+      if(!normalized||unique.has(normalized.id))continue;
+      unique.set(normalized.id,{
+        ...normalized,countryId,locationKind:"state",catalogSource:"imsakiyem",
+        isV2Region:false,sourceIds:{...(normalized.sourceIds||{}),imsakiyem:normalized.id}
+      });
+    }
+
+    // Keep the existing Turkey selector behavior while using the same API catalogue.
     if(isTurkeyCountry(countryObj)){
-      let rows=[];
-      try{
-        const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/states?countryId="+encodeURIComponent(countryId),{timeoutMs:12000});
-        rows=getLocationApiRows(response.data);
-      }catch(error){
-        $("status").textContent="İmsakiyem Türkiye il listesi alınamadı: "+String(error?.message||error);
-        renderStateSelect();return [];
-      }
-      const parsed=rows.map(item=>normalizeImsakiyemLocation(item,countryId,"district")).filter(Boolean);
-      state.states=[{id:"imsakiyem-turkey-root",countryId,nameTr:countryObj.nameTr||"Türkiye",nameEn:countryObj.nameEn||"Turkey",nameNl:countryObj.nameNl||"Türkiye",apiName:countryObj.apiName||"Türkiye",sourceIds:{imsakiyem:countryId},catalogSource:"imsakiyem",fallbackDistricts:parsed.map(item=>({...item,countryId,isTurkishProvinceCity:true})),isTurkeyRoot:true}];
+      const provinces=[...unique.values()].map(item=>({...item,countryId,isTurkishProvinceCity:true}));
+      state.states=[{
+        id:"imsakiyem-turkey-root",countryId,
+        nameTr:countryObj.nameTr||"Türkiye",nameEn:countryObj.nameEn||"Turkey",
+        nameNl:countryObj.nameNl||"Türkiye",apiName:countryObj.apiName||"Türkiye",
+        sourceIds:{imsakiyem:countryId},catalogSource:"imsakiyem",
+        fallbackDistricts:provinces,isTurkeyRoot:true
+      }];
       state.selectedState=state.states[0];
     }else{
-      try{
-        const response=await fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/v2/locations/countries/"+encodeURIComponent(countryId),{timeoutMs:12000});
-        const detail=unwrapImsakiyemV2Data(response.data)||{};
-        let regions=detail.admin_regions??detail.adminRegions??detail.admin_region??detail.regions??detail.region_list??detail.country?.admin_regions??detail.country?.admin_region??[];
-        if(!Array.isArray(regions))regions=[];
-        state.states=regions.map((region,index)=>normalizeImsakiyemAdminRegion(region,countryId,index)).filter(Boolean);
-
-        if(!state.states.length){
-          const districts=await fetchImsakiyemV2Districts({countryId});
-          const grouped=new Map();
-          for(const district of districts){
-            const regionName=String(district?.admin_region??district?.adminRegion??district?.region??district?.state_name??district?.state?.name??"").trim();
-            if(!regionName)continue;
-            const key=regionName.toLocaleLowerCase();
-            if(!grouped.has(key))grouped.set(key,{name:regionName,name_en:district?.state?.name_en||regionName});
-          }
-          state.states=[...grouped.values()].map((region,index)=>normalizeImsakiyemAdminRegion(region,countryId,index)).filter(Boolean);
-          state._imsakiyemCountryDistrictCache=districts;state._imsakiyemCountryDistrictCacheCountryId=countryId;
-        }
-      }catch(error){
-        $("status").textContent="İmsakiyem v2 eyalet/bölge listesi alınamadı: "+String(error?.message||error);
-        renderStateSelect();return [];
+      state.states=[...unique.values()];
+      if(preselectStateId){
+        const wanted=String(preselectStateId);
+        state.selectedState=state.states.find(item=>
+          item.id===wanted||Object.values(item.sourceIds||{}).includes(wanted)
+        )||null;
       }
-      if(preselectStateId)state.selectedState=state.states.find(item=>item.id===String(preselectStateId)||Object.values(item.sourceIds||{}).includes(String(preselectStateId)))||null;
     }
-    renderStateSelect();return state.states;
+    renderStateSelect();
+    return state.states;
+  }
+
+  async function loadDistrictsForState(stateObj,preselectDistrictId=""){
+    const distSel=$("districtSelect");
+    state.districts=[];state.selectedDistrict=null;
+    distSel.disabled=true;
+    distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
+    if(!stateObj){
+      distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';
+      return [];
+    }
+
+    if(stateObj.isTurkeyRoot||stateObj.isCountryLevelParent){
+      state.districts=[...(stateObj.fallbackDistricts||[])];
+    }else{
+      const stateId=String(getLocationSourceId(stateObj,"imsakiyem")||stateObj.id||"");
+      const countryId=String(stateObj.countryId||state.selectedCountry?.id||"");
+      if(!stateId){
+        $("status").textContent="İmsakiyem eyalet/bölge kimliği bulunamadı.";
+      }else{
+        try{
+          const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/districts?stateId="+encodeURIComponent(stateId),{timeoutMs:12000});
+          const rows=filterImsakiyemChildRows(getLocationApiRows(response.data),"state_id",stateId,countryId);
+          const unique=new Map();
+          for(const item of rows){
+            const normalized=normalizeImsakiyemLocation(item,countryId,"district");
+            if(!normalized||unique.has(normalized.id))continue;
+            unique.set(normalized.id,{...normalized,countryId,locationKind:"district",catalogSource:"imsakiyem"});
+          }
+          state.districts=[...unique.values()];
+        }catch(error){
+          $("status").textContent="İmsakiyem şehir/ilçe listesi alınamadı: "+String(error?.message||error);
+        }
+      }
+    }
+
+    if(preselectDistrictId){
+      const wanted=String(preselectDistrictId);
+      state.selectedDistrict=state.districts.find(item=>
+        item.id===wanted||Object.values(item.sourceIds||{}).includes(wanted)
+      )||null;
+    }
+    renderDistrictSelect();
+    if(!state.districts.length)$("status").textContent="İmsakiyem seçilen eyalet/il için eşleşen şehir veya ilçe kaydı döndürmedi.";
+    return state.districts;
   }
 
     function renderStateSelect() {
