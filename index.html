@@ -2888,6 +2888,26 @@ const DIYANET_ALL_LOCATIONS = [];
     }
   }
 
+  function imsakiyemDistrictMatchesRegion(item,stateObj) {
+    const wantedId=String(getLocationSourceId(stateObj,"imsakiyem")||stateObj?.id||"").trim();
+    const itemStateIds=[
+      item?.state_id,item?.stateId,item?.state?._id,item?.state?.id,
+      item?.province_id,item?.provinceId,item?.region_id,item?.regionId,
+      item?.admin_region_id,item?.adminRegionId
+    ].map(value=>String(value??"").trim()).filter(Boolean);
+    if(wantedId&&itemStateIds.includes(wantedId))return true;
+    const wantedNames=[
+      stateObj?.adminRegion,stateObj?.apiName,stateObj?.nameTr,stateObj?.nameEn
+    ].map(asciiFoldKey).filter(Boolean);
+    const itemNames=[
+      item?.admin_region,item?.adminRegion,item?.region,item?.state_name,
+      item?.stateName,item?.province,item?.province_name,item?.provinceName,
+      item?.state?.name,item?.state?.name_en,item?.state?.name_tr,
+      item?.region_name,item?.regionName
+    ].map(asciiFoldKey).filter(Boolean);
+    return wantedNames.some(name=>itemNames.includes(name));
+  }
+
   async function loadDistrictsForState(stateObj,preselectDistrictId=""){
     const distSel=$("districtSelect");state.districts=[];state.selectedDistrict=null;distSel.disabled=true;distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
     if(!stateObj){distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';return [];}
@@ -2896,9 +2916,20 @@ const DIYANET_ALL_LOCATIONS = [];
     }else if(stateObj.isV2Region){
       try{
         const countryId=String(stateObj.countryId||state.selectedCountry?.id||"");
-        const cached=Array.isArray(state._imsakiyemCountryDistrictCache)?state._imsakiyemCountryDistrictCache:null;
-        const rows=cached?cached.filter(item=>String(item?.admin_region??item?.adminRegion??item?.region??item?.state_name??item?.state?.name??"").trim()===String(stateObj.adminRegion))
-          :await fetchImsakiyemV2Districts({countryId,region:String(stateObj.adminRegion||stateObj.apiName||"")});
+        const regionId=String(getLocationSourceId(stateObj,"imsakiyem")||"");
+        let rows=[];
+        if(regionId){
+          try{rows=await fetchImsakiyemV2Districts({countryId,stateId:regionId});}catch(_){}
+        }
+        if(!rows.length){
+          const cached=String(state._imsakiyemCountryDistrictCacheCountryId||"")===countryId&&Array.isArray(state._imsakiyemCountryDistrictCache)
+            ?state._imsakiyemCountryDistrictCache:null;
+          const all=cached||await fetchImsakiyemV2Districts({countryId});
+          if(!cached){state._imsakiyemCountryDistrictCache=all;state._imsakiyemCountryDistrictCacheCountryId=countryId;}
+          rows=all.filter(item=>imsakiyemDistrictMatchesRegion(item,stateObj));
+        }else{
+          rows=rows.filter(item=>!item?.country_id||String(item.country_id)===countryId);
+        }
         state.districts=rows.map(item=>normalizeImsakiyemLocation(item,countryId,"district")).filter(Boolean);
       }catch(error){
         $("status").textContent="İmsakiyem v2 şehir/ilçe listesi alınamadı: "+String(error?.message||error);
