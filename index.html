@@ -2557,10 +2557,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   async function loadCountries() {
     const sel = $("countrySelect");
     sel.innerHTML = `<option value="" disabled selected>${escapeHtml(t("loadingList"))}</option>`;
-
-    // The embedded dataset is the single source of truth for country names.
-    // Live country APIs only map their own IDs to canonical countries; their
-    // translated names are never appended to the visible country list.
     const countries = DIYANET_ALL_LOCATIONS
       .filter(country => !isNonAdministrativeLocationName(country.nameTr, country.nameEn, country.nameNl))
       .map(country => ({
@@ -2570,37 +2566,39 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     state.countries = countries;
     renderCountrySelect();
 
-    const [r1, r2] = await Promise.allSettled([
-      fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/locations/countries", { timeoutMs: 6000 }),
-      fetchJsonWithTimeout("https://ezanvakti.emushaf.net/ulkeler", { timeoutMs: 6000 })
+    const [r1, r2, r3] = await Promise.allSettled([
+      fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/locations/countries", { timeoutMs: 5500 }),
+      fetchJsonWithTimeout("https://ezanvakti.emushaf.net/ulkeler", { timeoutMs: 5500 }),
+      fetchJsonWithTimeout("https://namazvakti.mtopal.dev/ulkeler", { timeoutMs: 5500 })
     ]);
-
     if (r1.status === "fulfilled") {
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const sourceId = String(item?._id || item?.id || "").trim();
         const canonical = findCanonicalCountryFromApi([item?.name_tr, item?.name_en, item?.nameEn, item?.name], countries);
-        if (!canonical || !sourceId) continue;
-        canonical.sourceIds = { ...(canonical.sourceIds || {}), imsakiyem: sourceId };
+        if (canonical && sourceId) canonical.sourceIds = { ...(canonical.sourceIds || {}), imsakiyem: sourceId };
       }
     }
-
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const sourceId = String(item?.UlkeID || "").trim();
         const canonical = findCanonicalCountryFromApi([item?.UlkeAdi, item?.UlkeAdiEn, item?.UlkeAdiEN], countries);
-        if (!canonical || !sourceId) continue;
-        canonical.sourceIds = { ...(canonical.sourceIds || {}), emushaf: sourceId };
+        if (canonical && sourceId) canonical.sourceIds = { ...(canonical.sourceIds || {}), emushaf: sourceId };
       }
     }
-
+    if (r3.status === "fulfilled" && Array.isArray(r3.value.data)) {
+      for (const item of r3.value.data) {
+        const sourceId = String(item?.UlkeID || "").trim();
+        const canonical = findCanonicalCountryFromApi([item?.UlkeAdi, item?.UlkeAdiEn, item?.UlkeAdiEN], countries);
+        if (canonical && sourceId) canonical.sourceIds = { ...(canonical.sourceIds || {}), mtopal: sourceId };
+      }
+    }
     if (state.selectedCountry) {
       state.selectedCountry = countries.find(country => country.id === state.selectedCountry.id) || state.selectedCountry;
     }
     state.countries = countries;
     renderCountrySelect();
   }
-
 
   function renderCountrySelect() {
     const sel = $("countrySelect");
@@ -2624,28 +2622,23 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   function buildParentStateChildRecord(item, source, countryId) {
-    const id = String(
-      source === "imsakiyem"
-        ? (item?._id || item?.id || "")
-        : (item?.IlceID || item?._id || item?.id || "")
-    ).trim();
-    const fallbackName = source === "imsakiyem"
-      ? (item?.name || "")
-      : (item?.IlceAdi || "");
-    const rawTr = source === "imsakiyem"
+    const isImsakiyem = source === "imsakiyem";
+    const id = String(isImsakiyem
+      ? (item?._id || item?.id || "")
+      : (item?.IlceID || item?._id || item?.id || "")).trim();
+    const fallbackName = isImsakiyem ? (item?.name || "") : (item?.IlceAdi || "");
+    const rawTr = isImsakiyem
       ? (item?.name_tr || item?.nameTr || fallbackName)
       : (item?.IlceAdi || fallbackName);
-    const rawEn = source === "imsakiyem"
+    const rawEn = isImsakiyem
       ? (item?.name_en || item?.nameEn || fallbackName)
       : (item?.IlceAdiEn || fallbackName);
     if (!id || (!String(rawTr || "").trim() && !String(rawEn || "").trim())) return null;
-
     const cleanTr = String(countryId) === "2"
       ? formatTurkishName(rawTr || rawEn)
       : formatTurkishForeignLocationName(rawTr || rawEn);
     const cleanEn = formatLatinName(rawEn || rawTr);
     if (isNonAdministrativeLocationName(cleanTr, cleanEn)) return null;
-
     return {
       id,
       countryId: String(countryId),
@@ -2722,17 +2715,18 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const source = parentState.source;
     const url = source === "imsakiyem"
       ? `https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(parentState.id)}`
-      : `https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(parentState.id)}`;
-
+      : source === "mtopal"
+        ? `https://namazvakti.mtopal.dev/ilceler/${encodeURIComponent(parentState.id)}`
+        : `https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(parentState.id)}`;
     try {
-      const response = await fetchJsonWithTimeout(url, { timeoutMs: 6500 });
+      const response = await fetchJsonWithTimeout(url, { timeoutMs: 5500 });
       const children = getParentStateChildrenPayload(response.data);
       for (const item of children) {
         const childRecord = buildParentStateChildRecord(item, source, countryObj.id);
         if (childRecord) addParentStateChildAsRegion(mapById, childRecord, countryObj);
       }
     } catch (_) {
-      // Keep canonical fallback states if the provider's nested endpoint is unavailable.
+      // Retain canonical fallback locations when an optional provider is offline.
     }
   }
 
@@ -2743,7 +2737,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     state.districts = [];
     state.selectedState = null;
     state.selectedDistrict = null;
-
     stateSel.disabled = true;
     stateSel.innerHTML = `<option value="" disabled selected>${escapeHtml(t("loadingList"))}</option>`;
     distSel.disabled = true;
@@ -2752,38 +2745,40 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const mapById = new Map();
     const parentStateRecords = [];
     const isUaeCountry = String(countryObj.id) === "184";
-    const fb = FALLBACK_LOCATIONS.find(c => c.id === countryObj.id);
+    const isTurkey = String(countryObj.id) === "2";
+    const fb = FALLBACK_LOCATIONS.find(country => country.id === countryObj.id);
 
-    // The local fallback contains only an incomplete Abu Dhabi entry for the UAE.
-    // Keep it as a fallback city, not as a separate state.
     if (fb && !isUaeCountry) {
-      for (const s of fb.states) {
-        mergeLocationRecord(mapById, s.id, s.nameTr, s.nameEn, {
-          ...s,
+      for (const item of (fb.states || [])) {
+        mergeLocationRecord(mapById, item.id, item.nameTr, item.nameEn, {
+          ...item,
           countryId: String(countryObj.id),
-          fallbackDistricts: s.districts
+          fallbackDistricts: item.districts
         }, "diyanet");
       }
     }
 
     const imsakiyemCountryId = getLocationSourceId(countryObj, "imsakiyem");
     const emushafCountryId = getLocationSourceId(countryObj, "emushaf");
-    const [r1, r2] = await Promise.allSettled([
+    const mtopalCountryId = getLocationSourceId(countryObj, "mtopal");
+    const [r1, r2, r3] = await Promise.allSettled([
       imsakiyemCountryId
-        ? fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states?countryId=${encodeURIComponent(imsakiyemCountryId)}`, { timeoutMs: 6500 })
+        ? fetchJsonWithTimeout(`https://ezanvakti.imsakiyem.com/api/locations/states?countryId=${encodeURIComponent(imsakiyemCountryId)}`, { timeoutMs: 5500 })
         : Promise.reject(new Error("No verified Imsakiyem country ID")),
       emushafCountryId
-        ? fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/sehirler/${encodeURIComponent(emushafCountryId)}`, { timeoutMs: 6500 })
-        : Promise.reject(new Error("No verified Emushaf country ID"))
+        ? fetchJsonWithTimeout(`https://ezanvakti.emushaf.net/sehirler/${encodeURIComponent(emushafCountryId)}`, { timeoutMs: 5500 })
+        : Promise.reject(new Error("No verified Emushaf country ID")),
+      mtopalCountryId
+        ? fetchJsonWithTimeout(`https://namazvakti.mtopal.dev/sehirler/${encodeURIComponent(mtopalCountryId)}`, { timeoutMs: 5500 })
+        : Promise.reject(new Error("No verified MTopal country ID"))
     ]);
 
     if (r1.status === "fulfilled") {
       const raw = Array.isArray(r1.value.data?.data) ? r1.value.data.data : (Array.isArray(r1.value.data) ? r1.value.data : []);
       for (const item of raw) {
         const id = String(item?._id || item?.id || "").trim();
-        const fallbackName = item?.name || "";
-        const rawTr = item?.name_tr || item?.nameTr || fallbackName;
-        const rawEn = item?.name_en || item?.nameEn || fallbackName;
+        const rawTr = item?.name_tr || item?.nameTr || item?.name || "";
+        const rawEn = item?.name_en || item?.nameEn || item?.name || "";
         if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
           if (id) parentStateRecords.push({ id, source: "imsakiyem" });
           continue;
@@ -2791,18 +2786,28 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "imsakiyem");
       }
     }
-
     if (r2.status === "fulfilled" && Array.isArray(r2.value.data)) {
       for (const item of r2.value.data) {
         const id = String(item?.SehirID || "").trim();
-        const fallbackName = item?.SehirAdi || "";
-        const rawTr = item?.SehirAdi || fallbackName;
-        const rawEn = item?.SehirAdiEn || fallbackName;
+        const rawTr = item?.SehirAdi || "";
+        const rawEn = item?.SehirAdiEn || "";
         if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
           if (id) parentStateRecords.push({ id, source: "emushaf" });
           continue;
         }
         mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "emushaf");
+      }
+    }
+    if (r3.status === "fulfilled" && Array.isArray(r3.value.data)) {
+      for (const item of r3.value.data) {
+        const id = String(item?.SehirID || "").trim();
+        const rawTr = item?.SehirAdi || "";
+        const rawEn = item?.SehirAdiEn || "";
+        if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
+          if (id) parentStateRecords.push({ id, source: "mtopal" });
+          continue;
+        }
+        mergeLocationRecord(mapById, id, rawTr, rawEn, { countryId: String(countryObj.id) }, "mtopal");
       }
     }
 
@@ -2812,9 +2817,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const fallbackDistricts = (fb?.states || []).flatMap(region =>
         (region.districts || []).map(district => ({ ...district, countryId: "184" }))
       );
-
-      // UAE is represented by one state. Its emirates are listed as cities
-      // beneath it by loadDistrictsForState() using the provider's parent ID.
       state.states = [{
         id: "uae-emirates",
         countryId: "184",
@@ -2826,22 +2828,73 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         isCountryLevelParent: true
       }];
       state.selectedState = state.states[0];
+    } else if (isTurkey) {
+      const oldProvinceByName = new Map((fb?.states || []).map(item =>
+        [canonicalLocationNameKey(item.nameEn || item.nameTr), item]
+      ));
+      const seen = new Set();
+      const mtopalCities = [...mapById.values()].filter(item => item.sourceIds?.mtopal);
+      const cities = mtopalCities.filter(item => {
+        const key = canonicalLocationNameKey(item.nameEn || item.nameTr);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).map(item => {
+        const key = canonicalLocationNameKey(item.nameEn || item.nameTr);
+        const old = oldProvinceByName.get(key);
+        const centre = (old?.districts || []).find(d =>
+          canonicalLocationNameKey(d.nameEn || d.nameTr) === key
+        );
+        return {
+          ...item,
+          countryId: "2",
+          isTurkishProvinceCity: true,
+          legacyDistrictIds: [...new Set([
+            ...(item.legacyDistrictIds || []),
+            ...(centre?.id ? [String(centre.id)] : []),
+            ...(old?.id ? [String(old.id)] : [])
+          ])],
+          sourceIds: { ...(item.sourceIds || {}), ...(centre?.sourceIds || {}) }
+        };
+      }).sort((a, b) => getLocalizedLocationName(a, "district").localeCompare(
+        getLocalizedLocationName(b, "district"), I18N[state.lang].locale, { sensitivity: "base" }
+      ));
+      const turkeyCities = cities.length ? cities : (fb?.states || []).map(province => {
+        const key = canonicalLocationNameKey(province.nameEn || province.nameTr);
+        const centre = (province.districts || []).find(d =>
+          canonicalLocationNameKey(d.nameEn || d.nameTr) === key
+        ) || province.districts?.[0];
+        return centre ? {
+          ...centre, countryId: "2", isTurkishProvinceCity: true,
+          nameTr: province.nameTr, nameEn: province.nameEn, nameNl: province.nameNl,
+          legacyDistrictIds: [String(centre.id), String(province.id)]
+        } : null;
+      }).filter(Boolean);
+
+      state.states = [{
+        id: "turkey-country-root",
+        countryId: "2",
+        nameTr: "Türkiye",
+        nameEn: "Turkey",
+        nameNl: "Turkije",
+        sourceIds: { imsakiyem: imsakiyemCountryId, emushaf: emushafCountryId, mtopal: mtopalCountryId },
+        fallbackDistricts: turkeyCities,
+        isTurkeyRoot: true
+      }];
+      state.selectedState = state.states[0];
     } else {
-      // Preserve the existing region grouping for all other countries.
-      for (const parentState of parentStateRecords) {
-        await expandCountryLevelState(mapById, parentState, countryObj);
-      }
+      for (const parentState of parentStateRecords) await expandCountryLevelState(mapById, parentState, countryObj);
       state.states = Array.from(mapById.values());
       if (preselectStateId) {
         const requestedId = String(preselectStateId);
-        state.selectedState = state.states.find(s =>
-          s.id === requestedId ||
-          s.sourceIds?.imsakiyem === requestedId ||
-          s.sourceIds?.emushaf === requestedId
+        state.selectedState = state.states.find(item =>
+          item.id === requestedId ||
+          item.sourceIds?.imsakiyem === requestedId ||
+          item.sourceIds?.emushaf === requestedId ||
+          item.sourceIds?.mtopal === requestedId
         ) || null;
       }
     }
-
     renderStateSelect();
   }
 
