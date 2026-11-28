@@ -1040,7 +1040,8 @@ details.nav-item > summary:hover{background:#163b30}
     { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië", salahtable: "malaysia" },
     { value: "custom", tr: "Özel yöntem (99)", en: "Custom method (99)", nl: "Aangepaste methode (99)", aladhan: 99 }
   ];
-  const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"];
+  const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah", "malik", "nawawi"];
+  const UMMAH_HADITH_COLLECTIONS = ["bukhari", "muslim", "abudawud", "tirmidhi", "ibnmajah", "nasai", "malik", "nawawi", "qudsi", "dehlawi"];
   const QUOTE_ROTATE_MS = 300000; // 5 minutes
   const FETCH_TIMEOUT_MS = 9500;
 
@@ -4040,7 +4041,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   }
 
   async function fetchUmmahHadith(selLang, signal) {
-    const url = "https://www.ummahapi.com/api/hadith/random";
+    const collection = UMMAH_HADITH_COLLECTIONS[Math.floor(Math.random() * UMMAH_HADITH_COLLECTIONS.length)];
+    const url = "https://www.ummahapi.com/api/hadith/random?collection=" + encodeURIComponent(collection);
     const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
     const record = response.data?.data || response.data;
     const field = selLang === "en" && typeof record?.english === "string" ? "english" : "arabic";
@@ -5272,6 +5274,10 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (Number.isFinite(Number(saved?.customFajrAngle))) state.customFajrAngle = Math.max(0, Math.min(30, Number(saved.customFajrAngle)));
     if (saved?.customMaghribSetting === "" || Number.isFinite(Number(saved?.customMaghribSetting))) state.customMaghribSetting = saved.customMaghribSetting;
     if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0, Math.min(60, Number(saved.customIshaSetting)));
+    if (saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`)) {
+      state.selectedApiMode = saved.apiMode;
+      $("apiSelect").value = saved.apiMode;
+    }
     loadZikrPrefs();
     if (typeof saved?.volume === "number") {
       $("volume").value = String(saved.volume);
