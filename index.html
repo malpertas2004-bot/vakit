@@ -615,6 +615,8 @@ details.nav-item > summary:hover{background:#163b30}
           <option value="prayertime">PrayerTime.info — Diyanet yöntemi</option>
           <option value="aladhan">AlAdhan — Diyanet Method 13 hesaplaması</option>
           <option value="salahtable">SalahTable — Diyanet method</option>
+          <option value="simplesolat">SimpleSolat — Türkiye Diyanet resmî verisi</option>
+          <option value="azan_turkey">Azan API — Diyanet (Turkey) yöntemi</option>
         </select>
       </div>
     </div>
@@ -942,7 +944,9 @@ details.nav-item > summary:hover{background:#163b30}
         mtopal: "4. MTopal (Diyanet verisi)",
         prayertime: "5. PrayerTime.info (Diyanet yöntemi)",
         aladhan: "6. AlAdhan (Diyanet Method 13)",
-        salahtable: "7. SalahTable (Diyanet yöntemi)"
+        salahtable: "7. SalahTable (Diyanet yöntemi)",
+        simplesolat: "8. SimpleSolat (Türkiye Diyanet resmî verisi)",
+        azan_turkey: "9. Azan API (Diyanet / Turkey yöntemi)"
       },
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
@@ -1102,7 +1106,9 @@ details.nav-item > summary:hover{background:#163b30}
         mtopal: "4. MTopal (Diyanet data)",
         prayertime: "5. PrayerTime.info (Diyanet method)",
         aladhan: "6. AlAdhan (Diyanet Method 13)",
-        salahtable: "7. SalahTable (Diyanet method)"
+        salahtable: "7. SalahTable (Diyanet method)",
+        simplesolat: "8. SimpleSolat (official Diyanet data for Turkey)",
+        azan_turkey: "9. Azan API (Diyanet / Turkey method)"
       },
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
@@ -1262,7 +1268,9 @@ details.nav-item > summary:hover{background:#163b30}
         mtopal: "4. MTopal (Diyanet-gegevens)",
         prayertime: "5. PrayerTime.info (Diyanet-methode)",
         aladhan: "6. AlAdhan (Diyanet-methode 13)",
-        salahtable: "7. SalahTable (Diyanet-methode)"
+        salahtable: "7. SalahTable (Diyanet-methode)",
+        simplesolat: "8. SimpleSolat (officiële Diyanet-gegevens voor Turkije)",
+        azan_turkey: "9. Azan API (Diyanet / Turkse methode)"
       },
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
@@ -1807,6 +1815,25 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     }
   }
 
+  async function fetchJsonPostWithTimeout(url, body, { signal, timeoutMs = FETCH_TIMEOUT_MS } = {}) {
+    const timeoutCtrl = new AbortController();
+    const timer = setTimeout(() => timeoutCtrl.abort(new Error("Timeout")), timeoutMs);
+    const onExternalAbort = () => timeoutCtrl.abort(signal.reason || new Error("Aborted"));
+    if (signal) {
+      if (signal.aborted) { clearTimeout(timer); throw new Error("Aborted"); }
+      signal.addEventListener("abort", onExternalAbort, { once: true });
+    }
+    const started = performance.now();
+    try {
+      const response = await fetch(url, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(body), signal: timeoutCtrl.signal });
+      const ms = Math.round(performance.now() - started);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return { data: await response.json(), status: response.status, ms };
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onExternalAbort);
+    }
+  }
   async function fetchApiPayloadWithTimeout(url, { signal, timeoutMs = FETCH_TIMEOUT_MS, headers } = {}) {
     const timeoutCtrl = new AbortController();
     const timer = setTimeout(() => timeoutCtrl.abort(new Error("Timeout")), timeoutMs);
@@ -2715,6 +2742,33 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return { mapped, hijri: "", sourceLabel: "SalahTable — Diyanet method", providerName: "SalahTable (Diyanet method)", endpointUrl: url, httpStatus: result.status + " OK · " + result.ms + " ms", paramsSummary: buildDiyanetIdSummary() };
   }
 
+  async function fetchFromSimpleSolat(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const url = "https://api.simplesolat.com/v2/prayer-times/by-location";
+    const result = await fetchJsonPostWithTimeout(url, { lat: coords.lat, lng: coords.lng, date: dateKey(p) }, { signal, timeoutMs: 4800 });
+    const payload = result.data;
+    const authority = String(payload?.authority || "");
+    if (payload?.source !== "official" || !/diyanet/i.test(authority) || String(payload?.country || "") !== "TR") {
+      throw new Error("SimpleSolat did not return an official Turkey Diyanet timetable for this location");
+    }
+    const row = Array.isArray(payload?.data) ? payload.data.find(item => String(item?.date || "") === dateKey(p)) : payload?.data;
+    if (!row) throw new Error("SimpleSolat has no timetable for the selected date");
+    const mapped = validateMappedTimes({ Fajr: cleanTime(row.imsak || row.fajr), Sunrise: cleanTime(row.syuruk), Dhuhr: cleanTime(row.dhuhr), Asr: cleanTime(row.asr), Maghrib: cleanTime(row.maghrib), Isha: cleanTime(row.isha) });
+    return { mapped, hijri: "", sourceLabel: "SimpleSolat — Turkey Diyanet official data", providerName: "SimpleSolat (official Diyanet Turkey data)", endpointUrl: url, httpStatus: result.status + " OK · " + result.ms + " ms", paramsSummary: buildDiyanetIdSummary() };
+  }
+
+  async function fetchFromAzanDiyanet(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const query = new URLSearchParams({ lat: String(coords.lat), lng: String(coords.lng), date: dateKey(p), timezone: state.zone || "Europe/Istanbul", method: "Turkey", madhab: "hanafi" });
+    const url = "https://azan.quran.et/v1/prayer-times?" + query.toString();
+    const result = await fetchJsonWithTimeout(url, { signal, timeoutMs: 4200 });
+    const payload = result.data?.data || result.data;
+    const times = payload?.times;
+    if (!times) throw new Error("Azan API returned no prayer times");
+    const local = value => cleanTime(value && typeof value === "object" ? (value.local || value.time || value.formatted || "") : value);
+    const mapped = validateMappedTimes({ Fajr: local(times.fajr), Sunrise: local(times.sunrise), Dhuhr: local(times.dhuhr), Asr: local(times.asr), Maghrib: local(times.maghrib), Isha: local(times.isha) });
+    return { mapped, hijri: "", sourceLabel: "Azan API — Turkey / Diyanet calculation method", providerName: "Azan API (Diyanet Turkey method)", endpointUrl: url, httpStatus: result.status + " OK · " + result.ms + " ms", paramsSummary: buildDiyanetIdSummary() };
+  }
   async function buildLocalDiyanetCalculation(p, districtObj, signal) {
     const coords = await resolveCityCoords(districtObj, signal);
     const tzHours = getTimezoneOffsetMinutes(state.zone) / 60;
@@ -2738,7 +2792,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const signal = renewSignal("prayer");
     const distName = getLocalizedLocationName(state.selectedDistrict, "district");
     if (!silentHourly || !state.todayData) $("status").textContent = t("fetchingFor", { city: distName });
-    const sourceOrder = ["imsakiyem", "emushaf", "mtopal", "prayertime", "salahtable", "aladhan"];
+    const sourceOrder = ["imsakiyem", "emushaf", "mtopal", "simplesolat", "prayertime", "salahtable", "aladhan", "azan_turkey"];
     const selected = state.selectedApiMode === "auto" ? "" : state.selectedApiMode;
     let attempts = selected ? [selected].concat(sourceOrder.filter(key => key !== selected)) : sourceOrder.slice();
     if (!selected) attempts = attempts.sort(() => Math.random() - 0.5);
@@ -2750,9 +2804,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         if (mode === "imsakiyem") res = await fetchFromImsakiyem(key, state.selectedDistrict, signal);
         else if (mode === "emushaf") res = await fetchFromEmushaf(p, state.selectedDistrict, signal);
         else if (mode === "mtopal") res = await fetchFromMtopal(p, state.selectedDistrict, signal);
+        else if (mode === "simplesolat") res = await fetchFromSimpleSolat(p, state.selectedDistrict, signal);
         else if (mode === "prayertime") res = await fetchFromPrayerTimeInfo(p, state.selectedDistrict, signal);
         else if (mode === "salahtable") res = await fetchFromSalahTable(p, state.selectedDistrict, signal);
         else if (mode === "aladhan") res = await fetchFromAladhan(p, state.selectedDistrict, signal);
+        else if (mode === "azan_turkey") res = await fetchFromAzanDiyanet(p, state.selectedDistrict, signal);
         else if (mode === "local") res = await buildLocalDiyanetCalculation(p, state.selectedDistrict, signal);
         if (res && res.mapped) { if (selected && mode !== selected) res.httpStatus = "Yedek kaynak kullanıldı · " + res.httpStatus; break; }
       } catch (error) { if (signal.aborted) return; res = null; }
