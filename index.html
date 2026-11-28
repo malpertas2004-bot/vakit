@@ -3013,7 +3013,7 @@ state.zone=zone;state.actualApiMode="";state.todayData=null;Persistence.savePref
 }
 function restoreCustomProviderLocation(saved){
 if(state.selectedApiMode==="aladhan"){$("aladhanCountryInput").value=saved?.aladhanCountryName||"";$("aladhanStateInput").value=saved?.aladhanStateName||"";$("aladhanCityInput").value=saved?.aladhanCityName||"";if($("aladhanCountryInput").value&&$("aladhanCityInput").value)applyAladhanLocation(false);return;}
-const lat=Number(saved?.providerLat),lng=Number(saved?.providerLng);if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180)return;
+if(saved?.providerLat===null||saved?.providerLat===undefined||saved?.providerLng===null||saved?.providerLng===undefined)return;const lat=Number(saved.providerLat),lng=Number(saved.providerLng);if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180)return;
 const country=saved?.providerCountryName||"",region=saved?.providerStateName||"",city=saved?.providerCityName||(state.selectedApiMode==="ummahapi"?"GPS location":"");if(!city)return;
 const zone=validTimezone(saved?.providerTimezone)||currentDeviceTimezone();setCustomLocation(country,region,city,{id:state.selectedApiMode+"-saved-location",lat,lng,tz:zone});state.zone=zone;
 $("ummahLatInput").value=String(lat);$("ummahLngInput").value=String(lng);$("ummahTimezoneInput").value=zone;$("qasraTimezoneInput").value=zone;
