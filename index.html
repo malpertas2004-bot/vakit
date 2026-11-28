@@ -4847,6 +4847,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       if (opt.value === "") opt.textContent = t("selectApiOption");
       else if (apiOpts[opt.value]) opt.textContent = apiOpts[opt.value];
     });
+    populatePrayerMethodOptions();
 
     $("lblApiProvider").textContent = t("lblApiProvider");
     $("lblApiStatus").textContent = t("lblApiStatus");
@@ -4855,6 +4856,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("copyApiUrl").textContent = t("copyBtn");
 
     $("hadithCardTitle").textContent = t("hadithCardTitle");
+    $("hadithApiPoolBadge").textContent = state.lang === "tr" ? "9 API kaynağı" : state.lang === "nl" ? "9 API-bronnen" : "9 API sources";
+    $("quranApiPoolBadge").textContent = state.lang === "tr" ? "12 API kaynağı" : state.lang === "nl" ? "12 API-bronnen" : "12 API sources";
     $("hadithLangBadge").textContent = contentLanguageBadge();
     $("refreshHadithBtn").textContent = t("refreshHadithBtn");
     $("lblHadithProvider").textContent = t("lblHadithProvider");
@@ -4870,6 +4873,14 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("lblQuranRef").textContent = t("lblQuranRef");
     $("lblQuranUpdated").textContent = t("lblQuranUpdated");
     $("religiousLangLabel").textContent = t("religiousLangLabel");
+    $("liveStreamsTitle").textContent = t("liveStreamsTitle");
+    $("liveMakkahTitle").textContent = t("liveMakkahTitle");
+    $("liveMadinahTitle").textContent = t("liveMadinahTitle");
+    $("liveMakkahLink").textContent = t("liveFallback");
+    $("liveMadinahLink").textContent = t("liveFallback");
+    $("liveStreamNote").textContent = t("liveStreamNote");
+    updateCalendarUI();
+    updateZikrUI();
     updateReligiousLanguageUI();
     if (!state.selectedHadithApi) { $("hadithText").textContent = t("hadithPlaceholder"); }
     if (!state.selectedQuranApi) { $("quranText").textContent = t("quranPlaceholder"); }
@@ -4997,6 +5008,34 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       });
     });
 
+    document.querySelectorAll(".calendar-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        const mode = button.dataset.calendar;
+        if (!["gregorian", "hijri"].includes(mode) || mode === state.calendarMode) return;
+        state.calendarMode = mode;
+        Persistence.savePrefs();
+        updateCalendarUI();
+        $("today").textContent = formatDate();
+      });
+    });
+
+    $("zikrPhraseSelect").addEventListener("change", e => {
+      if (!I18N.tr.zikrPhrases[e.target.value]) return;
+      state.zikrPhrase = e.target.value;
+      saveZikrPrefs();
+      updateZikrUI();
+    });
+    $("zikrTapBtn").addEventListener("click", () => {
+      if (state.zikrCount < Number.MAX_SAFE_INTEGER) state.zikrCount += 1;
+      saveZikrPrefs();
+      updateZikrUI();
+    });
+    $("zikrResetBtn").addEventListener("click", () => {
+      state.zikrCount = 0;
+      saveZikrPrefs();
+      updateZikrUI();
+    });
+
     $("countrySelect").addEventListener("change", async e => {
       const cObj = state.countries.find(c => c.id === e.target.value);
       if (!cObj) return;
@@ -5045,6 +5084,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     $("apiSelect").addEventListener("change", e => {
       state.selectedApiMode = e.target.value;
+      populatePrayerMethodOptions();
       Persistence.savePrefs();
       updateCityHeaderAndFooter();
       if (state.selectedDistrict && state.selectedApiMode) {
@@ -5053,6 +5093,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         updateMissingSelectionStatus();
         renderEmptyPrayerPlaceholder(true);
       }
+    });
+
+    $("prayerMethodSelect").addEventListener("change", e => {
+      state.prayerMethod = e.target.value || "auto";
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode) loadTimes({ silentHourly: false });
+    });
+    $("prayerSchoolSelect").addEventListener("change", e => {
+      state.prayerSchool = e.target.value === "hanafi" ? "hanafi" : "shafii";
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode) loadTimes({ silentHourly: false });
+    });
+    $("highLatitudeSelect").addEventListener("change", e => {
+      state.highLatitudeRule = e.target.value;
+      Persistence.savePrefs();
+      if (state.selectedDistrict && state.selectedApiMode === "ummahapi") loadTimes({ silentHourly: false });
     });
 
     document.querySelectorAll(".religious-lang-btn").forEach(btn => {
@@ -5150,6 +5206,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (["tr","en","nl"].includes(saved?.contentLang)) {
       state.contentLang = saved.contentLang;
     }
+    if (["gregorian","hijri"].includes(saved?.calendarMode)) state.calendarMode = saved.calendarMode;
+    if (PRAYER_METHODS.some(item => item.value === saved?.prayerMethod)) state.prayerMethod = saved.prayerMethod;
+    if (["shafii","hanafi"].includes(saved?.prayerSchool)) state.prayerSchool = saved.prayerSchool;
+    if (["recommended","MiddleOfNight","SeventhOfNight","TwilightAngle"].includes(saved?.highLatitudeRule)) state.highLatitudeRule = saved.highLatitudeRule;
+    loadZikrPrefs();
     if (typeof saved?.volume === "number") {
       $("volume").value = String(saved.volume);
       $("volumeValue").textContent = `${saved.volume}%`;
@@ -5166,6 +5227,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       state.selectedApiMode = saved.apiMode;
       $("apiSelect").value = saved.apiMode;
     }
+    populatePrayerMethodOptions();
     if (saved?.countryId) {
       const cObj = state.countries.find(c => c.id === String(saved.countryId));
       if (cObj) {
