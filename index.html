@@ -2991,9 +2991,47 @@ const DIYANET_ALL_LOCATIONS = [];
       }
     }
 
-    await Promise.all(parentStateRecords.map(parent =>
-      expandCountryLevelState(mapById, parent, countryObj)
-    ));
+    // Some live location catalogues expose a country as a single "state"
+    // and put all real cities in that record's district endpoint (for example,
+    // the United Kingdom). Keep those cities together under one country root;
+    // do not turn every city into a duplicate state with itself as its district.
+    const parentCityMap = new Map();
+    const parentSourceIds = {};
+    const parentEndpoints = {
+      imsakiyem: id => IMSAKIYEM_LOCATION_API + "/districts?stateId=" + encodeURIComponent(id),
+      emushaf: id => "https://ezanvakti.emushaf.net/ilceler/" + encodeURIComponent(id),
+      mtopal: id => "https://namazvakti.mtopal.dev/ilceler/" + encodeURIComponent(id)
+    };
+    const parentResults = await Promise.allSettled(parentStateRecords.map(async parent => {
+      parentSourceIds[parent.source] = parent.id;
+      const response = await fetchJsonWithTimeout(parentEndpoints[parent.source](parent.id), { timeoutMs: 8000 });
+      return { parent, rows: getParentStateChildrenPayload(response.data) };
+    }));
+    for (const result of parentResults) {
+      if (result.status !== "fulfilled") continue;
+      const { parent, rows } = result.value;
+      for (const item of rows) {
+        const child = buildParentStateChildRecord(item, parent.source, countryId);
+        if (!child) continue;
+        mergeLocationRecord(parentCityMap, child.id, child.nameTr, child.nameEn, {
+          ...child,
+          countryId,
+          apiName: child.apiName || child.nameTr || child.nameEn
+        }, parent.source);
+      }
+    }
+    const parentCityRecords = [...parentCityMap.values()];
+    const countryRootState = parentCityRecords.length ? {
+      id: "country-root-" + countryId,
+      countryId,
+      nameTr: countryObj.nameTr || countryObj.nameEn,
+      nameEn: countryObj.nameEn || countryObj.nameTr,
+      nameNl: countryObj.nameNl || countryObj.nameEn || countryObj.nameTr,
+      apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
+      sourceIds: parentSourceIds,
+      fallbackDistricts: parentCityRecords,
+      isCountryLevelParent: true
+    } : null;
 
     if (isTurkeyCountry(countryObj)) {
       const provinces = [...mapById.values()]
@@ -3014,21 +3052,7 @@ const DIYANET_ALL_LOCATIONS = [];
       state.selectedState = state.states[0];
     } else {
       state.states = [...mapById.values()];
-      if (!state.states.length && parentStateRecords.length) {
-        const sourceIds = {};
-        for (const parent of parentStateRecords) sourceIds[parent.source] = parent.id;
-        state.states = [{
-          id: "country-root-" + countryId,
-          countryId,
-          nameTr: countryObj.nameTr || countryObj.nameEn,
-          nameEn: countryObj.nameEn || countryObj.nameTr,
-          nameNl: countryObj.nameNl || countryObj.nameEn || countryObj.nameTr,
-          apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
-          sourceIds,
-          isCountryLevelParent: true,
-          fallbackDistricts: []
-        }];
-      }
+      if (countryRootState) state.states.push(countryRootState);
 
       if (preselectStateId) {
         const requested = String(preselectStateId);
@@ -3042,7 +3066,9 @@ const DIYANET_ALL_LOCATIONS = [];
       const hasActualRegions = state.states.some(item =>
         item.isTurkeyRoot
           ? (item.fallbackDistricts || []).length > 0
-          : !item.isCountryLevelParent
+          : item.isCountryLevelParent
+            ? (item.fallbackDistricts || []).length > 0
+            : true
       );
       if (!hasActualRegions) {
         const osmRegions = await fetchOsmAdminRegions(countryObj);
