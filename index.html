@@ -504,6 +504,13 @@ details.nav-item > summary:hover{background:#163b30}
 }
 .lang-btn:hover{color:var(--white)}
 .lang-btn.active{background:var(--gold);color:#13261f}
+.content-lang-panel{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:16px 0 12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md)}
+.content-lang-title{font-size:13px;font-weight:700;color:var(--muted)}
+.content-lang-options{display:inline-flex;flex-wrap:wrap;gap:6px}
+.religious-lang-btn{border:1px solid var(--line);background:var(--panel-alt);color:var(--muted);padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer}
+.religious-lang-btn.active{background:var(--gold);border-color:var(--gold);color:#13261f}
+.religious-lang-btn:hover{color:var(--white)}
+
 
 .foot{
   text-align:center;
@@ -535,9 +542,9 @@ details.nav-item > summary:hover{background:#163b30}
 
   /* Hadis ve dua kartlarında API durum ayrıntılarını gösterme. */
   #hadithCard .api-info,
-  #duaCard .api-info,
+  #quranCard .api-info,
   #hadithCard .quote-source,
-  #duaCard .quote-source { display: none !important; }
+  #quranCard .quote-source { display: none !important; }
 </style>
 </head>
 <body>
@@ -636,148 +643,64 @@ details.nav-item > summary:hover{background:#163b30}
     </div>
   </section>
 
-  <!-- Hadith Card (20 APIs) -->
-  <section class="card needs-selection" id="hadithCard" aria-labelledby="hadithCardTitle">
+  <section class="content-lang-panel" aria-label="Hadith and Quran translation language">
+    <div class="content-lang-title" id="religiousLangLabel">Hadis ve Kur’an dili:</div>
+    <div class="content-lang-options" role="group" aria-label="Hadis ve Kur’an dili">
+      <button type="button" class="religious-lang-btn active" data-content-lang="tr">Türkçe</button>
+      <button type="button" class="religious-lang-btn" data-content-lang="en">English</button>
+      <button type="button" class="religious-lang-btn" data-content-lang="nl">Nederlands</button>
+    </div>
+  </section>
+
+  <section class="card" id="hadithCard" aria-labelledby="hadithCardTitle">
     <div class="card-head">
-      <h2 id="hadithCardTitle">Hadis-i &#350;erif (20 Farkl&#305; API)</h2>
+      <h2 id="hadithCardTitle">Hadis-i Şerif</h2>
       <div class="head-tools">
-        <span class="badge lang-pill" id="hadithLangBadge">T&uuml;rk&ccedil;e (TR)</span>
+        <span class="badge lang-pill" id="hadithLangBadge">Türkçe (TR)</span>
         <span class="badge" id="hadithTimerBadge">05:00</span>
+        <button type="button" class="small-btn" id="hadithTranslateBtn">Google Translate</button>
         <button type="button" class="small-btn" id="refreshHadithBtn">Yeni Hadis</button>
       </div>
     </div>
-
-    <div class="control-grid">
-      <div>
-        <label class="field-label" for="hadithApiSelect" id="hadithApiSelectLabel">Hadis API Kayna&#287;&#305; Se&ccedil;imi (20 Farkl&#305; API):</label>
-        <select id="hadithApiSelect" class="prompt-select">
-          <option value="" disabled selected>&mdash; Hadis API kayna&#287;&#305;n&#305; se&ccedil;iniz &mdash;</option>
-          <option value="sunnetimiz">1. S&uuml;nnetimiz API</option>
-          <option value="fawaz_hadith">2. FawazAhmed0 Hadith CDN API</option>
-          <option value="hadeethenc">3. HadeethEnc.com API v1</option>
-          <option value="ummahapi_hadith">4. UmmahAPI Hadith Servisi</option>
-          <option value="hadith_gading">5. Hadith Gading REST API</option>
-          <option value="random_hadith_gen">6. Random Hadith Generator API</option>
-          <option value="dorar_hadith">7. Dorar.net Hadis Tahkik API</option>
-          <option value="sunnah_com">8. Sunnah.com Public API v1</option>
-          <option value="islamic_network_hadith">9. Islamic Network Hadith API</option>
-          <option value="thaqalayn_api">10. Thaqalayn REST API v2</option>
-          <option value="haditssoft_api">11. HaditsSoft REST API</option>
-          <option value="sunnahsource_hadith">12. SunnahSource Hadith Collections API</option>
-          <option value="ahmedbaset_hadith">13. Hadith-JSON A&ccedil;&#305;k Veri Seti API</option>
-          <option value="islamhouse_hadith">14. IslamHouse Hadis API</option>
-          <option value="diyanet_hadis">15. Diyanet Hadislerle &#304;slam A&ccedil;&#305;k API</option>
-          <option value="islamic_content_hadith">16. Islamic Content SDK Hadith API</option>
-          <option value="muslimapi_hadith">17. MuslimAPI Hadis Servisi</option>
-          <option value="quran_nlp_hadith">18. Quran-NLP Hadis Korpus API</option>
-          <option value="alhadith_api">19. Al-Hadith Open REST API</option>
-          <option value="hadithapi_com">20. HadithAPI.com Public REST API</option>
-        </select>
-      </div>
-    </div>
-
     <div class="quote-box" aria-live="polite">
-      <p class="quote-text" id="hadithText">L&uuml;tfen yukar&#305;daki listeden 20 Hadis API kayna&#287;&#305;ndan birini se&ccedil;iniz.</p>
+      <p class="quote-text" id="hadithText">Rastgele hadis yükleniyor…</p>
       <div class="quote-commentary" id="hadithCommentary" style="display:none"></div>
       <div class="quote-meta" id="hadithMeta" style="display:none"></div>
       <div class="quote-source" id="hadithSource">-</div>
     </div>
-
     <div class="api-info" aria-live="polite">
-      <div class="api-row">
-        <span class="api-key" id="lblHadithProvider">Hadis API Kayna&#287;&#305;:</span>
-        <span class="api-val" id="hadithApiProvider">-</span>
-      </div>
-      <div class="api-row">
-        <span class="api-key" id="lblHadithStatus">Durum &amp; Gecikme:</span>
-        <span class="api-val warn" id="hadithApiStatus">Hadis API se&ccedil;imi bekleniyor</span>
-      </div>
-      <div class="api-row">
-        <span class="api-key" id="lblHadithRef">Hadis Kay&#305;t / Dil:</span>
-        <span class="api-val" id="hadithApiRef">-</span>
-      </div>
-      <div class="api-row">
-        <span class="api-key" id="lblHadithUpdated">Son G&uuml;ncelleme:</span>
-        <span class="api-val" id="hadithApiUpdated">-</span>
-      </div>
-      <div class="api-url-box">
-        <span class="api-url-text" id="hadithApiUrl">Hadis API se&ccedil;imi bekleniyor...</span>
-        <button type="button" class="small-btn" id="copyHadithUrl">Kopyala</button>
-      </div>
+      <div class="api-row"><span class="api-key" id="lblHadithProvider">Hadis kaynağı:</span><span class="api-val" id="hadithApiProvider">-</span></div>
+      <div class="api-row"><span class="api-key" id="lblHadithStatus">Durum:</span><span class="api-val warn" id="hadithApiStatus">Hazırlanıyor</span></div>
+      <div class="api-row"><span class="api-key" id="lblHadithRef">Hadis / Dil:</span><span class="api-val" id="hadithApiRef">-</span></div>
+      <div class="api-row"><span class="api-key" id="lblHadithUpdated">Son güncelleme:</span><span class="api-val" id="hadithApiUpdated">-</span></div>
+      <div class="api-url-box"><span class="api-url-text" id="hadithApiUrl">-</span><button type="button" class="small-btn" id="copyHadithUrl">Kopyala</button></div>
     </div>
   </section>
 
-  <!-- Dua & Verse Card (20 APIs) -->
-  <section class="card needs-selection" id="duaCard" aria-labelledby="duaCardTitle">
+  <section class="card" id="quranCard" aria-labelledby="quranCardTitle">
     <div class="card-head">
-      <h2 id="duaCardTitle">Dua &amp; Ayet (20 Farkl&#305; API)</h2>
+      <h2 id="quranCardTitle">Kur’an-ı Kerim</h2>
       <div class="head-tools">
-        <span class="badge lang-pill" id="duaLangBadge">T&uuml;rk&ccedil;e (TR)</span>
-        <span class="badge" id="duaTimerBadge">05:00</span>
-        <button type="button" class="small-btn" id="refreshDuaBtn">Yeni Dua</button>
+        <span class="badge lang-pill" id="quranLangBadge">Türkçe (TR)</span>
+        <span class="badge" id="quranTimerBadge">05:00</span>
+        <button type="button" class="small-btn" id="quranTranslateBtn">Google Translate</button>
+        <button type="button" class="small-btn" id="refreshQuranBtn">Yeni Ayet</button>
       </div>
     </div>
-
-    <div class="control-grid">
-      <div>
-        <label class="field-label" for="duaApiSelect" id="duaApiSelectLabel">Dua API Kayna&#287;&#305; Se&ccedil;imi (20 Farkl&#305; API):</label>
-        <select id="duaApiSelect" class="prompt-select">
-          <option value="" disabled selected>&mdash; Dua API kayna&#287;&#305;n&#305; se&ccedil;iniz &mdash;</option>
-          <option value="alquran_cloud">1. AlQuran Cloud API</option>
-          <option value="fawaz_quran_cdn">2. FawazAhmed0 Quran CDN API</option>
-          <option value="acikkuran_api">3. A&ccedil;&#305;k Kuran REST API</option>
-          <option value="quran_com_v4">4. Quran.com API v4</option>
-          <option value="ummahapi_duas">5. UmmahAPI Duas &amp; Adhkar Servisi</option>
-          <option value="fitrahive_duadhikr">6. Fitrahive Dua &amp; Dhikr REST API</option>
-          <option value="hisnul_workers">7. Hisnul Muslim Cloudflare Workers API</option>
-          <option value="islamic_network_pray_dua">8. Islamic Network Devotional Pray API</option>
-          <option value="quranenc_tr">9. QuranEnc.com Meal API</option>
-          <option value="tanzil_api">10. Tanzil.net Ayet &amp; Dua Servisi</option>
-          <option value="quran_foundation">11. Quran Foundation API</option>
-          <option value="sunnahsource_duas">12. SunnahSource Duas &amp; Azkar API</option>
-          <option value="quranify_dua">13. Quranify Dua REST API</option>
-          <option value="kind_unes_adhkar">14. Adhkar-Duaa A&ccedil;&#305;k JSON API</option>
-          <option value="azkar_db">15. Azkar-DB A&ccedil;&#305;k REST JSON API</option>
-          <option value="hisn_muslim_json">16. Hisn Al-Muslim A&ccedil;&#305;k JSON API</option>
-          <option value="islamhouse_dua">17. IslamHouse Dua &amp; Zikir API</option>
-          <option value="diyanet_kuran">18. Diyanet A&ccedil;&#305;k Kaynak Kur'an &amp; Dua API</option>
-          <option value="global_quran">19. GlobalQuran REST API</option>
-          <option value="alquran_pages">20. Al-Quran Pages REST API</option>
-        </select>
-      </div>
-    </div>
-
     <div class="quote-box" aria-live="polite">
-      <p class="quote-text" id="duaText">L&uuml;tfen yukar&#305;daki listeden 20 Dua API kayna&#287;&#305;ndan birini se&ccedil;iniz.</p>
-      <div class="quote-commentary" id="duaCommentary" style="display:none"></div>
-      <div class="quote-meta" id="duaMeta" style="display:none"></div>
-      <div class="quote-source" id="duaSource">-</div>
+      <p class="quote-text" id="quranText">Rastgele Kur’an ayeti yükleniyor…</p>
+      <div class="quote-commentary" id="quranCommentary" style="display:none"></div>
+      <div class="quote-meta" id="quranMeta" style="display:none"></div>
+      <div class="quote-source" id="quranSource">-</div>
     </div>
-
     <div class="api-info" aria-live="polite">
-      <div class="api-row">
-        <span class="api-key" id="lblDuaProvider">Dua API Kayna&#287;&#305;:</span>
-        <span class="api-val" id="duaApiProvider">-</span>
-      </div>
-      <div class="api-row">
-        <span class="api-key" id="lblDuaStatus">Durum &amp; Gecikme:</span>
-        <span class="api-val warn" id="duaApiStatus">Dua API se&ccedil;imi bekleniyor</span>
-      </div>
-      <div class="api-row">
-        <span class="api-key" id="lblDuaRef">Dua / Ayet &amp; Dil:</span>
-        <span class="api-val" id="duaApiRef">-</span>
-      </div>
-      <div class="api-row">
-        <span class="api-key" id="lblDuaUpdated">Son G&uuml;ncelleme:</span>
-        <span class="api-val" id="duaApiUpdated">-</span>
-      </div>
-      <div class="api-url-box">
-        <span class="api-url-text" id="duaApiUrl">Dua API se&ccedil;imi bekleniyor...</span>
-        <button type="button" class="small-btn" id="copyDuaUrl">Kopyala</button>
-      </div>
+      <div class="api-row"><span class="api-key" id="lblQuranProvider">Meal / tercüme kaynağı:</span><span class="api-val" id="quranApiProvider">-</span></div>
+      <div class="api-row"><span class="api-key" id="lblQuranStatus">Durum:</span><span class="api-val warn" id="quranApiStatus">Hazırlanıyor</span></div>
+      <div class="api-row"><span class="api-key" id="lblQuranRef">Sure / Ayet / Dil:</span><span class="api-val" id="quranApiRef">-</span></div>
+      <div class="api-row"><span class="api-key" id="lblQuranUpdated">Son güncelleme:</span><span class="api-val" id="quranApiUpdated">-</span></div>
+      <div class="api-url-box"><span class="api-url-text" id="quranApiUrl">-</span></div>
     </div>
   </section>
-
   <!-- Resources Section -->
   <section class="card" id="resourcesCard" aria-labelledby="resourcesCardTitle">
     <details class="resources-root" id="resourcesDetails">
@@ -1026,7 +949,7 @@ details.nav-item > summary:hover{background:#163b30}
       lblApiUpdated: "Son Güncelleme:",
       copyBtn: "Kopyala",
       copiedBtn: "Kopyalandı!",
-      hadithCardTitle: "Hadis-i Şerif (Diyanet veri kaynakları)",
+      hadithCardTitle: "Hadis-i Şerif",
       refreshHadithBtn: "Yeni Hadis",
       hadithApiSelectLabel: "Hadis API Kaynağı Seçimi (Diyanet veri kaynakları):",
       selectHadithApiOption: "— Hadis API kaynağını seçiniz —",
@@ -1061,17 +984,17 @@ details.nav-item > summary:hover{background:#163b30}
         alhadith_api: "19. Al-Hadith Open REST API",
         hadithapi_com: "20. HadithAPI.com Public REST API"
       },
-      duaCardTitle: "Dua & Ayet (Diyanet veri kaynakları)",
-      refreshDuaBtn: "Yeni Dua",
-      duaApiSelectLabel: "Dua API Kaynağı Seçimi (Diyanet veri kaynakları):",
+      quranCardTitle: "Kur’an-ı Kerim",
+      refreshQuranBtn: "Yeni Ayet",
+      quranApiSelectLabel: "Dua API Kaynağı Seçimi (Diyanet veri kaynakları):",
       selectDuaApiOption: "— Dua API kaynağını seçiniz —",
       duaPlaceholder: "Lütfen yukarıdaki listeden 20 Dua API kaynağından birini seçiniz.",
       duaFetching: "Türkçe dua / ayet meali alınıyor…",
       duaFetchErr: "Canlı API bağlantı hatası ({msg}). Lütfen “Yeni Dua” düğmesine basın.",
-      lblDuaProvider: "Dua API Kaynağı:",
-      lblDuaStatus: "Durum & Gecikme:",
-      lblDuaRef: "Dua / Ayet & Dil:",
-      lblDuaUpdated: "Son Güncelleme:",
+      lblQuranProvider: "Dua API Kaynağı:",
+      lblQuranStatus: "Durum & Gecikme:",
+      lblQuranRef: "Dua / Ayet & Dil:",
+      lblQuranUpdated: "Son Güncelleme:",
       duaWaitingStatus: "Dua API seçimi bekleniyor",
       duaWaitingUrl: "Dua API seçimi bekleniyor...",
       duaApiOptions: {
@@ -1185,7 +1108,7 @@ details.nav-item > summary:hover{background:#163b30}
       lblApiUpdated: "Last Updated:",
       copyBtn: "Copy",
       copiedBtn: "Copied!",
-      hadithCardTitle: "Hadith (Diyanet data sources)",
+      hadithCardTitle: "Hadith",
       refreshHadithBtn: "New Hadith",
       hadithApiSelectLabel: "Hadith API Source (Diyanet data sources):",
       selectHadithApiOption: "— Select Hadith API Source —",
@@ -1220,17 +1143,17 @@ details.nav-item > summary:hover{background:#163b30}
         alhadith_api: "19. Al-Hadith Open REST API",
         hadithapi_com: "20. HadithAPI.com Public REST API"
       },
-      duaCardTitle: "Dua & Verse (Diyanet data sources)",
-      refreshDuaBtn: "New Dua",
-      duaApiSelectLabel: "Dua API Source (Diyanet data sources):",
+      quranCardTitle: "The Holy Quran",
+      refreshQuranBtn: "New Verse",
+      quranApiSelectLabel: "Dua API Source (Diyanet data sources):",
       selectDuaApiOption: "— Select Dua API Source —",
       duaPlaceholder: "Please select one of the 20 Dua API sources above.",
       duaFetching: "Fetching English dua / verse…",
       duaFetchErr: "Live API connection error ({msg}). Please click “New Dua” again.",
-      lblDuaProvider: "Dua API Source:",
-      lblDuaStatus: "Status & Latency:",
-      lblDuaRef: "Dua / Verse & Language:",
-      lblDuaUpdated: "Last Updated:",
+      lblQuranProvider: "Dua API Source:",
+      lblQuranStatus: "Status & Latency:",
+      lblQuranRef: "Dua / Verse & Language:",
+      lblQuranUpdated: "Last Updated:",
       duaWaitingStatus: "Waiting for Dua API selection",
       duaWaitingUrl: "Waiting for Dua API selection...",
       duaApiOptions: {
@@ -1379,17 +1302,17 @@ details.nav-item > summary:hover{background:#163b30}
         alhadith_api: "19. Al-Hadith Open REST API",
         hadithapi_com: "20. HadithAPI.com Public REST API"
       },
-      duaCardTitle: "Dua & Vers (20 Verschillende API's)",
-      refreshDuaBtn: "Nieuwe Dua",
-      duaApiSelectLabel: "Dua API-bron (20 Verschillende API's):",
+      quranCardTitle: "Dua & Vers (20 Verschillende API's)",
+      refreshQuranBtn: "Nieuwe Dua",
+      quranApiSelectLabel: "Dua API-bron (20 Verschillende API's):",
       selectDuaApiOption: "— Kies Dua API-bron —",
       duaPlaceholder: "Selecteer hierboven een van de 20 Dua API-bronnen.",
       duaFetching: "Nederlandse dua / vers ophalen…",
       duaFetchErr: "Live API-verbindingsfout ({msg}). Klik opnieuw op “Nieuwe Dua”.",
-      lblDuaProvider: "Dua API-bron:",
-      lblDuaStatus: "Status & Latentie:",
-      lblDuaRef: "Dua / Vers & Taal:",
-      lblDuaUpdated: "Laatst bijgewerkt:",
+      lblQuranProvider: "Dua API-bron:",
+      lblQuranStatus: "Status & Latentie:",
+      lblQuranRef: "Dua / Vers & Taal:",
+      lblQuranUpdated: "Laatst bijgewerkt:",
       duaWaitingStatus: "Wachten op Dua API-selectie",
       duaWaitingUrl: "Wachten op Dua API-selectie...",
       duaApiOptions: {
@@ -1454,6 +1377,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   /* Application Reactive State */
   const state = {
     lang: "tr",
+    contentLang: "tr",
     zone: DEFAULT_ZONE,
     countries: [],
     states: [],
@@ -1463,7 +1387,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     selectedDistrict: null,
     selectedApiMode: "auto",
     selectedHadithApi: "",
-    selectedDuaApi: "",
+    selectedQuranApi: "",
     todayData: null,
     soundEnabled: false,
     lastPlayedStamp: "",
@@ -1471,7 +1395,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     lastStatusType: "missing",
     lastStatusMeta: {},
     nextHadithAt: Date.now() + QUOTE_ROTATE_MS,
-    nextDuaAt: Date.now() + QUOTE_ROTATE_MS,
+    nextQuranAt: Date.now() + QUOTE_ROTATE_MS,
     lastRenderedEmptySig: ""
   };
 
@@ -1781,12 +1705,11 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       try {
         const payload = {
           lang: state.lang,
+          contentLang: state.contentLang,
           countryId: state.selectedCountry?.id || "",
           stateId: state.selectedState?.id || "",
           districtId: state.selectedDistrict?.id || "",
           apiMode: state.selectedApiMode || "",
-          hadithApi: state.selectedHadithApi || "",
-          duaApi: state.selectedDuaApi || "",
           volume: Number($("volume")?.value ?? 85)
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -3171,8 +3094,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (box) { box.textContent = ""; box.style.display = "none"; }
   }
 
-  function renderDuaCommentary() {
-    const box = $("duaCommentary");
+  function renderQuranCommentary() {
+    const box = $("quranCommentary");
     if (box) { box.textContent = ""; box.style.display = "none"; }
   }
 
@@ -3670,7 +3593,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     return t("surahFormat", { surah: sName, no: `${refObj.surah}:${refObj.verse}` });
   }
 
-  async function fetchLiveDuaInLang(selLang, refObj, signal) {
+  async function fetchLiveQuranInLang(selLang, refObj, signal) {
     const surahTitle = selLang === "tr" ? refObj.surahTr : (selLang === "nl" ? refObj.surahNl : refObj.surahEn);
     const alquranUrl = `https://api.alquran.cloud/v1/ayah/${refObj.ayah}/${getQuranEditionForLang(selLang)}`;
     try {
@@ -3712,30 +3635,30 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     throw new Error("No valid dua or verse text was returned by fallback APIs");
   }
 
-  async function loadRandomDua() {
-    if (!state.selectedDuaApi) return;
+  async function loadRandomQuran() {
+    if (!state.selectedQuranApi) return;
     const signal = renewSignal("dua");
-    state.nextDuaAt = Date.now() + QUOTE_ROTATE_MS;
-    const spec = DUA_PROVIDERS[state.selectedDuaApi];
+    state.nextQuranAt = Date.now() + QUOTE_ROTATE_MS;
+    const spec = DUA_PROVIDERS[state.selectedQuranApi];
     if (!spec) return;
 
-    $("duaCard").classList.remove("needs-selection");
-    $("duaApiSelect").classList.remove("prompt-select");
+    $("quranCard").classList.remove("needs-selection");
+    $("quranApiSelect").classList.remove("prompt-select");
 
     const selLang = state.lang;
     const langLabel = t("langNameBadge");
     const refObj = QURAN_DUA_REFS[Math.floor(Math.random() * QURAN_DUA_REFS.length)];
     const endpointUrl = spec.buildUrl(selLang, refObj.ayah, refObj.surah, refObj.verse);
-    const providerLabel = I18N[state.lang].duaApiOptions[state.selectedDuaApi].replace(/^\d+\.\s*/, "");
+    const providerLabel = I18N[state.lang].duaApiOptions[state.selectedQuranApi].replace(/^\d+\.\s*/, "");
     const t0 = performance.now();
 
-    $("duaLangBadge").textContent = langLabel;
-    $("duaText").textContent = t("duaFetching");
-    renderDuaCommentary("");
-    clearApiResponseDetails("duaMeta");
+    $("quranLangBadge").textContent = langLabel;
+    $("quranText").textContent = t("duaFetching");
+    renderQuranCommentary("");
+    clearApiResponseDetails("quranMeta");
 
     try {
-      if (state.selectedDuaApi === "fitrahive_duadhikr" && selLang === "en") {
+      if (state.selectedQuranApi === "fitrahive_duadhikr" && selLang === "en") {
         try {
           const fitrahiveHeaders = { "Accept-Language": "en" };
           const { data: listPayload } = await fetchApiPayloadWithTimeout(
@@ -3754,16 +3677,16 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
             const review = inspectReligiousText(txt, "en");
             if (txt && !review.issues.length) {
               const detail = detailPayload?.data || detailPayload;
-              $("duaText").textContent = "“" + txt + "”";
-              renderDuaCommentary(review.note);
-              renderApiResponseDetails("duaMeta", detailPayload, "dua", detailUrl, textInfo);
-              $("duaSource").textContent = extractCleanText(detail?.source || detail?.title || detail?.categoryName, "en") || "Fitrahive";
-              $("duaApiProvider").textContent = textInfo.languageFallback ? providerLabel + " → English fallback" : providerLabel;
-              $("duaApiStatus").textContent = textInfo.languageFallback ? "English fallback · " + ms + " ms" : status + " OK · " + ms + " ms";
-              $("duaApiStatus").className = textInfo.languageFallback ? "api-val warn" : "api-val ok";
-              $("duaApiRef").textContent = String(detail?.id || pick.id) + " · " + langLabel;
-              $("duaApiUpdated").textContent = formatClock();
-              $("duaApiUrl").textContent = detailUrl;
+              $("quranText").textContent = "“" + txt + "”";
+              renderQuranCommentary(review.note);
+              renderApiResponseDetails("quranMeta", detailPayload, "dua", detailUrl, textInfo);
+              $("quranSource").textContent = extractCleanText(detail?.source || detail?.title || detail?.categoryName, "en") || "Fitrahive";
+              $("quranApiProvider").textContent = textInfo.languageFallback ? providerLabel + " → English fallback" : providerLabel;
+              $("quranApiStatus").textContent = textInfo.languageFallback ? "English fallback · " + ms + " ms" : status + " OK · " + ms + " ms";
+              $("quranApiStatus").className = textInfo.languageFallback ? "api-val warn" : "api-val ok";
+              $("quranApiRef").textContent = String(detail?.id || pick.id) + " · " + langLabel;
+              $("quranApiUpdated").textContent = formatClock();
+              $("quranApiUrl").textContent = detailUrl;
               return;
             }
           }
@@ -3772,22 +3695,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      if (state.selectedDuaApi === "fawaz_quran_cdn") {
+      if (state.selectedQuranApi === "fawaz_quran_cdn") {
         try {
           const { data: j, status, ms } = await fetchJsonWithTimeout(endpointUrl, { signal, timeoutMs: 5500 });
           const textInfo = extractProviderApiText("fawaz_quran_cdn", j, selLang, "dua");
           const txt = textInfo?.text || "";
           if (txt) {
-            $("duaText").textContent = `“${txt}”`;
-            renderDuaCommentary(inspectReligiousText(txt, selLang).note);
-            renderApiResponseDetails("duaMeta", j, "dua", endpointUrl, textInfo);
-            $("duaSource").textContent = formatSurahRef(refObj, selLang);
-            $("duaApiProvider").textContent = providerLabel;
-            $("duaApiStatus").textContent = `${status} OK · ${ms} ms`;
-            $("duaApiStatus").className = "api-val ok";
-            $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
-            $("duaApiUpdated").textContent = formatClock();
-            $("duaApiUrl").textContent = endpointUrl;
+            $("quranText").textContent = `“${txt}”`;
+            renderQuranCommentary(inspectReligiousText(txt, selLang).note);
+            renderApiResponseDetails("quranMeta", j, "dua", endpointUrl, textInfo);
+            $("quranSource").textContent = formatSurahRef(refObj, selLang);
+            $("quranApiProvider").textContent = providerLabel;
+            $("quranApiStatus").textContent = `${status} OK · ${ms} ms`;
+            $("quranApiStatus").className = "api-val ok";
+            $("quranApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
+            $("quranApiUpdated").textContent = formatClock();
+            $("quranApiUrl").textContent = endpointUrl;
             return;
           }
         } catch (err) {
@@ -3795,26 +3718,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      if (state.selectedDuaApi !== "fawaz_quran_cdn" &&
-          state.selectedDuaApi !== "fitrahive_duadhikr") {
+      if (state.selectedQuranApi !== "fawaz_quran_cdn" &&
+          state.selectedQuranApi !== "fitrahive_duadhikr") {
         try {
           const selectedResponse = await fetchApiPayloadWithTimeout(endpointUrl, { signal, timeoutMs: 4500 });
-          const selectedTextInfo = extractProviderApiText(state.selectedDuaApi, selectedResponse.data, selLang, "dua");
+          const selectedTextInfo = extractProviderApiText(state.selectedQuranApi, selectedResponse.data, selLang, "dua");
           const selectedText = selectedTextInfo?.text || "";
           const selectedReview = inspectReligiousText(selectedText, selLang);
           if (selectedText && !selectedReview.issues.length) {
             const payload = selectedTextInfo.record || selectedResponse.data?.data || selectedResponse.data?.result || selectedResponse.data;
             const sourceLabel = extractCleanText(payload?.source || payload?.book || payload?.surah?.name, selLang) || formatSurahRef(refObj, selLang);
-            $("duaText").textContent = `“${selectedText}”`;
-            renderDuaCommentary(selectedReview.note);
-            renderApiResponseDetails("duaMeta", selectedResponse.data, "dua", endpointUrl, selectedTextInfo);
-            $("duaSource").textContent = sourceLabel;
-            $("duaApiProvider").textContent = selectedTextInfo.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
-            $("duaApiStatus").textContent = selectedTextInfo.languageFallback ? `English fallback · ${selectedResponse.ms} ms` : `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
-            $("duaApiStatus").className = selectedTextInfo.languageFallback ? "api-val warn" : "api-val ok";
-            $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
-            $("duaApiUpdated").textContent = formatClock();
-            $("duaApiUrl").textContent = endpointUrl;
+            $("quranText").textContent = `“${selectedText}”`;
+            renderQuranCommentary(selectedReview.note);
+            renderApiResponseDetails("quranMeta", selectedResponse.data, "dua", endpointUrl, selectedTextInfo);
+            $("quranSource").textContent = sourceLabel;
+            $("quranApiProvider").textContent = selectedTextInfo.languageFallback ? `${providerLabel} → English fallback` : providerLabel;
+            $("quranApiStatus").textContent = selectedTextInfo.languageFallback ? `English fallback · ${selectedResponse.ms} ms` : `${selectedResponse.status} OK · ${selectedResponse.ms} ms`;
+            $("quranApiStatus").className = selectedTextInfo.languageFallback ? "api-val warn" : "api-val ok";
+            $("quranApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
+            $("quranApiUpdated").textContent = formatClock();
+            $("quranApiUrl").textContent = endpointUrl;
             return;
           }
         } catch (selectedError) {
@@ -3822,44 +3745,44 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
         }
       }
 
-      const live = await fetchLiveDuaInLang(selLang, refObj, signal);
+      const live = await fetchLiveQuranInLang(selLang, refObj, signal);
       if (signal.aborted) return;
       const ms = Math.round(performance.now() - t0);
 
       const duaReview = inspectReligiousText(live.text, selLang);
       if (duaReview.issues.length) throw new Error(duaReview.note);
-      $("duaText").textContent = `“${live.text}”`;
-      renderDuaCommentary(duaReview.note);
-      renderApiResponseDetails("duaMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl, live.textInfo);
-      $("duaSource").textContent = live.source;
+      $("quranText").textContent = `“${live.text}”`;
+      renderQuranCommentary(duaReview.note);
+      renderApiResponseDetails("quranMeta", live.raw || {}, "dua", live.liveUrl || endpointUrl, live.textInfo);
+      $("quranSource").textContent = live.source;
       const duaUsesSelectedFallback = live.provider === providerLabel;
-      $("duaApiProvider").textContent = duaUsesSelectedFallback ? providerLabel : `${providerLabel} → ${live.provider || "Yedek kaynak"}`;
-      $("duaApiStatus").textContent = duaUsesSelectedFallback ? `200 OK · ${ms} ms` : `Yedek kaynak · ${ms} ms`;
-      $("duaApiStatus").className = duaUsesSelectedFallback ? "api-val ok" : "api-val warn";
-      $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
-      $("duaApiUpdated").textContent = formatClock();
-      $("duaApiUrl").textContent = live.liveUrl || endpointUrl;
+      $("quranApiProvider").textContent = duaUsesSelectedFallback ? providerLabel : `${providerLabel} → ${live.provider || "Yedek kaynak"}`;
+      $("quranApiStatus").textContent = duaUsesSelectedFallback ? `200 OK · ${ms} ms` : `Yedek kaynak · ${ms} ms`;
+      $("quranApiStatus").className = duaUsesSelectedFallback ? "api-val ok" : "api-val warn";
+      $("quranApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
+      $("quranApiUpdated").textContent = formatClock();
+      $("quranApiUrl").textContent = live.liveUrl || endpointUrl;
     } catch (e) {
       if (signal.aborted) return;
       const ms = Math.round(performance.now() - t0);
-      $("duaText").textContent = selLang === "tr"
+      $("quranText").textContent = selLang === "tr"
         ? "Seçilen dua API'si ve yedek kaynaklardan geçerli bir metin alınamadı. “Yeni Dua” düğmesiyle tekrar deneyin."
         : selLang === "nl"
           ? "De geselecteerde dua-API en reservebronnen leverden geen geldige tekst. Probeer opnieuw met “Nieuwe dua”."
           : "The selected dua API and fallback sources returned no valid text. Press “New Dua” to try again.";
-      clearApiResponseDetails("duaMeta");
-      renderDuaCommentary(selLang === "tr"
+      clearApiResponseDetails("quranMeta");
+      renderQuranCommentary(selLang === "tr"
         ? "Metin gösterilemedi. Açıklama: API yanıtı boş, eksik veya biçim açısından şüpheli olabilir; anlamı değiştirecek otomatik düzeltme yapılmadı."
         : selLang === "nl"
           ? "De tekst kon niet worden weergegeven. De API-reactie kan leeg, onvolledig of afwijkend opgemaakt zijn; er is geen automatische betekeniswijziging toegepast."
           : "The text could not be displayed. The API response may be empty, incomplete or malformed; no meaning-changing auto-correction was applied.");
-      $("duaSource").textContent = formatSurahRef(refObj, selLang);
-      $("duaApiProvider").textContent = providerLabel;
-      $("duaApiStatus").textContent = `No valid record · ${ms} ms`;
-      $("duaApiStatus").className = "api-val warn";
-      $("duaApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
-      $("duaApiUpdated").textContent = formatClock();
-      $("duaApiUrl").textContent = endpointUrl;
+      $("quranSource").textContent = formatSurahRef(refObj, selLang);
+      $("quranApiProvider").textContent = providerLabel;
+      $("quranApiStatus").textContent = `No valid record · ${ms} ms`;
+      $("quranApiStatus").className = "api-val warn";
+      $("quranApiRef").textContent = `${refObj.surah}:${refObj.verse} · ${langLabel}`;
+      $("quranApiUpdated").textContent = formatClock();
+      $("quranApiUrl").textContent = endpointUrl;
     }
   }
 
@@ -4142,26 +4065,26 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       $("hadithApiUrl").textContent = t("hadithWaitingUrl");
     }
 
-    $("duaCardTitle").textContent = t("duaCardTitle");
-    $("duaLangBadge").textContent = t("langNameBadge");
-    $("refreshDuaBtn").textContent = t("refreshDuaBtn");
-    $("duaApiSelectLabel").textContent = t("duaApiSelectLabel");
+    $("quranCardTitle").textContent = t("quranCardTitle");
+    $("quranLangBadge").textContent = t("langNameBadge");
+    $("refreshQuranBtn").textContent = t("refreshQuranBtn");
+    $("quranApiSelectLabel").textContent = t("quranApiSelectLabel");
     const dOpts = I18N[state.lang].duaApiOptions;
-    Array.from($("duaApiSelect").options).forEach(opt => {
+    Array.from($("quranApiSelect").options).forEach(opt => {
       if (opt.value === "") opt.textContent = t("selectDuaApiOption");
       else if (dOpts[opt.value]) opt.textContent = dOpts[opt.value];
     });
-    $("lblDuaProvider").textContent = t("lblDuaProvider");
-    $("lblDuaStatus").textContent = t("lblDuaStatus");
-    $("lblDuaRef").textContent = t("lblDuaRef");
-    $("lblDuaUpdated").textContent = t("lblDuaUpdated");
-    $("copyDuaUrl").textContent = t("copyBtn");
-    if (!state.selectedDuaApi) {
-      $("duaText").textContent = t("duaPlaceholder");
-      renderDuaCommentary("");
-      clearApiResponseDetails("duaMeta");
-      $("duaApiStatus").textContent = t("duaWaitingStatus");
-      $("duaApiUrl").textContent = t("duaWaitingUrl");
+    $("lblQuranProvider").textContent = t("lblQuranProvider");
+    $("lblQuranStatus").textContent = t("lblQuranStatus");
+    $("lblQuranRef").textContent = t("lblQuranRef");
+    $("lblQuranUpdated").textContent = t("lblQuranUpdated");
+    $("copyQuranUrl").textContent = t("copyBtn");
+    if (!state.selectedQuranApi) {
+      $("quranText").textContent = t("duaPlaceholder");
+      renderQuranCommentary("");
+      clearApiResponseDetails("quranMeta");
+      $("quranApiStatus").textContent = t("duaWaitingStatus");
+      $("quranApiUrl").textContent = t("duaWaitingUrl");
     }
 
     $("resourcesCardTitle").textContent = t("resourcesCardTitle");
@@ -4209,7 +4132,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     if (reloadQuotes) {
       if (state.selectedHadithApi) loadRandomHadith();
-      if (state.selectedDuaApi) loadRandomDua();
+      if (state.selectedQuranApi) loadRandomQuran();
     }
   }
 
@@ -4229,12 +4152,12 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       $("hadithTimerBadge").textContent = "05:00";
     }
 
-    if (state.selectedDuaApi) {
-      const remD = Math.ceil((state.nextDuaAt - nowMs) / 1000);
-      $("duaTimerBadge").textContent = formatRemainingSec(remD);
-      if (nowMs >= state.nextDuaAt) loadRandomDua();
+    if (state.selectedQuranApi) {
+      const remD = Math.ceil((state.nextQuranAt - nowMs) / 1000);
+      $("quranTimerBadge").textContent = formatRemainingSec(remD);
+      if (nowMs >= state.nextQuranAt) loadRandomQuran();
     } else {
-      $("duaTimerBadge").textContent = "05:00";
+      $("quranTimerBadge").textContent = "05:00";
     }
   }
 
@@ -4360,20 +4283,20 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       loadRandomHadith();
     });
 
-    $("duaApiSelect").addEventListener("change", e => {
-      state.selectedDuaApi = e.target.value;
+    $("quranApiSelect").addEventListener("change", e => {
+      state.selectedQuranApi = e.target.value;
       Persistence.savePrefs();
-      if (state.selectedDuaApi) loadRandomDua();
+      if (state.selectedQuranApi) loadRandomQuran();
     });
 
-    $("refreshDuaBtn").addEventListener("click", () => {
-      if (!state.selectedDuaApi) { $("duaApiSelect").focus(); return; }
-      loadRandomDua();
+    $("refreshQuranBtn").addEventListener("click", () => {
+      if (!state.selectedQuranApi) { $("quranApiSelect").focus(); return; }
+      loadRandomQuran();
     });
 
     bindCopyButton("copyApiUrl", "infoApiUrl");
     bindCopyButton("copyHadithUrl", "hadithApiUrl");
-    bindCopyButton("copyDuaUrl", "duaApiUrl");
+    bindCopyButton("copyQuranUrl", "quranApiUrl");
 
     $("enableSound").addEventListener("click", async () => {
       const audio = $("adhan");
@@ -4495,9 +4418,9 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       loadRandomHadith();
     }
     if (saved?.duaApi && DUA_PROVIDERS[saved.duaApi]) {
-      state.selectedDuaApi = saved.duaApi;
-      $("duaApiSelect").value = saved.duaApi;
-      loadRandomDua();
+      state.selectedQuranApi = saved.duaApi;
+      $("quranApiSelect").value = saved.duaApi;
+      loadRandomQuran();
     }
 
     tick();
