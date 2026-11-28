@@ -651,6 +651,7 @@ details.nav-item > summary:hover{background:#163b30}
         <label class="field-label" for="apiSelect" id="apiSelectLabel">Vakit API Kayna&#287;&#305; Se&ccedil;imi (20 Farkl&#305; API):</label>
         <select id="apiSelect" class="prompt-select">
           <option value="" disabled selected>&mdash; Vakit API kayna&#287;&#305;n&#305; se&ccedil;iniz &mdash;</option>
+          <option value="auto">Otomatik · Çalışan kaynağı bul</option>
           <option value="mtopal">MTopal · Diyanet dünya vakitleri</option>
           <option value="imsakiyem">İmsakiyem · Diyanet API</option>
           <option value="emushaf">eMushaf · Diyanet API</option>
@@ -1193,6 +1194,7 @@ details.nav-item > summary:hover{background:#163b30}
       apiSelectLabel: "Vakit API kaynağı:",
       religiousLangLabel: "Hadis ve Kur’an dili:",
       apiOptions: {
+        auto: "Otomatik · Çalışan kaynağı bul",
         mtopal: "MTopal · Diyanet dünya vakitleri",
         imsakiyem: "İmsakiyem · Diyanet API",
         emushaf: "eMushaf · Diyanet API",
@@ -1344,6 +1346,7 @@ details.nav-item > summary:hover{background:#163b30}
       apiSelectLabel: "Prayer Times API source:",
       religiousLangLabel: "Hadith and Quran language:",
       apiOptions: {
+        auto: "Automatic · Find a working source",
         mtopal: "MTopal · Diyanet worldwide data",
         imsakiyem: "Imsakiyem · Diyanet API",
         emushaf: "eMushaf · Diyanet API",
@@ -1495,6 +1498,7 @@ details.nav-item > summary:hover{background:#163b30}
       apiSelectLabel: "Gebedstijden API-bron:",
       religiousLangLabel: "Taal voor hadith en Koran:",
       apiOptions: {
+        auto: "Automatisch · Werkende bron zoeken",
         mtopal: "MTopal · Diyanet wereldwijde tijden",
         imsakiyem: "Imsakiyem · Diyanet-API",
         emushaf: "eMushaf · Diyanet-API",
@@ -1581,6 +1585,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     selectedState: null,
     selectedDistrict: null,
     selectedApiMode: "",
+    actualApiMode: "",
     selectedHadithApi: "",
     selectedQuranApi: "",
     preferredHadithProvider: "random",
@@ -3587,6 +3592,22 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     $("infoApiUrl").textContent = info.endpointUrl;
   }
 
+  async function fetchPrayerTimesByProvider(mode, p, isoDate, districtObj, signal) {
+    if (mode === "mtopal") return fetchFromMtopal(p, districtObj, signal);
+    if (mode === "imsakiyem") return fetchFromImsakiyem(isoDate, districtObj, signal);
+    if (mode === "emushaf") return fetchFromEmushaf(p, districtObj, signal);
+    if (mode === "aladhan") return fetchFromAladhan(p, districtObj, signal);
+    if (mode === "islamic_app") return fetchFromIslamicApp(p, districtObj, signal);
+    if (mode === "deen2u") return fetchFromDeen2u(p, districtObj, signal);
+    if (mode === "salahtable") return fetchFromSalahTable(p, districtObj, signal);
+    if (mode === "ummahapi") return fetchFromUmmahApi(districtObj, signal);
+    if (mode === "azan_quran_et") return fetchFromAzanEt(p, districtObj, signal);
+    if (mode === "esalah") return fetchFromESalah(p, districtObj, signal);
+    if (mode === "simplesolat") return fetchFromSimpleSolat(p, districtObj, signal);
+    if (mode === "zikr_prayer") return fetchFromZikrPrayer(p, districtObj, signal);
+    throw new Error("Bilinmeyen vakit kaynağı: " + mode);
+  }
+
   async function loadTimes({ silentHourly = false } = {}) {
     $("today").textContent = formatDate();
     const p = localParts(), key = dateKey(p);
@@ -3600,27 +3621,67 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     const signal = renewSignal("prayer");
     const distName = getLocalizedLocationName(state.selectedDistrict, "district");
-    if (!silentHourly || !state.todayData) {
-      $("status").textContent = t("fetchingFor", { city: distName });
+    if (!silentHourly || !state.todayData) $("status").textContent = t("fetchingFor", { city: distName });
+
+    const providerOrder = [
+      "mtopal", "imsakiyem", "emushaf", "aladhan", "deen2u",
+      "islamic_app", "salahtable", "ummahapi", "azan_quran_et",
+      "esalah", "simplesolat", "zikr_prayer"
+    ];
+    const requestedMode = state.selectedApiMode;
+    const attempts = requestedMode === "auto"
+      ? providerOrder
+      : [requestedMode, ...providerOrder.filter(mode => mode !== requestedMode)];
+    const failures = [];
+    let res = null;
+    let usedMode = "";
+
+    for (const mode of attempts) {
+      if (signal.aborted) return;
+      try {
+        const candidate = await fetchPrayerTimesByProvider(mode, p, key, state.selectedDistrict, signal);
+        if (!candidate?.mapped) throw new Error("Kaynak geçerli vakit verisi döndürmedi.");
+        res = candidate;
+        usedMode = mode;
+        break;
+      } catch (error) {
+        if (signal.aborted) return;
+        failures.push(mode + ": " + String(error?.message || error));
+      }
     }
 
-    try {
-      let res;
-      const mode = state.selectedApiMode;
-      if (mode === "imsakiyem") res = await fetchFromImsakiyem(key, state.selectedDistrict, signal);
-      else if (mode === "aladhan") res = await fetchFromAladhan(p, state.selectedDistrict, signal);
-      else if (mode === "emushaf") res = await fetchFromEmushaf(p, state.selectedDistrict, signal);
-      else if (mode === "ummahapi") res = await fetchFromUmmahApi(state.selectedDistrict, signal);
-      else if (mode === "pawan_krd") res = await fetchFromPawanKrd(p, state.selectedDistrict, signal);
-      else if (mode === "azan_quran_et") res = await fetchFromAzanEt(p, state.selectedDistrict, signal);
-      else if (mode === "deen2u") res = await fetchFromDeen2u(p, state.selectedDistrict, signal);
-      else if (mode === "salahtable") res = await fetchFromSalahTable(p, state.selectedDistrict, signal);
-      else if (mode === "islamic_app") res = await fetchFromIslamicApp(p, state.selectedDistrict, signal);
-      else if (mode === "esalah") res = await fetchFromESalah(p, state.selectedDistrict, signal);
-      else if (mode === "waqtazan") res = await fetchFromWaqtazan(p, state.selectedDistrict, signal);
-      else if (mode === "vakit_vercel") res = await fetchFromVakitVercel(p, state.selectedDistrict, signal);
-      else throw new Error("Invalid API selection");
+    if (!res) throw new Error(failures.slice(0, 4).join(" · ") || "Hiçbir açık vakit kaynağı geçerli veri döndürmedi.");
+    state.actualApiMode = usedMode;
+    if (usedMode !== requestedMode) {
+      const actualName = I18N[state.lang].apiOptions[usedMode] || usedMode;
+      res.httpStatus = (requestedMode === "auto" ? "Otomatik seçim" : "Yedek kaynak: " + actualName) + " · " + res.httpStatus;
+    }
 
+    if (signal.aborted) return;
+
+    state.todayData = {
+      key,
+      city: distName,
+      times: PRAYER_ORDER.map(k => ({ name: I18N[state.lang].prayers[k], time: res.mapped[k], key: k }))
+    };
+    state.lastRenderedEmptySig = "";
+
+    $("liveDot").classList.add("synced");
+    $("hijri").textContent = res.hijri ? `${t("hijriPrefix")}${res.hijri}` : "";
+    renderList();
+
+    state.lastStatusType = "updated";
+    state.lastStatusMeta = { source: res.sourceLabel, hour: p.hour };
+    $("status").textContent = t("updatedStatus", state.lastStatusMeta);
+
+    updateApiInfoUI({
+      providerName: res.providerName,
+      httpStatus: res.httpStatus,
+      paramsSummary: res.paramsSummary,
+      updatedAt: formatClock(),
+      endpointUrl: res.endpointUrl
+    }, false);
+  }
       if (signal.aborted) return;
 
       state.todayData = {
@@ -5076,7 +5137,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     const credit = $("prayerApiCredit");
     credit.replaceChildren();
-    const creditUrl = state.selectedApiMode === "salahtable" ? getSalahTableCityPageUrl() : "";
+    const creditUrl = (state.actualApiMode || state.selectedApiMode) === "salahtable" ? getSalahTableCityPageUrl() : "";
     if (creditUrl) {
       credit.appendChild(document.createTextNode(" · "));
       const creditLink = document.createElement("a");
@@ -5342,6 +5403,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const cObj = state.countries.find(c => c.id === e.target.value);
       if (!cObj) return;
       state.selectedCountry = cObj;
+      state.actualApiMode = "";
       state.zone = detectTimezoneForCountry(state.selectedCountry);
       state.todayData = null;
       $("liveDot").classList.remove("synced");
@@ -5359,6 +5421,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const sObj = state.states.find(s => s.id === e.target.value);
       if (!sObj) return;
       state.selectedState = sObj;
+      state.actualApiMode = "";
       state.todayData = null;
       $("liveDot").classList.remove("synced");
       Persistence.savePrefs();
@@ -5372,6 +5435,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       const dObj = state.districts.find(d => d.id === e.target.value);
       if (!dObj) return;
       state.selectedDistrict = dObj;
+      state.actualApiMode = "";
       state.todayData = null;
       $("liveDot").classList.remove("synced");
       Persistence.savePrefs();
@@ -5386,6 +5450,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
 
     $("apiSelect").addEventListener("change", e => {
       state.selectedApiMode = e.target.value;
+      state.actualApiMode = "";
       populatePrayerMethodOptions();
       Persistence.savePrefs();
       updateCityHeaderAndFooter();
