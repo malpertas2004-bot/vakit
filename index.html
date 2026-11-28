@@ -3013,7 +3013,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const latitudeModes = { MiddleOfNight: "1", SeventhOfNight: "2", TwilightAngle: "3" };
     if (latitudeModes[state.highLatitudeRule]) params.set("latitudeAdjustmentMethod", latitudeModes[state.highLatitudeRule]);
     if (state.prayerTune) {
-      if (!/^-?\\d+(,-?\\d+){8}$/.test(state.prayerTune)) throw new Error("Tune must contain exactly 9 comma-separated integer offsets.");
+      if (!/^-?\d+(,-?\d+){8}$/.test(state.prayerTune)) throw new Error("Tune must contain exactly 9 comma-separated integer offsets.");
       params.set("tune", state.prayerTune);
     }
     params.set("midnightMode", state.midnightMode === "1" ? "1" : "0");
@@ -4850,7 +4850,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
   function getSalahTableCityPageUrl() {
     if (!state.selectedCountry || !state.selectedDistrict) return "";
     const slug = value => String(value || "").normalize("NFKD")
-      .replace(/[\\u0300-\\u036f]/g, "").replace(/ı/g, "i").toLowerCase().trim()
+      .replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").toLowerCase().trim()
       .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const countryKey = asciiFoldKey(state.selectedCountry.nameEn || state.selectedCountry.nameTr || "");
     const aliases = { "united arab emirates":"united-arab-emirates", "uae":"united-arab-emirates", "turkiye":"turkey", "turkey":"turkey", "united kingdom":"united-kingdom", "uk":"united-kingdom", "united states":"united-states", "usa":"united-states", "saudi arabia":"saudi-arabia" };
@@ -5224,8 +5224,8 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       if (state.selectedDistrict && state.selectedApiMode) loadTimes({ silentHourly: false });
     });
     $("prayerTuneInput").addEventListener("change", e => {
-      const raw = e.target.value.trim().replace(/\\s+/g, "");
-      if (raw && !/^-?\\d+(,-?\\d+){8}$/.test(raw)) {
+      const raw = e.target.value.trim().replace(/\s+/g, "");
+      if (raw && !/^-?\d+(,-?\d+){8}$/.test(raw)) {
         $("prayerTuneInput").setAttribute("aria-invalid", "true");
         return;
       }
@@ -5367,7 +5367,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     if (Number.isFinite(Number(saved?.customFajrAngle))) state.customFajrAngle = Math.max(0, Math.min(30, Number(saved.customFajrAngle)));
     if (saved?.customMaghribSetting === "" || Number.isFinite(Number(saved?.customMaghribSetting))) state.customMaghribSetting = saved.customMaghribSetting;
     if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0, Math.min(60, Number(saved.customIshaSetting)));
-    if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\\d+(,-?\\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
+    if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\d+(,-?\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
     if (["0","1"].includes(String(saved?.midnightMode))) state.midnightMode = String(saved.midnightMode);
     if (saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`)) {
       state.selectedApiMode = saved.apiMode;
