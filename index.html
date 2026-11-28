@@ -238,6 +238,8 @@ button.mini-btn{padding:5px 9px;font-size:11.5px;border-radius:8px}
 .head-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .api-source-select{max-width:190px;padding:7px 9px;font-size:12px;border-radius:9px;min-width:125px}
 .api-source-select:focus{border-color:var(--gold)}
+.provider-credit{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.provider-credit a{color:var(--gold);text-decoration:underline;text-underline-offset:2px}
 
 /* Form Controls */
 .control-grid{display:grid;gap:10px}
@@ -762,6 +764,7 @@ details.nav-item > summary:hover{background:#163b30}
       <div class="head-tools">
         <span class="badge lang-pill" id="hadithLangBadge">Türkçe (TR)</span>
         <span class="badge" id="hadithApiPoolBadge">9 API kaynağı</span>
+        <span id="hadithProviderCredit" class="provider-credit" style="display:none"></span>
         <select id="hadithApiSelect" class="api-source-select" aria-label="Hadis API sağlayıcısı">
           <option value="random">Otomatik / Rastgele</option>
           <option value="hadeethenc">HadeethEnc</option>
@@ -4202,6 +4205,20 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     const target = $("hadithSource");
     if (!target) return;
     target.replaceChildren();
+    const visibleCredit = $("hadithProviderCredit");
+    if (visibleCredit) {
+      visibleCredit.replaceChildren();
+      visibleCredit.style.display = "none";
+      if (provider === "Sünnetimiz Hadith API") {
+        const link = document.createElement("a");
+        link.href = "https://sunnetimiz.com";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Kaynak: Sünnetimiz.com";
+        visibleCredit.appendChild(link);
+        visibleCredit.style.display = "inline";
+      }
+    }
     const label = String(source || provider || "-");
     if (provider === "Sünnetimiz Hadith API") {
       const link = document.createElement("a");
