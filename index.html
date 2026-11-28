@@ -5490,7 +5490,7 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
     populatePrayerMethodOptions();
     $("hadithApiSelect").value = state.preferredHadithProvider;
     $("quranApiSelect").value = state.preferredQuranProvider;
-    if (saved?.countryId {
+    if (saved?.countryId) {
       const cObj = state.countries.find(c => c.id === String(saved.countryId));
       if (cObj) {
         state.selectedCountry = cObj;
