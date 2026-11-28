@@ -2854,6 +2854,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const cachedLng = Number(districtObj?.lng);
     if (Number.isFinite(cachedLat) && Number.isFinite(cachedLng)
       && cachedLat >= -90 && cachedLat <= 90 && cachedLng >= -180 && cachedLng <= 180) {
+      if (districtObj?.tz) state.zone = districtObj.tz;
       return { lat: cachedLat, lng: cachedLng };
     }
 
@@ -2872,6 +2873,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const expectedIso = getSelectedCountryIso2();
     const countryKeys = new Set(countryNames.map(asciiFoldKey).filter(Boolean));
     const stateKeys = new Set(stateNames.map(asciiFoldKey).filter(Boolean));
+    const wantedCityKeys = new Set(names.map(asciiFoldKey).filter(Boolean));
     const querySet = new Set();
     for (const name of names.slice(0, 3)) {
       querySet.add([name, ...stateNames.slice(0, 1), ...countryNames.slice(0, 1)].filter(Boolean).join(", "));
@@ -2884,11 +2886,14 @@ const DIYANET_ALL_LOCATIONS = [];
       const hitCountry = asciiFoldKey(fields.country || "");
       const hitAdmin = asciiFoldKey(fields.admin || "");
       const hitCity = asciiFoldKey(fields.city || "");
-      const wantedCity = asciiFoldKey(names[0]);
+      const hitName = asciiFoldKey(fields.name || "");
       const sameCountry = (expectedIso && code === expectedIso) || (countryKeys.size && countryKeys.has(hitCountry));
       if (!sameCountry) return null;
-      const sameCity = hitCity === wantedCity || asciiFoldKey(fields.name || "") === wantedCity;
+      const sameCity = wantedCityKeys.has(hitCity) || wantedCityKeys.has(hitName);
       const sameState = stateKeys.size && stateKeys.has(hitAdmin);
+      // A matching country alone is not enough: require a city/district name
+      // or a matching first-level administrative region.
+      if (!sameCity && !sameState) return null;
       const score = 100 + (sameCity ? 45 : 0) + (sameState ? 25 : 0)
         + (Number(fields.population) > 0 ? Math.min(5, Math.log10(Number(fields.population))) : 0);
       const lat = Number(fields.lat);
@@ -5371,6 +5376,7 @@ const DIYANET_ALL_LOCATIONS = [];
       const dObj = state.districts.find(d => d.id === e.target.value);
       if (!dObj) return;
       state.selectedDistrict = dObj;
+      if (dObj.tz) state.zone = dObj.tz;
       state.actualApiMode = "";
       state.todayData = null;
       $("liveDot").classList.remove("synced");
@@ -5570,8 +5576,7 @@ const DIYANET_ALL_LOCATIONS = [];
         await loadStatesForCountry(cObj, saved.stateId || "");
         if (state.selectedState) {
           await loadDistrictsForState(state.selectedState, saved.districtId || "");
-          if (state.selectedDistrict) {
-          }
+          if (state.selectedDistrict?.tz) state.zone = state.selectedDistrict.tz;
         }
       }
     }
