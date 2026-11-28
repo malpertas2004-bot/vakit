@@ -1623,31 +1623,41 @@ const DIYANET_ALL_LOCATIONS = [];
     return matches.length === 1 ? matches[0] : null;
   }
   function normalizeImsakiyemLocation(item, countryId, kind = "district") {
-    const id = String(item?._id ?? item?.id ?? item?.state_id ?? item?.district_id ?? "").trim();
-    const rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.SehirAdi ?? item?.IlceAdi ?? item?.name ?? "").trim();
-    const genericName = String(item?.name ?? item?.title ?? item?.display_name ?? item?.displayName ?? "").trim();
-    const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.SehirAdiEn ?? item?.IlceAdiEn ?? item?.english_name ?? (!rawTr ? genericName : "")).trim();
-    if (!id || (!rawTr && !rawEn && !genericName) || isNonAdministrativeLocationName(rawTr, rawEn || genericName)) return null;
+    // v1 contract: _id is the record's own ID; country_id/state_id are parent IDs.
+    // Never use a parent relation as a fallback record ID.
+    const id = String(item?._id ?? item?.id ?? "").trim();
+    const rawTr = String(item?.name ?? item?.name_tr ?? item?.nameTr ??
+      item?.UlkeAdi ?? item?.SehirAdi ?? item?.IlceAdi ?? "").trim();
+    const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.english_name ??
+      item?.UlkeAdiEn ?? item?.SehirAdiEn ?? item?.IlceAdiEn ?? "").trim();
+    const displayTr = rawTr || rawEn;
+    const displayEn = rawEn || rawTr;
+    if (!id || (!displayTr && !displayEn) ||
+        isNonAdministrativeLocationName(displayTr, displayEn)) return null;
 
     const geo = item?.coordinates || item?.coordinate || item?.location || item?.geo || {};
     const latRaw = item?.latitude ?? item?.lat ?? item?.Latitude ?? geo?.latitude ?? geo?.lat;
     const lngRaw = item?.longitude ?? item?.lng ?? item?.lon ?? item?.Longitude ?? geo?.longitude ?? geo?.lng ?? geo?.lon;
     const latitude = latRaw !== undefined && latRaw !== null && String(latRaw).trim() !== "" ? Number(latRaw) : NaN;
     const longitude = lngRaw !== undefined && lngRaw !== null && String(lngRaw).trim() !== "" ? Number(lngRaw) : NaN;
-    const hasCoords = Number.isFinite(latitude) && Number.isFinite(longitude)
-      && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+    const hasCoords = Number.isFinite(latitude) && Number.isFinite(longitude) &&
+      latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 
     return {
-      id, countryId: String(countryId || item?.country_id || ""),
-      // Keep the API's own location label unchanged; UI language must not translate it.
-      apiName: normalizeLocationApiLabel(genericName || rawTr || rawEn, countryId),
-      nameTr: rawTr, nameEn: rawEn || (!rawTr ? genericName : ""),
-      nameNl: String(item?.name_nl ?? item?.nameNl ?? "").trim(),
-      sourceNameLang: item?.language || item?.lang || (rawTr && !rawEn ? "tr" : "en"),
+      id,
+      countryId: String(countryId || ""),
+      // Preserve source labels. Turkish UI uses name; English and Dutch use name_en.
+      apiName: displayTr,
+      nameTr: displayTr,
+      nameEn: displayEn,
+      nameNl: displayEn,
+      sourceNameLang: rawEn ? (rawTr ? "tr/en" : "en") : "tr",
       tz: item?.timezone || item?.time_zone || item?.tz || item?.timezone_id || "",
       iso2: String(item?.iso2 || item?.iso_code || item?.country_code || "").toUpperCase(),
       ...(hasCoords ? { lat: latitude, lng: longitude } : {}),
-      sourceIds: { imsakiyem: id }, locationKind: kind, displayNames: {}
+      sourceIds: { imsakiyem: id },
+      locationKind: kind,
+      displayNames: {}
     };
   }
 
@@ -2753,35 +2763,86 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function loadCountries() {
-    const sel=$("countrySelect");sel.disabled=true;sel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
-    let rows=[],countryLoadError=null;
-    // Use only the current v2 global country catalogue; do not call the legacy v1 API.
-    try{
-      const response=await fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/v2/locations/countries",{timeoutMs:12000});
-      rows=getLocationApiRows(response.data);
-    }catch(error){countryLoadError=error;}
-    if(!rows.length){
-      state.countries=[];sel.innerHTML='<option value="" disabled selected>İmsakiyem ülke listesi alınamadı</option>';
-      $("status").textContent="İmsakiyem dünya ülke listesi alınamadı: "+String(countryLoadError?.message||"API boş liste döndürdü");
+    const sel = $("countrySelect");
+    sel.disabled = true;
+    sel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
+
+    let rows = [];
+    let countryLoadError = null;
+    try {
+      // Use the v1 location catalogue for all three hierarchy levels so every
+      // country_id/state_id belongs to the same ID space.
+      const response = await fetchJsonWithTimeout(
+        IMSAKIYEM_LOCATION_API + "/countries",
+        { timeoutMs: 12000 }
+      );
+      rows = getLocationApiRows(response.data);
+    } catch (error) {
+      countryLoadError = error;
+    }
+
+    if (!rows.length) {
+      state.countries = [];
+      sel.innerHTML = '<option value="" disabled selected>İmsakiyem ülke listesi alınamadı</option>';
+      $("status").textContent = "İmsakiyem dünya ülke listesi alınamadı: " +
+        String(countryLoadError?.message || "API boş liste döndürdü");
       return [];
     }
-    const unique=new Map();
-    for(const item of rows){
-      const id=String(item?._id??item?.id??"").trim(),rawTr=String(item?.name_tr??item?.nameTr??item?.UlkeAdi??item?.name??"").trim();
-      const rawEn=String(item?.name_en??item?.nameEn??item?.UlkeAdiEn??item?.UlkeAdiEN??item?.english_name??rawTr).trim(),rawNl=String(item?.name_nl??item?.nameNl??rawEn).trim();
-      const code=String(item?.iso2??item?.iso_code??item?.country_code??item?.code??"").toUpperCase(),iso2=/^[A-Z]{2}$/.test(code)?code:(countryIso2FromName(rawEn)||countryIso2FromName(rawTr)||"");
-      if(!id||(!rawTr&&!rawEn)||isNonAdministrativeLocationName(rawTr,rawEn,rawNl))continue;
-      const identity=iso2?"iso-"+iso2:"name-"+countryApiNameKey(rawEn||rawTr);if(unique.has(identity))continue;
-      unique.set(identity,{id,countryId:id,nameTr:rawTr||rawEn,nameEn:rawEn||rawTr,nameNl:rawNl||rawEn||rawTr,apiName:rawTr||rawEn,
-        nameAliases:[...new Set([rawTr,rawEn,rawNl,...collectApiLocationNameAliases(item)].filter(Boolean))],iso2,sourceIds:{imsakiyem:id},catalogSource:"imsakiyem",locationKind:"country",tz:item?.timezone||item?.tz||""});
-    }
-    const previous=state.selectedCountry;
-    state.countries=[...unique.values()].sort((a,b)=>getLocalizedLocationName(a,"country").localeCompare(getLocalizedLocationName(b,"country"),I18N[state.lang].locale,{sensitivity:"base"}));
-    if(previous)state.selectedCountry=state.countries.find(c=>(previous.iso2&&c.iso2===previous.iso2)||canonicalLocationNameKey(c.apiName)===canonicalLocationNameKey(previous.apiName||previous.nameEn||previous.nameTr))||null;
-    if(!state.countries.length){sel.disabled=true;sel.innerHTML='<option value="" disabled selected>İmsakiyem konum listesinde ülke bulunamadı</option>';return [];}
-    sel.disabled=false;renderCountrySelect();return state.countries;
-  }
 
+    const unique = new Map();
+    for (const item of rows) {
+      const id = String(item?._id ?? item?.id ?? "").trim();
+      const rawTr = String(item?.name ?? item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? "").trim();
+      const rawEn = String(item?.name_en ?? item?.nameEn ?? item?.english_name ?? item?.UlkeAdiEn ?? rawTr).trim();
+      const isoRaw = String(item?.iso2 ?? item?.iso_code ?? item?.country_code ?? item?.code ?? "").toUpperCase();
+      const iso2 = /^[A-Z]{2}$/.test(isoRaw) ? isoRaw : (countryIso2FromName(rawEn) || countryIso2FromName(rawTr) || "");
+      if (!id || (!rawTr && !rawEn) || isNonAdministrativeLocationName(rawTr || rawEn, rawEn || rawTr)) continue;
+      // IDs are authoritative inside one API catalogue. Do not collapse distinct
+      // countries just because translated names or inferred ISO aliases overlap.
+      if (unique.has(id)) continue;
+      unique.set(id, {
+        id,
+        countryId: id,
+        nameTr: rawTr || rawEn,
+        nameEn: rawEn || rawTr,
+        nameNl: rawEn || rawTr,
+        apiName: rawTr || rawEn,
+        nameAliases: [...new Set([rawTr, rawEn, ...collectApiLocationNameAliases(item)].filter(Boolean))],
+        iso2,
+        sourceIds: { imsakiyem: id },
+        catalogSource: "imsakiyem",
+        locationKind: "country",
+        tz: item?.timezone || item?.tz || ""
+      });
+    }
+
+    const previous = state.selectedCountry;
+    state.countries = [...unique.values()].sort((a, b) =>
+      getLocalizedLocationName(a, "country").localeCompare(
+        getLocalizedLocationName(b, "country"),
+        I18N[state.lang].locale,
+        { sensitivity: "base" }
+      )
+    );
+    if (previous) {
+      state.selectedCountry = state.countries.find(country =>
+        (previous.iso2 && country.iso2 === previous.iso2) ||
+        canonicalLocationNameKey(country.apiName) === canonicalLocationNameKey(
+          previous.apiName || previous.nameEn || previous.nameTr
+        )
+      ) || null;
+    }
+
+    if (!state.countries.length) {
+      sel.disabled = true;
+      sel.innerHTML = '<option value="" disabled selected>İmsakiyem konum listesinde ülke bulunamadı</option>';
+      return [];
+    }
+
+    sel.disabled = false;
+    renderCountrySelect();
+    return state.countries;
+  }
 
 
     function renderCountrySelect() {
@@ -2822,114 +2883,137 @@ const DIYANET_ALL_LOCATIONS = [];
     });
   }
 
-  async function loadStatesForCountry(countryObj,preselectStateId=""){
-    const stateSel=$("stateSelect"),distSel=$("districtSelect");
-    state.states=[];state.districts=[];state.selectedState=null;state.selectedDistrict=null;
-    stateSel.disabled=true;
-    stateSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
-    distSel.disabled=true;
-    distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';
-    const countryId=String(getLocationSourceId(countryObj,"imsakiyem")||countryObj?.id||"");
-    if(!countryId)throw new Error("İmsakiyem ülke kimliği bulunamadı.");
+  async function loadStatesForCountry(countryObj, preselectStateId = "") {
+    const stateSel = $("stateSelect");
+    const distSel = $("districtSelect");
+    state.states = [];
+    state.districts = [];
+    state.selectedState = null;
+    state.selectedDistrict = null;
 
-    let rows=[];
-    try{
-      // The API repository and Swagger v1 contract provide states by countryId.
-      const response=await fetchJsonWithTimeout(
-        IMSAKIYEM_LOCATION_API+"/states?countryId="+encodeURIComponent(countryId),
-        {timeoutMs:12000}
+    stateSel.disabled = true;
+    stateSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
+    distSel.disabled = true;
+    distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
+
+    const countryId = String(getLocationSourceId(countryObj, "imsakiyem") || countryObj?.id || "").trim();
+    if (!countryId) throw new Error("İmsakiyem ülke kimliği bulunamadı.");
+
+    let rows = [];
+    try {
+      const response = await fetchJsonWithTimeout(
+        IMSAKIYEM_LOCATION_API + "/states?countryId=" + encodeURIComponent(countryId),
+        { timeoutMs: 12000 }
       );
-      rows=getLocationApiRows(response.data);
-    }catch(error){
-      $("status").textContent="İmsakiyem eyalet/bölge listesi alınamadı: "+String(error?.message||error);
+      // Enforce the documented State.country_id -> Country._id relationship.
+      rows = filterImsakiyemChildRows(
+        getLocationApiRows(response.data),
+        "country_id",
+        countryId,
+        countryId
+      );
+    } catch (error) {
+      $("status").textContent = "İmsakiyem eyalet/bölge listesi alınamadı: " + String(error?.message || error);
+      distSel.disabled = true;
+      distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("selectDistrictOption")) + '</option>';
       renderStateSelect();
       return [];
     }
 
-    const unique=new Map();
-    for(const item of rows){
-      const normalized=normalizeImsakiyemLocation(item,countryId,"state");
-      if(!normalized||unique.has(normalized.id))continue;
-      unique.set(normalized.id,{
-        ...normalized,countryId,locationKind:"state",catalogSource:"imsakiyem",
-        sourceIds:{...(normalized.sourceIds||{}),imsakiyem:normalized.id}
+    const unique = new Map();
+    for (const item of rows) {
+      const normalized = normalizeImsakiyemLocation(item, countryId, "state");
+      if (!normalized || unique.has(normalized.id)) continue;
+      unique.set(normalized.id, {
+        ...normalized,
+        countryId,
+        locationKind: "state",
+        catalogSource: "imsakiyem",
+        sourceIds: { ...(normalized.sourceIds || {}), imsakiyem: normalized.id }
       });
     }
 
-    if(isTurkeyCountry(countryObj)){
-      // Türkiye provinces remain the city-level selector, as before.
-      const provinces=[...unique.values()].map(item=>({...item,countryId,isTurkishProvinceCity:true}));
-      state.states=[{
-        id:"imsakiyem-turkey-root",countryId,
-        nameTr:countryObj.nameTr||"Türkiye",nameEn:countryObj.nameEn||"Turkey",
-        nameNl:countryObj.nameNl||"Türkiye",apiName:countryObj.apiName||"Türkiye",
-        sourceIds:{imsakiyem:countryId},catalogSource:"imsakiyem",
-        fallbackDistricts:provinces,isTurkeyRoot:true
-      }];
-      state.selectedState=state.states[0];
-    }else{
-      state.states=[...unique.values()];
-      if(preselectStateId){
-        const wanted=String(preselectStateId);
-        state.selectedState=state.states.find(item=>
-          item.id===wanted||Object.values(item.sourceIds||{}).includes(wanted)
-        )||null;
-      }
+    // Keep the API's actual hierarchy for every country, including Türkiye:
+    // Country -> State -> District. No synthetic root or province-as-district.
+    state.states = [...unique.values()];
+    if (preselectStateId) {
+      const wanted = String(preselectStateId);
+      state.selectedState = state.states.find(item =>
+        item.id === wanted || Object.values(item.sourceIds || {}).includes(wanted)
+      ) || null;
     }
+
+    distSel.disabled = true;
+    distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("selectDistrictOption")) + '</option>';
     renderStateSelect();
     return state.states;
   }
+  async function loadDistrictsForState(stateObj, preselectDistrictId = "") {
+    const distSel = $("districtSelect");
+    state.districts = [];
+    state.selectedDistrict = null;
+    distSel.disabled = true;
+    distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
 
-  async function loadDistrictsForState(stateObj,preselectDistrictId=""){
-    const distSel=$("districtSelect");
-    state.districts=[];state.selectedDistrict=null;
-    distSel.disabled=true;
-    distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
-    if(!stateObj){
-      distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';
+    if (!stateObj) {
+      distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("selectDistrictOption")) + '</option>';
       return [];
     }
 
-    if(stateObj.isTurkeyRoot||stateObj.isCountryLevelParent){
-      state.districts=[...(stateObj.fallbackDistricts||[])];
-    }else{
-      const stateId=String(getLocationSourceId(stateObj,"imsakiyem")||stateObj.id||"");
-      const countryId=String(stateObj.countryId||state.selectedCountry?.id||"");
-      if(!stateId){
-        $("status").textContent="İmsakiyem eyalet/bölge kimliği bulunamadı.";
-      }else{
-        try{
-          // The repository's district route is explicitly scoped by stateId.
-          const response=await fetchJsonWithTimeout(
-            IMSAKIYEM_LOCATION_API+"/districts?stateId="+encodeURIComponent(stateId),
-            {timeoutMs:12000}
-          );
-          const rows=filterImsakiyemChildRows(
-            getLocationApiRows(response.data),"state_id",stateId,countryId
-          );
-          const unique=new Map();
-          for(const item of rows){
-            const normalized=normalizeImsakiyemLocation(item,countryId,"district");
-            if(!normalized||unique.has(normalized.id))continue;
-            unique.set(normalized.id,{
-              ...normalized,countryId,locationKind:"district",catalogSource:"imsakiyem"
-            });
-          }
-          state.districts=[...unique.values()];
-        }catch(error){
-          $("status").textContent="İmsakiyem şehir/ilçe listesi alınamadı: "+String(error?.message||error);
-        }
-      }
+    const stateId = String(getLocationSourceId(stateObj, "imsakiyem") || stateObj.id || "").trim();
+    const countryId = String(
+      getLocationSourceId(state.selectedCountry, "imsakiyem") ||
+      state.selectedCountry?.id ||
+      stateObj.countryId ||
+      ""
+    ).trim();
+
+    if (!stateId || !countryId) {
+      $("status").textContent = "İmsakiyem eyalet veya ülke kimliği bulunamadı.";
+      renderDistrictSelect();
+      return [];
     }
 
-    if(preselectDistrictId){
-      const wanted=String(preselectDistrictId);
-      state.selectedDistrict=state.districts.find(item=>
-        item.id===wanted||Object.values(item.sourceIds||{}).includes(wanted)
-      )||null;
+    try {
+      const response = await fetchJsonWithTimeout(
+        IMSAKIYEM_LOCATION_API + "/districts?stateId=" + encodeURIComponent(stateId),
+        { timeoutMs: 12000 }
+      );
+      // A district must point to both the selected state and selected country.
+      const rows = filterImsakiyemChildRows(
+        getLocationApiRows(response.data),
+        "state_id",
+        stateId,
+        countryId
+      );
+
+      const unique = new Map();
+      for (const item of rows) {
+        const normalized = normalizeImsakiyemLocation(item, countryId, "district");
+        if (!normalized || unique.has(normalized.id)) continue;
+        unique.set(normalized.id, {
+          ...normalized,
+          countryId,
+          locationKind: "district",
+          catalogSource: "imsakiyem"
+        });
+      }
+      state.districts = [...unique.values()];
+    } catch (error) {
+      $("status").textContent = "İmsakiyem şehir/ilçe listesi alınamadı: " + String(error?.message || error);
     }
+
+    if (preselectDistrictId) {
+      const wanted = String(preselectDistrictId);
+      state.selectedDistrict = state.districts.find(item =>
+        item.id === wanted || Object.values(item.sourceIds || {}).includes(wanted)
+      ) || null;
+    }
+
     renderDistrictSelect();
-    if(!state.districts.length)$("status").textContent="İmsakiyem seçilen eyalet/il için şehir veya ilçe kaydı döndürmedi.";
+    if (!state.districts.length) {
+      $("status").textContent = "İmsakiyem seçilen eyalet/il için şehir veya ilçe kaydı döndürmedi.";
+    }
     return state.districts;
   }
 
@@ -3105,25 +3189,16 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function resolveTurkeyCityCentreId(districtObj, source, signal) {
-    if (!districtObj?.isTurkishProvinceCity) {
-      const sourceId = getLocationSourceId(districtObj, source);
-      if (!sourceId) {
-        throw new Error("Seçilen konum için İmsakiyem API eşleşen ID bulunamadı.");
-      }
-      return sourceId;
+    if (source !== "imsakiyem") {
+      throw new Error("Bu konum için desteklenmeyen şehir ID kaynağı.");
     }
-    if (source !== "imsakiyem") throw new Error("Bu konum için desteklenmeyen şehir ID kaynağı.");
-    const stateId = getLocationSourceId(districtObj, "imsakiyem");
-    if (!stateId) throw new Error("İmsakiyem il ID bilgisi bulunamadı.");
-    const url = IMSAKIYEM_LOCATION_API + "/districts?stateId=" + encodeURIComponent(stateId);
-    const response = await fetchJsonWithTimeout(url, { signal, timeoutMs: 7000 });
-    const rows = getLocationApiRows(response.data);
-    const wanted = canonicalLocationNameKey(districtObj.nameEn || districtObj.nameTr);
-    const match = rows.find(item => canonicalLocationNameKey(
-      item?.name_en || item?.nameEn || item?.name_tr || item?.nameTr || item?.name
-    ) === wanted);
-    const districtId = String(match?._id || match?.id || "");
-    if (!districtId) throw new Error("İmsakiyem seçilen ilin merkez ilçesini bulamadı.");
+    // The selected v1 District._id is the exact ID expected by /api/prayer-times.
+    const districtId = String(
+      getLocationSourceId(districtObj, "imsakiyem") || districtObj?.id || ""
+    ).trim();
+    if (!districtId) {
+      throw new Error("Seçilen ilçe için İmsakiyem district ID bulunamadı.");
+    }
     return districtId;
   }
 
@@ -3275,7 +3350,7 @@ const valid=["auto","aladhan","ummahapi","qasra","imsakiyem"],mode=valid.include
 state.selectedApiMode=mode;state.actualApiMode="";state.todayData=null;
 if(mode==="auto"||mode==="imsakiyem"){
 state.selectedCountry=oldCountry;state.selectedState=oldState;state.selectedDistrict=oldDistrict;populatePrayerMethodOptions();await loadCountries();
-if(state.selectedCountry){await loadStatesForCountry(state.selectedCountry,oldState?.id||"");const match=oldState?.isTurkeyRoot?state.states.find(x=>x.isTurkeyRoot):findMatchingLocationRecordInList(state.states,oldState);state.selectedState=match||state.selectedState||null;
+if(state.selectedCountry){await loadStatesForCountry(state.selectedCountry,oldState?.id||"");const match=findMatchingLocationRecordInList(state.states,oldState);state.selectedState=match||state.selectedState||null;
 if(state.selectedState){await loadDistrictsForState(state.selectedState);state.selectedDistrict=findMatchingLocationRecordInList(state.districts,oldDistrict);renderDistrictSelect();}}
 }else{state.countries=[];state.states=[];state.districts=[];state.selectedCountry=null;state.selectedState=null;state.selectedDistrict=null;}
 populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);updateMissingSelectionStatus();
@@ -3298,7 +3373,7 @@ populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs()
     });
     return {
       mapped,
-      hijri: extractCleanText(item?.hijriDate || item?.hicriTarih, state.lang),
+      hijri: extractCleanText(item?.hijri_date || item?.hijriDate || item?.hicriTarih, state.lang),
       sourceLabel: "T.C. Diyanet / İmsakiyem API",
       providerName: "İmsakiyem API (T.C. Diyanet)",
       endpointUrl: url,
@@ -4890,9 +4965,7 @@ populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs()
 
   function updateCityHeaderAndFooter() {
     const titleEl = $("cityTitle");
-    $("districtSelectLabel").textContent = isTurkeyCountry(state.selectedCountry)
-      ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
-      : t("districtSelectLabel");
+    $("districtSelectLabel").textContent = t("districtSelectLabel");
     $("selectionCard").classList.toggle("needs-selection", !state.selectedDistrict || !state.selectedApiMode);
     $("apiSelect").classList.toggle("prompt-select", !state.selectedApiMode);
 
@@ -4977,9 +5050,7 @@ populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs()
     $("locLangBadge").textContent = t("langNameBadge");
     $("countrySelectLabel").textContent = t("countrySelectLabel");
     $("stateSelectLabel").textContent = t("stateSelectLabel");
-    $("districtSelectLabel").textContent = isTurkeyCountry(state.selectedCountry)
-      ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
-      : t("districtSelectLabel");
+    $("districtSelectLabel").textContent = t("districtSelectLabel");
     $("apiSelectLabel").textContent = t("apiSelectLabel");
     updateLocationProviderUI();
 
@@ -5193,9 +5264,6 @@ populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs()
       updateMissingSelectionStatus();
       renderEmptyPrayerPlaceholder(true);
       await loadStatesForCountry(state.selectedCountry);
-      if (state.selectedState?.isTurkeyRoot) {
-        await loadDistrictsForState(state.selectedState);
-      }
     });
 
     $("stateSelect").addEventListener("change", async e => {
