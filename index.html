@@ -3474,6 +3474,8 @@ const DIYANET_ALL_LOCATIONS = [];
     return mapped;
   }
 
+
+
   function getSelectedPrayerMethod() {
     return PRAYER_METHODS.find(item => item.value === state.prayerMethod) || PRAYER_METHODS[0];
   }
@@ -3619,6 +3621,9 @@ const DIYANET_ALL_LOCATIONS = [];
     };
   }
 
+
+
+
   async function fetchFromUmmahApi(p, districtObj, signal) {
     const coords = await resolveCityCoords(districtObj, signal);
     const method = getSelectedPrayerMethod();
@@ -3653,6 +3658,13 @@ const DIYANET_ALL_LOCATIONS = [];
       paramsSummary: buildDiyanetIdSummary()
     };
   }
+
+
+
+
+
+
+
 
   function updateApiInfoUI(info, isError = false) {
     $("infoApiProvider").textContent = info.providerName;
@@ -4210,6 +4222,77 @@ const DIYANET_ALL_LOCATIONS = [];
     if (["indonesian","id","text_id"].includes(key)) return "id";
     if (["urdu","ur"].includes(key)) return "ur";
     return fallback;
+  }
+
+  async function fetchFromKafelaHadith(selLang, signal) {
+    const endpoints = ["https://api.kafela.net/v1/hadiths/random", "https://api.kafela.net/v2/hadiths/random"];
+    let lastError = null;
+    for (const url of endpoints) {
+      try {
+        const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 7000 });
+        const payload = response.data;
+        const keys = selLang === "tr"
+          ? ["turkish","tr","tur","translation_tr","english","en","translation","text","hadith","arabic","ar","matn"]
+          : selLang === "nl"
+            ? ["dutch","nl","translation_nl","english","en","translation","text","hadith","arabic","ar","matn"]
+            : ["english","en","translation_en","translation","text","hadith","arabic","ar","matn"];
+        const found = findRawApiText(payload, keys);
+        if (!found?.text) continue;
+        return {
+          text: found.text, raw: payload, source: "Kafela Hadith API",
+          ref: "Random hadith", liveUrl: url, provider: "Kafela Hadith API",
+          sourceLanguage: rawTextLanguage(found.field, selLang)
+        };
+      } catch (error) {
+        if (signal && signal.aborted) throw error;
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("Kafela did not return hadith text");
+  }
+
+  async function fetchFromZikrHadith(selLang, signal) {
+    const root = "https://zikrequran.com/api";
+    const collectionResponse = await fetchApiPayloadWithTimeout(root + "/hadith", { signal, timeoutMs: 7000 });
+    const collectionPayload = collectionResponse.data;
+    const collections = Array.isArray(collectionPayload?.data) ? collectionPayload.data
+      : Array.isArray(collectionPayload) ? collectionPayload : [];
+    if (!collections.length) throw new Error("Zikr e Quran returned no collections");
+    const collection = collections[Math.floor(Math.random() * collections.length)];
+    const collectionId = collection?.code || collection?.id;
+    if (!collectionId) throw new Error("Zikr e Quran collection ID missing");
+    const booksResponse = await fetchApiPayloadWithTimeout(
+      root + "/hadith/" + encodeURIComponent(collectionId) + "/books",
+      { signal, timeoutMs: 7000 }
+    );
+    const booksPayload = booksResponse.data;
+    const books = Array.isArray(booksPayload?.data) ? booksPayload.data
+      : Array.isArray(booksPayload) ? booksPayload : [];
+    if (!books.length) throw new Error("Zikr e Quran returned no books");
+    const book = books[Math.floor(Math.random() * books.length)];
+    const bookId = book?.id || book?.number;
+    if (bookId == null) throw new Error("Zikr e Quran book ID missing");
+    const params = new URLSearchParams({ language: selLang, page: "1", limit: "50" });
+    const url = root + "/hadith/books/" + encodeURIComponent(bookId) + "/hadiths?" + params.toString();
+    const recordsResponse = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 7500 });
+    const recordsPayload = recordsResponse.data;
+    const rows = Array.isArray(recordsPayload?.data) ? recordsPayload.data
+      : Array.isArray(recordsPayload) ? recordsPayload : [];
+    if (!rows.length) throw new Error("Zikr e Quran book returned no records");
+    const row = rows[Math.floor(Math.random() * rows.length)];
+    const keys = selLang === "tr"
+      ? ["turkish","tr","translation","text","hadith","hadeeth","arabic","ar"]
+      : selLang === "nl"
+        ? ["dutch","nl","translation","text","hadith","hadeeth","arabic","ar"]
+        : ["english","en","translation","text","hadith","hadeeth","arabic","ar"];
+    const found = findRawApiText(row, keys);
+    if (!found?.text) throw new Error("Zikr e Quran record text missing");
+    return {
+      text: found.text, raw: row, source: collection?.name || "Zikr e Quran",
+      ref: String(row?.number || row?.hadithNumber || row?.hadith_number || bookId),
+      liveUrl: url, provider: "Zikr e Quran Hadith API",
+      sourceLanguage: rawTextLanguage(found.field, selLang)
+    };
   }
 
   async function fetchIMuslimHadith(selLang, signal) {
