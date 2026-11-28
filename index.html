@@ -1548,7 +1548,7 @@ const DIYANET_ALL_LOCATIONS = [];
         if (direct) { record.displayNames[target] = direct; continue; }
         const raw = record.nameEn || record.nameTr || "";
         if (!raw) continue;
-        const from = record.nameEn ? "en" : "tr";
+        const from = ["tr","en","nl"].includes(record.sourceNameLang) ? record.sourceNameLang : (record.nameEn ? "en" : "tr");
         const key = from + "|" + target + "|" + raw;
         try {
           let translated = LOCATION_TRANSLATION_CACHE.get(key);
