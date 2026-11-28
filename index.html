@@ -3650,7 +3650,23 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       }
     }
 
-    if (!res) throw new Error(failures.slice(0, 4).join(" · ") || "Hiçbir açık vakit kaynağı geçerli veri döndürmedi.");
+    if (!res) {
+      const message = failures.slice(0, 4).join(" · ") || "Hiçbir açık vakit kaynağı geçerli veri döndürmedi.";
+      state.actualApiMode = "";
+      $("liveDot").classList.remove("synced");
+      state.lastStatusType = "error";
+      state.lastStatusMeta = { msg: message };
+      $("status").textContent = t("fetchErr") + " (" + message + ")";
+      updateApiInfoUI({
+        providerName: I18N[state.lang].apiOptions[requestedMode] || requestedMode,
+        httpStatus: "Tüm açık kaynaklar başarısız oldu",
+        paramsSummary: buildDiyanetIdSummary(),
+        updatedAt: formatClock(),
+        endpointUrl: "-"
+      }, true);
+      if (!state.todayData) renderEmptyPrayerPlaceholder(true);
+      return;
+    }
     state.actualApiMode = usedMode;
     if (usedMode !== requestedMode) {
       const actualName = I18N[state.lang].apiOptions[usedMode] || usedMode;
@@ -3681,48 +3697,6 @@ const FALLBACK_LOCATIONS = DIYANET_ALL_LOCATIONS;
       updatedAt: formatClock(),
       endpointUrl: res.endpointUrl
     }, false);
-  }
-      if (signal.aborted) return;
-
-      state.todayData = {
-        key,
-        city: distName,
-        times: PRAYER_ORDER.map(k => ({ name: I18N[state.lang].prayers[k], time: res.mapped[k], key: k }))
-      };
-      state.lastRenderedEmptySig = "";
-
-      $("liveDot").classList.add("synced");
-      $("hijri").textContent = res.hijri ? `${t("hijriPrefix")}${res.hijri}` : "";
-      renderList();
-
-      state.lastStatusType = "updated";
-      state.lastStatusMeta = { source: res.sourceLabel, hour: p.hour };
-      $("status").textContent = t("updatedStatus", state.lastStatusMeta);
-
-      updateApiInfoUI({
-        providerName: res.providerName,
-        httpStatus: res.httpStatus,
-        paramsSummary: res.paramsSummary,
-        updatedAt: formatClock(),
-        endpointUrl: res.endpointUrl
-      }, false);
-    } catch (e) {
-      if (signal.aborted) return;
-      $("liveDot").classList.remove("synced");
-      state.lastStatusType = "error";
-      state.lastStatusMeta = { msg: e.message };
-      $("status").textContent = `${t("fetchErr")} (${e.message})`;
-      updateApiInfoUI({
-        providerName: I18N[state.lang].apiOptions[state.selectedApiMode] || state.selectedApiMode,
-        httpStatus: `Error: ${e.message}`,
-        paramsSummary: buildDiyanetIdSummary(),
-        updatedAt: formatClock(),
-        endpointUrl: $("infoApiUrl").textContent
-      }, true);
-      if (!state.todayData) {
-        renderEmptyPrayerPlaceholder(true);
-      }
-    }
   }
 
   /* ==========================================================================
