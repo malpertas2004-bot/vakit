@@ -1007,7 +1007,7 @@ details.nav-item > summary:hover{background:#163b30}
   const DB_STORE = "tracks";
   const DEFAULT_ZONE = "Europe/Amsterdam";
   const PRAYER_ORDER = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
-  const PRAYER_METHOD_PROVIDER_KEY = { aladhan: "aladhan", islamic_app: "islamic", ummahapi: "ummah", deen2u: "deen2u", salahtable: "salahtable", esalah: "esalah" };
+  const PRAYER_METHOD_PROVIDER_KEY = { aladhan: "aladhan", ummahapi: "ummah" };
   const PRAYER_METHODS = [
     { value: "auto", tr: "Servis varsayılanı / otomatik", en: "Provider default / automatic", nl: "Standaard van provider / automatisch", aladhan: "", islamic: "", ummah: "", deen2u: "auto", salahtable: "", esalah: "" },
     { value: "jafari", tr: "Caferî / Şiî", en: "Jafari / Shia Ithna-Ashari", nl: "Jafari / Shia Ithna-Ashari", aladhan: 0, islamic: 0, ummah: "Jafari", esalah: "jafari" },
@@ -2188,6 +2188,16 @@ const DIYANET_ALL_LOCATIONS = [];
     const str = String(s || "").trim();
     const isoMatch = str.match(/T(\d{2}:\d{2})/);
     if (isoMatch) return isoMatch[1];
+    const match = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+    if (match) {
+      let hour = Number(match[1]);
+      const minute = Number(match[2]);
+      if (match[3]) {
+        const suffix = match[3].toUpperCase();
+        hour = hour % 12 + (suffix === "PM" ? 12 : 0);
+      }
+      return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+    }
     return str.split(" ")[0].slice(0, 5);
   }
 
@@ -2990,7 +3000,7 @@ const DIYANET_ALL_LOCATIONS = [];
     select.value = state.prayerMethod;
     select.disabled = !key || supported.length <= 1;
 
-    const schoolModes = ["aladhan", "islamic_app", "ummahapi", "deen2u", "salahtable", "esalah"];
+    const schoolModes = ["aladhan", "ummahapi", "qasra"];
     $("prayerSchoolSelect").disabled = !schoolModes.includes(mode);
     $("highLatitudeSelect").disabled = !["ummahapi", "aladhan"].includes(mode);
     $("customMethodSettingsRow").style.display = mode === "aladhan" && state.prayerMethod === "custom" ? "" : "none";
@@ -3079,7 +3089,7 @@ const DIYANET_ALL_LOCATIONS = [];
       school: state.prayerSchool === "hanafi" ? "1" : "0"
     });
     if (method.aladhan !== "" && method.aladhan !== undefined) params.set("method", String(method.aladhan));
-    else params.set("method", "13");
+    else params.set("method", isTurkeyCountry(state.selectedCountry) ? "13" : "3");
     if (state.prayerMethod === "moonsighting") params.set("shafaq", state.shafaqMode || "general");
     if (state.prayerMethod === "custom") {
       const maghrib = state.customMaghribSetting === "" ? "null" : String(state.customMaghribSetting);
@@ -3206,13 +3216,13 @@ const DIYANET_ALL_LOCATIONS = [];
     };
   }
 
-  async function fetchFromUmmahApi(districtObj, signal) {
+  async function fetchFromUmmahApi(p, districtObj, signal) {
     const coords = await resolveCityCoords(districtObj, signal);
     const method = getSelectedPrayerMethod();
     const params = new URLSearchParams({
       lat: String(coords.lat),
       lng: String(coords.lng),
-      date: dateKey(localParts()),
+      date: dateKey(p),
       timezone: state.zone || "UTC",
       madhab: state.prayerSchool === "hanafi" ? "Hanafi" : "Shafi"
     });
@@ -3235,6 +3245,39 @@ const DIYANET_ALL_LOCATIONS = [];
       mapped, hijri: record?.hijri?.date || "",
       sourceLabel: "UmmahAPI · " + (method[state.lang] || method.en),
       providerName: "UmmahAPI Prayer Times",
+      endpointUrl: url,
+      httpStatus: status + " OK · " + ms + " ms",
+      paramsSummary: buildDiyanetIdSummary()
+    };
+  }
+
+  async function fetchFromQasra(p, districtObj, signal) {
+    const coords = await resolveCityCoords(districtObj, signal);
+    const params = new URLSearchParams({
+      latitude: String(coords.lat),
+      longitude: String(coords.lng),
+      timezone: state.zone || "UTC",
+      date: dateKey(p)
+    });
+    const url = "https://salah.qasra.org/?" + params.toString();
+    const { data: j, status, ms } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 9000 });
+    if (j?.error || !j?.timings) throw new Error(j?.error || "QASRA did not return prayer timings.");
+    const schedule = state.prayerSchool === "hanafi" ? j.timings.hanafi : j.timings.jumhur;
+    if (!schedule) throw new Error("QASRA did not return the selected madhhab timings.");
+    const mapped = validateMappedTimes({
+      Fajr: cleanTime(schedule.Fajr?.start),
+      Sunrise: cleanTime(schedule.Sunrise?.start),
+      Dhuhr: cleanTime(schedule.Dhuhr?.start),
+      Asr: cleanTime(schedule.Asr?.start),
+      Maghrib: cleanTime(schedule.Maghrib?.start),
+      Isha: cleanTime(schedule.Isha?.start)
+    });
+    const h = j.date?.hijri;
+    const hijri = h ? (h.day + " " + (h.month?.en || h.month?.ar || "") + " " + h.year).trim() : "";
+    return {
+      mapped, hijri,
+      sourceLabel: "QASRA · " + (state.prayerSchool === "hanafi" ? "Hanafi" : "Jumhur"),
+      providerName: "QASRA Salah API",
       endpointUrl: url,
       httpStatus: status + " OK · " + ms + " ms",
       paramsSummary: buildDiyanetIdSummary()
@@ -3475,18 +3518,10 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function fetchPrayerTimesByProvider(mode, p, isoDate, districtObj, signal) {
-    if (mode === "mtopal") return fetchFromMtopal(p, districtObj, signal);
     if (mode === "imsakiyem") return fetchFromImsakiyem(isoDate, districtObj, signal);
-    if (mode === "emushaf") return fetchFromEmushaf(p, districtObj, signal);
     if (mode === "aladhan") return fetchFromAladhan(p, districtObj, signal);
-    if (mode === "islamic_app") return fetchFromIslamicApp(p, districtObj, signal);
-    if (mode === "deen2u") return fetchFromDeen2u(p, districtObj, signal);
-    if (mode === "salahtable") return fetchFromSalahTable(p, districtObj, signal);
-    if (mode === "ummahapi") return fetchFromUmmahApi(districtObj, signal);
-    if (mode === "azan_quran_et") return fetchFromAzanEt(p, districtObj, signal);
-    if (mode === "esalah") return fetchFromESalah(p, districtObj, signal);
-    if (mode === "simplesolat") return fetchFromSimpleSolat(p, districtObj, signal);
-    if (mode === "zikr_prayer") return fetchFromZikrPrayer(p, districtObj, signal);
+    if (mode === "ummahapi") return fetchFromUmmahApi(p, districtObj, signal);
+    if (mode === "qasra") return fetchFromQasra(p, districtObj, signal);
     throw new Error("Bilinmeyen vakit kaynağı: " + mode);
   }
 
@@ -3505,11 +3540,7 @@ const DIYANET_ALL_LOCATIONS = [];
     const distName = getLocalizedLocationName(state.selectedDistrict, "district");
     if (!silentHourly || !state.todayData) $("status").textContent = t("fetchingFor", { city: distName });
 
-    const providerOrder = [
-      "mtopal", "imsakiyem", "emushaf", "aladhan", "deen2u",
-      "islamic_app", "salahtable", "ummahapi", "azan_quran_et",
-      "esalah", "simplesolat", "zikr_prayer"
-    ];
+    const providerOrder = ["imsakiyem", "aladhan", "ummahapi", "qasra"];
     const requestedMode = state.selectedApiMode;
     const attempts = requestedMode === "auto"
       ? providerOrder
@@ -4997,15 +5028,15 @@ const DIYANET_ALL_LOCATIONS = [];
 
     const credit = $("prayerApiCredit");
     credit.replaceChildren();
-    const creditUrl = (state.actualApiMode || state.selectedApiMode) === "salahtable" ? getSalahTableCityPageUrl() : "";
-    if (creditUrl) {
+    const activePrayerSource = state.actualApiMode || state.selectedApiMode;
+    if (activePrayerSource === "qasra") {
+      const link = document.createElement("a");
+      link.href = "https://salah.qasra.org/";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "QASRA · Quran and Sunnah Research Academy, Ajmer";
       credit.appendChild(document.createTextNode(" · "));
-      const creditLink = document.createElement("a");
-      creditLink.href = creditUrl;
-      creditLink.target = "_blank";
-      creditLink.rel = "noopener noreferrer";
-      creditLink.textContent = state.lang === "tr" ? "SalahTable vakitleri" : state.lang === "nl" ? "SalahTable gebedstijden" : "SalahTable prayer times";
-      credit.appendChild(creditLink);
+      credit.appendChild(link);
       credit.style.display = "inline";
     } else {
       credit.style.display = "none";
