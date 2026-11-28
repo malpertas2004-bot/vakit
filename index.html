@@ -529,7 +529,7 @@ details.nav-item > summary:hover{background:#163b30}
 .live-stream-item{min-width:0;background:#091d17;border:1px solid var(--line);border-radius:14px;padding:10px;display:grid;gap:9px}
 .live-stream-item h3{margin:2px 0;font-size:14px;color:var(--gold)}
 .live-player-wrap{aspect-ratio:16/9;width:100%;overflow:hidden;border-radius:10px;background:#000}
-.live-player{width:100%;height:100%;border:0;display:block}
+.live-player{width:100%;height:100%;border:0;display:block}.live-youtube-only{min-height:84px;display:grid;place-items:center;background:#101f1b;border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:13px;font-weight:650}
 @media(max-width:540px){.live-stream-grid{grid-template-columns:1fr}}
 .content-lang-panel{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:16px 0 12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md)}
 .content-lang-title{font-size:13px;font-weight:700;color:var(--muted)}
@@ -650,21 +650,12 @@ details.nav-item > summary:hover{background:#163b30}
       <div>
         <label class="field-label" for="apiSelect" id="apiSelectLabel">Vakit API Kayna&#287;&#305; Se&ccedil;imi (20 Farkl&#305; API):</label>
         <select id="apiSelect" class="prompt-select">
-          <option value="" disabled selected>&mdash; Vakit API kayna&#287;&#305;n&#305; se&ccedil;iniz &mdash;</option>
-          <option value="auto">Otomatik · Çalışan kaynağı bul</option>
-          <option value="mtopal">MTopal · Diyanet dünya vakitleri</option>
-          <option value="imsakiyem">İmsakiyem · Diyanet API</option>
-          <option value="emushaf">eMushaf · Diyanet API</option>
+          <option value="auto" selected>Otomatik · Çalışan kaynağı bul</option>
           <option value="aladhan">AlAdhan · Prayer Times API</option>
-          <option value="islamic_app">islamic.app · 33.000+ şehir</option>
-          <option value="deen2u">Deen2u · Şehir veya koordinat</option>
-          <option value="salahtable">SalahTable · 407 şehir</option>
-          <option value="ummahapi">UmmahAPI · Koordinat</option>
-          <option value="azan_quran_et">Azan · Koordinat</option>
-          <option value="esalah">eSalah · Koordinat</option>
-          <option value="simplesolat">SimpleSolat · Açık veri</option>
-          <option value="zikr_prayer">Zikr e Quran · Koordinat</option>
-</select>
+          <option value="ummahapi">UmmahAPI · Prayer Times API</option>
+          <option value="qasra">QASRA · Salah API</option>
+          <option value="imsakiyem">İmsakiyem · Diyanet API</option>
+        </select>
       </div>
       <div class="loc-row prayer-options-row">
         <div>
@@ -750,34 +741,15 @@ details.nav-item > summary:hover{background:#163b30}
     </div>
   </section>
 
-  <section class="content-lang-panel" aria-label="Hadith and Quran translation language">
-    <div class="content-lang-title" id="religiousLangLabel">Hadis ve Kur’an dili:</div>
-    <div class="content-lang-options" role="group" aria-label="Hadis ve Kur’an dili">
-      <button type="button" class="religious-lang-btn active" data-content-lang="tr">Türkçe</button>
-      <button type="button" class="religious-lang-btn" data-content-lang="en">English</button>
-      <button type="button" class="religious-lang-btn" data-content-lang="nl">Nederlands</button>
-    </div>
-  </section>
+  
 
   <section class="card" id="hadithCard" aria-labelledby="hadithCardTitle">
     <div class="card-head">
       <h2 id="hadithCardTitle">Hadis-i Şerif</h2>
       <div class="head-tools">
         <span class="badge lang-pill" id="hadithLangBadge">Türkçe (TR)</span>
-        <span class="badge" id="hadithApiPoolBadge">9 API kaynağı</span>
-        <span id="hadithProviderCredit" class="provider-credit" style="display:none"></span>
-        <select id="hadithApiSelect" class="api-source-select" aria-label="Hadis API sağlayıcısı">
-          <option value="random">Otomatik / Rastgele</option>
-          <option value="hadeethenc">HadeethEnc</option>
-          <option value="fawaz">FawazAhmed0 Hadith API</option>
-          <option value="kafela">Kafela Hadith API</option>
-          <option value="zikr">Zikr e Quran</option>
-          <option value="imuslim">i-muslim</option>
-          <option value="sunnetimiz">Sünnetimiz</option>
-          <option value="ummah">UmmahAPI</option>
-          <option value="randomhadith">Random Hadith</option>
-          <option value="sahihbukhari">Sahih al-Bukhari API</option>
-        </select>
+<span id="hadithProviderCredit" class="provider-credit" style="display:none"></span>
+
         <span class="badge" id="hadithTimerBadge">05:00</span>
         <button type="button" class="small-btn" id="refreshHadithBtn">Yeni Hadis</button>
       </div>
@@ -802,22 +774,7 @@ details.nav-item > summary:hover{background:#163b30}
       <h2 id="quranCardTitle">Kur’an-ı Kerim</h2>
       <div class="head-tools">
         <span class="badge lang-pill" id="quranLangBadge">Türkçe (TR)</span>
-        <span class="badge" id="quranApiPoolBadge">12 API kaynağı</span>
-        <select id="quranApiSelect" class="api-source-select" aria-label="Kur’an API sağlayıcısı">
-          <option value="random">Otomatik / Rastgele</option>
-          <option value="fawaz">FawazAhmed0 Quran API</option>
-          <option value="quranenc">QuranEnc</option>
-          <option value="quranpedia">Quranpedia</option>
-          <option value="alqurancloud">AlQuran Cloud</option>
-          <option value="ummahapi">UmmahAPI</option>
-          <option value="zikr">Zikr e Quran</option>
-          <option value="imuslim">i-muslim</option>
-          <option value="telawa">Telawa</option>
-          <option value="ayahquran">Ayah Quran</option>
-          <option value="quranproject">The Quran Project</option>
-          <option value="surahpk">Surah.pk</option>
-          <option value="quranonline">QuranOnline</option>
-        </select>
+
         <span class="badge" id="quranTimerBadge">05:00</span>
         <button type="button" class="small-btn" id="refreshQuranBtn">Yeni Ayet</button>
       </div>
@@ -842,17 +799,7 @@ details.nav-item > summary:hover{background:#163b30}
       <span class="badge" id="zikrCountLabel">Tekrar sayısı</span>
     </div>
     <div class="control-grid">
-      <div>
-        <label class="field-label" for="zikrPhraseSelect" id="zikrPhraseLabel">Zikir seçimi:</label>
-        <select id="zikrPhraseSelect">
-          <option value="subhanallah">Sübhanallah</option>
-          <option value="alhamdulillah">Elhamdülillah</option>
-          <option value="allahuakbar">Allahu ekber</option>
-          <option value="tahlil">Lâ ilâhe illallah</option>
-          <option value="istighfar">Estağfirullah</option>
-        </select>
-      </div>
-      <div class="zikr-counter" aria-live="polite" aria-atomic="true">
+<div class="zikr-counter" aria-live="polite" aria-atomic="true">
         <div class="zikr-count" id="zikrCount">0</div>
         <div class="field-label" id="zikrCurrentPhrase">Sübhanallah</div>
       </div>
@@ -871,17 +818,13 @@ details.nav-item > summary:hover{background:#163b30}
     <div class="live-stream-grid">
       <article class="live-stream-item">
         <h3 id="liveMakkahTitle">Mekke · Mescid-i Haram</h3>
-        <div class="live-player-wrap">
-          <iframe class="live-player" loading="lazy" title="Mekke Mescid-i Haram canlı yayın" src="https://aloula.sba.sa/en/live/quran" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-        </div>
-        <a class="link-pill" href="https://aloula.sba.sa/en/live/quran" target="_blank" rel="noopener noreferrer" id="liveMakkahLink">YouTube’da aç</a>
+        <div class="live-youtube-only">YouTube üzerinden canlı yayın</div>
+        <a class="link-pill" href="https://www.youtube.com/channel/UCos52azQNBgW63_9uDJoPDA/live" target="_blank" rel="noopener noreferrer" id="liveMakkahLink">YouTube’da aç</a>
       </article>
       <article class="live-stream-item">
         <h3 id="liveMadinahTitle">Medine · Mescid-i Nebevî</h3>
-        <div class="live-player-wrap">
-          <iframe class="live-player" loading="lazy" title="Medine Mescid-i Nebevî canlı yayın" src="https://aloula.sba.sa/en/live/sunna" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-        </div>
-        <a class="link-pill" href="https://aloula.sba.sa/en/live/sunna" target="_blank" rel="noopener noreferrer" id="liveMadinahLink">YouTube’da aç</a>
+        <div class="live-youtube-only">YouTube üzerinden canlı yayın</div>
+        <a class="link-pill" href="https://www.youtube.com/channel/UCROKYPep-UuODNwyipe6JMw/live" target="_blank" rel="noopener noreferrer" id="liveMadinahLink">YouTube’da aç</a>
       </article>
     </div>
     <p class="status" id="liveStreamNote">Yayınlar Suudi Arabistan’ın resmî Aloula canlı yayın sayfalarından açılır. Oynatıcı çalışmazsa kanal bağlantısını yeni sekmede açın.</p>
@@ -1148,7 +1091,7 @@ details.nav-item > summary:hover{background:#163b30}
       liveMakkahTitle: "Mekke · Mescid-i Haram",
       liveMadinahTitle: "Medine · Mescid-i Nebevî",
       liveFallback: "YouTube’da aç",
-      liveStreamNote: "Yayınlar Suudi Arabistan’ın resmî Aloula canlı yayın sayfalarından açılır. Oynatıcı çalışmazsa kanal bağlantısını yeni sekmede açın.",
+      liveStreamNote: "Mekke ve Medine yayınlarını resmî YouTube kanallarından açabilirsiniz.",
       pageSuffix: "Namaz Vakitleri — DİYANET",
       unselectedTitle: "Ülke, Eyalet/İl ve İlçe Seçiniz",
       selectCountryOption: "— Ülke seçiniz —",
@@ -1195,18 +1138,10 @@ details.nav-item > summary:hover{background:#163b30}
       religiousLangLabel: "Hadis ve Kur’an dili:",
       apiOptions: {
         auto: "Otomatik · Çalışan kaynağı bul",
-        mtopal: "MTopal · Diyanet dünya vakitleri",
-        imsakiyem: "İmsakiyem · Diyanet API",
-        emushaf: "eMushaf · Diyanet API",
         aladhan: "AlAdhan · Prayer Times API",
-        islamic_app: "islamic.app · Şehir tabanlı API",
-        deen2u: "Deen2u · Şehir veya koordinat",
-        salahtable: "SalahTable · Şehir tabanlı API",
-        ummahapi: "UmmahAPI · Koordinat tabanlı API",
-        azan_quran_et: "Azan · Koordinat tabanlı API",
-        esalah: "eSalah · Koordinat tabanlı API",
-        simplesolat: "SimpleSolat · Açık veri API",
-        zikr_prayer: "Zikr e Quran · Prayer Times API"
+        ummahapi: "UmmahAPI · Prayer Times API",
+        qasra: "QASRA · Salah API",
+        imsakiyem: "İmsakiyem · Diyanet API"
       },
       lblApiProvider: "Sağlayıcı / Yöntem:",
       lblApiStatus: "Durum & Gecikme:",
@@ -1347,18 +1282,10 @@ details.nav-item > summary:hover{background:#163b30}
       religiousLangLabel: "Hadith and Quran language:",
       apiOptions: {
         auto: "Automatic · Find a working source",
-        mtopal: "MTopal · Diyanet worldwide data",
-        imsakiyem: "Imsakiyem · Diyanet API",
-        emushaf: "eMushaf · Diyanet API",
         aladhan: "AlAdhan · Prayer Times API",
-        islamic_app: "islamic.app · City-based API",
-        deen2u: "Deen2u · City or coordinates",
-        salahtable: "SalahTable · City-based API",
-        ummahapi: "UmmahAPI · Coordinates",
-        azan_quran_et: "Azan · Coordinates",
-        esalah: "eSalah · Coordinates",
-        simplesolat: "SimpleSolat · Open data API",
-        zikr_prayer: "Zikr e Quran · Prayer Times API"
+        ummahapi: "UmmahAPI · Prayer Times API",
+        qasra: "QASRA · Salah API",
+        imsakiyem: "Imsakiyem · Diyanet Prayer Times API"
       },
       lblApiProvider: "Provider / Method:",
       lblApiStatus: "Status & Latency:",
@@ -1499,18 +1426,10 @@ details.nav-item > summary:hover{background:#163b30}
       religiousLangLabel: "Taal voor hadith en Koran:",
       apiOptions: {
         auto: "Automatisch · Werkende bron zoeken",
-        mtopal: "MTopal · Diyanet wereldwijde tijden",
-        imsakiyem: "Imsakiyem · Diyanet-API",
-        emushaf: "eMushaf · Diyanet-API",
         aladhan: "AlAdhan · gebedstijden-API",
-        islamic_app: "islamic.app · stads-API",
-        deen2u: "Deen2u · Stad of coördinaten",
-        salahtable: "SalahTable · stads-API",
-        ummahapi: "UmmahAPI · coördinaten",
-        azan_quran_et: "Azan · coördinaten",
-        esalah: "eSalah · coördinaten",
-        simplesolat: "SimpleSolat · open data-API",
-        zikr_prayer: "Zikr e Quran · gebedstijden-API"
+        ummahapi: "UmmahAPI · gebedstijden-API",
+        qasra: "QASRA · Salah API",
+        imsakiyem: "Imsakiyem · Diyanet gebedstijden-API"
       },
       lblApiProvider: "Provider / Methode:",
       lblApiStatus: "Status & Latentie:",
@@ -1646,7 +1565,7 @@ const DIYANET_ALL_LOCATIONS = [];
     selectedCountry: null,
     selectedState: null,
     selectedDistrict: null,
-    selectedApiMode: "",
+    selectedApiMode: "auto",
     actualApiMode: "",
     selectedHadithApi: "",
     selectedQuranApi: "",
@@ -3128,8 +3047,8 @@ const DIYANET_ALL_LOCATIONS = [];
     try {
       const saved = JSON.parse(localStorage.getItem("vakit_zikr_counter_v1") || "null");
       if (saved && Number.isSafeInteger(saved.count) && saved.count >= 0) state.zikrCount = saved.count;
-      if (saved && I18N.tr.zikrPhrases[saved.phrase]) state.zikrPhrase = saved.phrase;
     } catch (_) {}
+    state.zikrPhrase = "subhanallah";
   }
 
   function saveZikrPrefs() {
@@ -3143,14 +3062,9 @@ const DIYANET_ALL_LOCATIONS = [];
 
   function updateZikrUI() {
     const phrases = I18N[state.lang].zikrPhrases;
-    Array.from($("zikrPhraseSelect").options).forEach(option => {
-      option.textContent = phrases[option.value] || option.value;
-    });
-    $("zikrPhraseSelect").value = state.zikrPhrase;
     $("zikrCount").textContent = state.zikrCount.toLocaleString(I18N[state.lang].locale);
-    $("zikrCurrentPhrase").textContent = phrases[state.zikrPhrase] || state.zikrPhrase;
+    $("zikrCurrentPhrase").textContent = phrases.subhanallah;
     $("zikrTitle").textContent = t("zikrTitle");
-    $("zikrPhraseLabel").textContent = t("zikrPhraseLabel");
     $("zikrCountLabel").textContent = t("zikrCountLabel");
     $("zikrTapBtn").textContent = t("zikrTapBtn");
     $("zikrResetBtn").textContent = t("zikrResetBtn");
@@ -5042,7 +4956,7 @@ const DIYANET_ALL_LOCATIONS = [];
 
   function updateCityHeaderAndFooter() {
     const titleEl = $("cityTitle");
-    $("districtSelectLabel").textContent = String(state.selectedCountry?.id) === "2"
+    $("districtSelectLabel").textContent = isTurkeyCountry(state.selectedCountry)
       ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
       : t("districtSelectLabel");
     $("selectionCard").classList.toggle("needs-selection", !state.selectedDistrict || !state.selectedApiMode);
@@ -5141,7 +5055,7 @@ const DIYANET_ALL_LOCATIONS = [];
     $("locLangBadge").textContent = t("langNameBadge");
     $("countrySelectLabel").textContent = t("countrySelectLabel");
     $("stateSelectLabel").textContent = t("stateSelectLabel");
-    $("districtSelectLabel").textContent = String(state.selectedCountry?.id) === "2"
+    $("districtSelectLabel").textContent = isTurkeyCountry(state.selectedCountry)
       ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
       : t("districtSelectLabel");
     $("apiSelectLabel").textContent = t("apiSelectLabel");
@@ -5164,11 +5078,7 @@ const DIYANET_ALL_LOCATIONS = [];
     $("copyApiUrl").textContent = t("copyBtn");
 
     $("hadithCardTitle").textContent = t("hadithCardTitle");
-    $("hadithApiSelect").options[0].textContent = t("apiAuto");
-    $("quranApiSelect").options[0].textContent = t("apiAuto");
-    $("hadithApiPoolBadge").textContent = state.lang === "tr" ? "9 API kaynağı" : state.lang === "nl" ? "9 API-bronnen" : "9 API sources";
-    $("quranApiPoolBadge").textContent = state.lang === "tr" ? "12 API kaynağı" : state.lang === "nl" ? "12 API-bronnen" : "12 API sources";
-    $("hadithLangBadge").textContent = contentLanguageBadge();
+        $("hadithLangBadge").textContent = contentLanguageBadge();
     $("refreshHadithBtn").textContent = t("refreshHadithBtn");
     $("lblHadithProvider").textContent = t("lblHadithProvider");
     $("lblHadithStatus").textContent = t("lblHadithStatus");
@@ -5313,8 +5223,16 @@ const DIYANET_ALL_LOCATIONS = [];
         const nextLang = btn.dataset.lang;
         if (!nextLang || nextLang === state.lang) return;
         state.lang = nextLang;
+        state.contentLang = nextLang;
         Persistence.savePrefs();
         applyLanguageUI(true);
+        [state.countries, state.states, state.districts].forEach(records => {
+          if (Array.isArray(records) && records.length) localizeLocationRecords(records).then(() => {
+            if (records === state.countries) renderCountrySelect();
+            else if (records === state.states) renderStateSelect();
+            else if (records === state.districts) renderDistrictSelect();
+          });
+        });
       });
     });
 
@@ -5329,13 +5247,6 @@ const DIYANET_ALL_LOCATIONS = [];
       });
     });
 
-    $("zikrPhraseSelect").addEventListener("change", e => {
-      if (!I18N.tr.zikrPhrases[e.target.value]) return;
-      state.zikrPhrase = e.target.value;
-      state.zikrCount = 0;
-      saveZikrPrefs();
-      updateZikrUI();
-    });
     $("zikrTapBtn").addEventListener("click", () => {
       if (state.zikrCount < Number.MAX_SAFE_INTEGER) state.zikrCount += 1;
       saveZikrPrefs();
@@ -5360,7 +5271,7 @@ const DIYANET_ALL_LOCATIONS = [];
       updateMissingSelectionStatus();
       renderEmptyPrayerPlaceholder(true);
       await loadStatesForCountry(state.selectedCountry);
-      if (state.selectedState && (state.selectedCountry.id === "184" || state.selectedState.isTurkeyRoot)) {
+      if (state.selectedState?.isTurkeyRoot) {
         await loadDistrictsForState(state.selectedState);
       }
     });
@@ -5464,28 +5375,6 @@ const DIYANET_ALL_LOCATIONS = [];
       if (state.selectedDistrict && state.selectedApiMode === "ummahapi") loadTimes({ silentHourly: false });
     });
 
-    document.querySelectorAll(".religious-lang-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const nextLang = btn.dataset.contentLang;
-        if (!["tr","en","nl"].includes(nextLang) || nextLang === state.contentLang) return;
-        state.contentLang = nextLang;
-        Persistence.savePrefs();
-        updateReligiousLanguageUI();
-        loadRandomHadith();
-        loadRandomQuran();
-      });
-    });
-
-    $("hadithApiSelect").addEventListener("change", e => {
-      state.preferredHadithProvider = e.target.value;
-      Persistence.savePrefs();
-      loadRandomHadith();
-    });
-    $("quranApiSelect").addEventListener("change", e => {
-      state.preferredQuranProvider = e.target.value;
-      Persistence.savePrefs();
-      loadRandomQuran();
-    });
     $("refreshHadithBtn").addEventListener("click", () => loadRandomHadith());
     $("refreshQuranBtn").addEventListener("click", () => loadRandomQuran());
     bindCopyButton("copyApiUrl", "infoApiUrl");
@@ -5566,9 +5455,7 @@ const DIYANET_ALL_LOCATIONS = [];
     if (saved?.lang && I18N[saved.lang]) {
       state.lang = saved.lang;
     }
-    if (["tr","en","nl"].includes(saved?.contentLang)) {
-      state.contentLang = saved.contentLang;
-    }
+    state.contentLang = state.lang;
     if (["gregorian","hijri"].includes(saved?.calendarMode)) state.calendarMode = saved.calendarMode;
     if (PRAYER_METHODS.some(item => item.value === saved?.prayerMethod)) state.prayerMethod = saved.prayerMethod;
     if (["shafii","hanafi"].includes(saved?.prayerSchool)) state.prayerSchool = saved.prayerSchool;
@@ -5579,14 +5466,8 @@ const DIYANET_ALL_LOCATIONS = [];
     if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\d+(,-?\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
     if (["0","1"].includes(String(saved?.midnightMode))) state.midnightMode = String(saved.midnightMode);
     if (["general","ahmer","abyad"].includes(saved?.shafaqMode)) state.shafaqMode = saved.shafaqMode;
-    const hadithProviderIds = ["random","hadeethenc","fawaz","kafela","zikr","imuslim","sunnetimiz","ummah","randomhadith","sahihbukhari"];
-    const quranProviderIds = ["random","fawaz","quranenc","quranpedia","alqurancloud","ummahapi","zikr","imuslim","telawa","ayahquran","quranproject","surahpk","quranonline"];
-    if (hadithProviderIds.includes(saved?.preferredHadithProvider)) state.preferredHadithProvider = saved.preferredHadithProvider;
-    if (quranProviderIds.includes(saved?.preferredQuranProvider)) state.preferredQuranProvider = saved.preferredQuranProvider;
-    if (saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`)) {
-      state.selectedApiMode = saved.apiMode;
-      $("apiSelect").value = saved.apiMode;
-    }
+    state.selectedApiMode = saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`) ? saved.apiMode : "auto";
+    $("apiSelect").value = state.selectedApiMode;
     loadZikrPrefs();
     if (typeof saved?.volume === "number") {
       $("volume").value = String(saved.volume);
@@ -5596,19 +5477,13 @@ const DIYANET_ALL_LOCATIONS = [];
 
     await Persistence.restoreAllAudioTracks();
     applyLanguageUI(false);
-    $("hadithApiSelect").value = state.preferredHadithProvider;
-    $("quranApiSelect").value = state.preferredQuranProvider;
     renderEmptyPrayerPlaceholder(true);
     await loadCountries();
 
     // Restore saved location & API selections cleanly
-    if (saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`)) {
-      state.selectedApiMode = saved.apiMode;
-      $("apiSelect").value = saved.apiMode;
-    }
+    state.selectedApiMode = saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`) ? saved.apiMode : "auto";
+    $("apiSelect").value = state.selectedApiMode;
     populatePrayerMethodOptions();
-    $("hadithApiSelect").value = state.preferredHadithProvider;
-    $("quranApiSelect").value = state.preferredQuranProvider;
     if (saved?.countryId) {
       const cObj = state.countries.find(c => c.id === String(saved.countryId));
       if (cObj) {
