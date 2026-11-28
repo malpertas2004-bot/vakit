@@ -1039,7 +1039,7 @@ details.nav-item > summary:hover{background:#163b30}
     { value: "malaysia", tr: "Malezya", en: "Malaysia", nl: "Maleisië", salahtable: "malaysia" },
     { value: "custom", tr: "Özel yöntem (99)", en: "Custom method (99)", nl: "Aangepaste methode (99)", aladhan: 99 }
   ];
-  const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah", "malik", "nawawi"];
+  const HADITH_BOOKS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"];
   const UMMAH_HADITH_COLLECTIONS = ["bukhari", "muslim", "abudawud", "tirmidhi", "ibnmajah", "nasai", "malik", "nawawi", "qudsi", "dehlawi"];
   const QUOTE_ROTATE_MS = 300000; // 5 minutes
   const FETCH_TIMEOUT_MS = 9500;
@@ -3980,25 +3980,21 @@ const DIYANET_ALL_LOCATIONS = [];
   }
 
   async function fetchLiveHadithInLang(selLang, book, randNo, signal) {
-    if (selLang === "nl") {
-      const dutch = await fetchCleanFromHadeethEnc("nl", randNo, signal);
-      if (dutch) return dutch;
-      throw new Error("No Dutch hadith text was returned by the selected API.");
-    }
     const prefix = selLang === "tr" ? "tur" : "eng";
     const books = prefix === "tur"
-      ? ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah","nawawi","malik"]
+      ? ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah"]
       : ["bukhari","muslim","abudawud","tirmidhi","nasai","ibnmajah","nawawi","malik","qudsi","dehlawi"];
     const hosts = [
       "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions",
       "https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions"
     ];
-    for (let attempt = 0; attempt < 10; attempt++) {
+    let lastError = null;
+    for (let attempt = 0; attempt < 12; attempt++) {
       if (signal?.aborted) throw new Error("Aborted");
       const selectedBook = attempt === 0 ? book : books[Math.floor(Math.random() * books.length)];
       const selectedNumber = attempt === 0 ? randNo : Math.floor(Math.random() * 2500) + 1;
       const base = hosts[attempt % hosts.length] + "/" + prefix + "-" + selectedBook + "/" + selectedNumber;
-      for (const suffix of [".min.json",".json"]) {
+      for (const suffix of [".min.json", ".json"]) {
         const url = base + suffix;
         try {
           const response = await fetchApiPayloadWithTimeout(url, { signal, timeoutMs: 4800 });
@@ -4012,7 +4008,7 @@ const DIYANET_ALL_LOCATIONS = [];
             ? payload.metadata.name : selectedBook.toUpperCase();
           return {
             text: rawText,
-            sourceLanguage: selLang,
+            sourceLanguage: prefix === "tur" ? "tr" : "en",
             raw: payload,
             source: title + " #" + selectedNumber,
             ref: prefix + "-" + selectedBook + " #" + selectedNumber,
@@ -4022,12 +4018,13 @@ const DIYANET_ALL_LOCATIONS = [];
           };
         } catch (error) {
           if (signal?.aborted) throw error;
+          lastError = error;
         }
       }
     }
     const fallback = await fetchCleanFromHadeethEnc(selLang, randNo, signal);
     if (fallback) return fallback;
-    throw new Error("No hadith record was returned by the selected APIs.");
+    throw lastError || new Error("No hadith record was returned by the selected APIs.");
   }
 
   function findRawApiText(payload, preferredKeys, depth = 0, seen = new Set()) {
@@ -4189,7 +4186,7 @@ const DIYANET_ALL_LOCATIONS = [];
 
   async function fetchUmmahHadith(selLang, signal) {
     const collection = UMMAH_HADITH_COLLECTIONS[Math.floor(Math.random() * UMMAH_HADITH_COLLECTIONS.length)];
-    const url = "https://www.ummahapi.com/api/hadith/random?collection=" + encodeURIComponent(collection);
+    const url = "https://ummahapi.com/api/hadith/random?collection=" + encodeURIComponent(collection);
     const response = await fetchApiPayloadWithTimeout(url,{signal,timeoutMs:8000});
     const record = response.data?.data || response.data;
     const field = selLang === "en" && typeof record?.english === "string" ? "english" : "arabic";
@@ -4279,23 +4276,15 @@ const DIYANET_ALL_LOCATIONS = [];
     renderHadithCommentary("");
     clearApiResponseDetails("hadithMeta");
 
-    const providers = ["hadeethenc","fawaz","kafela","zikr","imuslim","sunnetimiz","ummah","randomhadith","sahihbukhari"];
-    for (let i = providers.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [providers[i], providers[j]] = [providers[j], providers[i]];
-    }
-    if (state.preferredHadithProvider !== "random") {
-      const preferredIndex = providers.indexOf(state.preferredHadithProvider);
-      if (preferredIndex > 0) providers.unshift(providers.splice(preferredIndex, 1)[0]);
-    }
+    const providers = ["ummah", "fawaz", "hadeethenc"];
 
     try {
       let result = null;
       for (const provider of providers) {
         if (signal.aborted) return;
         try {
-          if (provider === "hadeethenc") {
-            result = await fetchCleanFromHadeethEnc(sourceLang, Math.floor(Math.random() * 2500) + 1, signal);
+          if (provider === "ummah") {
+            result = await fetchUmmahHadith(sourceLang, signal);
           } else if (provider === "fawaz") {
             result = await fetchLiveHadithInLang(
               sourceLang,
@@ -4303,20 +4292,8 @@ const DIYANET_ALL_LOCATIONS = [];
               Math.floor(Math.random() * 2500) + 1,
               signal
             );
-          } else if (provider === "kafela") {
-            result = await fetchFromKafelaHadith(sourceLang, signal);
-          } else if (provider === "zikr") {
-            result = await fetchFromZikrHadith(sourceLang, signal);
-          } else if (provider === "imuslim") {
-            result = await fetchIMuslimHadith(sourceLang, signal);
-          } else if (provider === "sunnetimiz") {
-            result = await fetchSunnetimizHadith(sourceLang, signal);
-          } else if (provider === "ummah") {
-            result = await fetchUmmahHadith(sourceLang, signal);
-          } else if (provider === "randomhadith") {
-            result = await fetchRandomHadithApi(sourceLang, signal);
-          } else if (provider === "sahihbukhari") {
-            result = await fetchSahihHadithApi(sourceLang, signal);
+          } else if (provider === "hadeethenc") {
+            result = await fetchCleanFromHadeethEnc(sourceLang, Math.floor(Math.random() * 2500) + 1, signal);
           }
           if (typeof result?.text === "string" && result.text.length > 0) break;
         } catch (error) {
