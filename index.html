@@ -2831,7 +2831,7 @@ const DIYANET_ALL_LOCATIONS = [];
       if(!actualParent||actualParent!==expectedParent)return false;
       const countryValue=item?.country_id??item?.countryId??item?.country;
       const actualCountry=getImsakiyemRelationId(countryValue);
-      return !expectedCountry||!actualCountry||actualCountry===expectedCountry;
+      return !expectedCountry||actualCountry===expectedCountry;
     });
   }
 
