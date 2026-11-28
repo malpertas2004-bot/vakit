@@ -243,6 +243,9 @@ button.mini-btn{padding:5px 9px;font-size:11.5px;border-radius:8px}
 
 /* Form Controls */
 .control-grid{display:grid;gap:10px}
+.provider-location-panel{padding:10px;background:#0b211b;border:1px solid var(--line);border-radius:12px}
+.provider-location-panel .status{margin:0}
+.provider-location-panel a{color:var(--gold);text-decoration:underline;text-underline-offset:2px}
 .loc-row{
   display:grid;
   grid-template-columns:repeat(3,1fr);
@@ -635,7 +638,7 @@ details.nav-item > summary:hover{background:#163b30}
     </div>
 
     <div class="control-grid">
-      <div class="loc-row">
+      <div class="loc-row" id="locationHierarchyRow">
         <div>
           <label class="field-label" for="countrySelect" id="countrySelectLabel">&Uuml;lke:</label>
           <select id="countrySelect" class="prompt-select" aria-label="&Uuml;lke Se&ccedil;imi"></select>
@@ -660,6 +663,33 @@ details.nav-item > summary:hover{background:#163b30}
           <option value="imsakiyem">İmsakiyem · Diyanet API</option>
         </select>
       </div>
+      <div id="providerLocationFields" class="control-grid" style="display:none">
+        <div id="aladhanLocationFields" class="loc-row provider-location-panel" style="display:none">
+          <div><label class="field-label" for="aladhanCountryInput" id="aladhanCountryLabel">Ülke:</label><input id="aladhanCountryInput" type="text" placeholder="Netherlands" autocomplete="country-name"></div>
+          <div><label class="field-label" for="aladhanStateInput" id="aladhanStateLabel">Eyalet / İl (isteğe bağlı):</label><input id="aladhanStateInput" type="text" placeholder="Overijssel" autocomplete="address-level1"></div>
+          <div><label class="field-label" for="aladhanCityInput" id="aladhanCityLabel">Şehir:</label><input id="aladhanCityInput" type="text" placeholder="Enschede" autocomplete="address-level2"></div>
+          <button type="button" class="primary" id="aladhanApplyLocationBtn" style="grid-column:1/-1">Konumu uygula ve vakitleri getir</button>
+        </div>
+        <div id="ummahLocationFields" class="provider-location-panel control-grid" style="display:none">
+          <p class="status" id="ummahLocationHint">UmmahAPI koordinat ister. Cihaz konumunu kullanın veya enlem ve boylamı girin.</p>
+          <div class="loc-row">
+            <div><label class="field-label" for="ummahLatInput">Enlem (latitude)</label><input id="ummahLatInput" type="number" step="any" min="-90" max="90" placeholder="52.22"></div>
+            <div><label class="field-label" for="ummahLngInput">Boylam (longitude)</label><input id="ummahLngInput" type="number" step="any" min="-180" max="180" placeholder="6.89"></div>
+            <div><label class="field-label" for="ummahTimezoneInput">Saat dilimi</label><input id="ummahTimezoneInput" type="text" placeholder="Europe/Amsterdam"></div>
+          </div>
+          <div class="actions"><button type="button" id="ummahUseDeviceLocationBtn">Cihaz konumunu kullan</button><button type="button" class="primary" id="ummahApplyCoordsBtn">Koordinatları uygula ve vakitleri getir</button></div>
+        </div>
+        <div id="qasraLocationFields" class="provider-location-panel control-grid" style="display:none">
+          <div class="loc-row">
+            <div style="grid-column:span 2"><label class="field-label" for="qasraSearchInput" id="qasraSearchLabel">Şehir ara (QASRA Geocoder):</label><input id="qasraSearchInput" type="text" placeholder="Ajmer" autocomplete="off"></div>
+            <div style="align-self:end"><button type="button" class="primary" id="qasraSearchBtn">Şehir ara</button></div>
+          </div>
+          <div><label class="field-label" for="qasraResultsSelect" id="qasraResultsLabel">Arama sonuçları:</label><select id="qasraResultsSelect" disabled><option value="">Önce şehir arayın</option></select></div>
+          <div><label class="field-label" for="qasraTimezoneInput" id="qasraTimezoneLabel">Saat dilimi (IANA):</label><input id="qasraTimezoneInput" type="text" placeholder="Asia/Kolkata"><p class="status" id="qasraTimezoneHint">Geocoder saat dilimi döndürmez. Şehrin IANA saat dilimini seçin.</p></div>
+          <p class="status">Konum arama ve vakit verisi: <a href="https://www.qasra.org" target="_blank" rel="noopener noreferrer">Quran &amp; Sunnah Research Academy, Ajmer (QASRA)</a>.</p>
+        </div>
+      </div>
+
       <div class="loc-row prayer-options-row">
         <div>
           <label class="field-label" for="prayerMethodSelect" id="prayerMethodLabel">Hesaplama yöntemi:</label>
@@ -1527,19 +1557,7 @@ const DIYANET_ALL_LOCATIONS = [];
 
   // Each visible hierarchy comes from one catalogue at a time. Mixing catalogue
   // rows from providers with different IDs and spellings creates duplicate places.
-  function getLocationCatalogSourceOrder(mode = state.selectedApiMode) {
-    const plans = {
-      imsakiyem: ["imsakiyem", "emushaf", "mtopal"],
-      aladhan: ["emushaf", "mtopal", "imsakiyem"],
-      ummahapi: ["emushaf", "mtopal", "imsakiyem"],
-      qasra: ["emushaf", "mtopal", "imsakiyem"],
-      auto: ["emushaf", "mtopal", "imsakiyem"]
-    };
-    return [...(plans[mode] || plans.auto)];
-  }
-
-  
-function findMatchingLocationRecordInList(records, previous) {
+  function findMatchingLocationRecordInList(records, previous) {
     if (!previous || !Array.isArray(records) || !records.length) return null;
     const previousIds = new Set([
       previous.id,
@@ -1635,7 +1653,8 @@ function findMatchingLocationRecordInList(records, previous) {
     lastStatusMeta: {},
     nextHadithAt: Date.now() + QUOTE_ROTATE_MS,
     nextQuranAt: Date.now() + QUOTE_ROTATE_MS,
-    lastRenderedEmptySig: ""
+    lastRenderedEmptySig: "",
+    qasraSearchResults: []
   };
 
   const adhanUrls = { Fajr: null, Dhuhr: null, Asr: null, Maghrib: null, Isha: null };
@@ -1909,6 +1928,15 @@ function findMatchingLocationRecordInList(records, previous) {
           stateId: state.selectedState?.id || "",
           districtId: state.selectedDistrict?.id || "",
           apiMode: state.selectedApiMode || "",
+          aladhanCountryName: $("aladhanCountryInput")?.value || "",
+          aladhanStateName: $("aladhanStateInput")?.value || "",
+          aladhanCityName: $("aladhanCityInput")?.value || "",
+          providerCityName: state.selectedDistrict?.nameEn || state.selectedDistrict?.nameTr || "",
+          providerStateName: state.selectedState?.nameEn || state.selectedState?.nameTr || "",
+          providerCountryName: state.selectedCountry?.nameEn || state.selectedCountry?.nameTr || "",
+          providerLat: Number.isFinite(Number(state.selectedDistrict?.lat)) ? Number(state.selectedDistrict.lat) : null,
+          providerLng: Number.isFinite(Number(state.selectedDistrict?.lng)) ? Number(state.selectedDistrict.lng) : null,
+          providerTimezone: state.zone || DEFAULT_ZONE,
           preferredHadithProvider: state.preferredHadithProvider,
           preferredQuranProvider: state.preferredQuranProvider,
           shafaqMode: state.shafaqMode,
@@ -2674,147 +2702,27 @@ function findMatchingLocationRecordInList(records, previous) {
   }
 
   async function loadCountries() {
-    const sel = $("countrySelect");
-    sel.disabled = true;
-    sel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
-
-    const endpoints = {
-      imsakiyem: IMSAKIYEM_LOCATION_API + "/countries",
-      emushaf: "https://ezanvakti.emushaf.net/ulkeler",
-      mtopal: "https://namazvakti.mtopal.dev/ulkeler"
-    };
-    const sourceOrder = getLocationCatalogSourceOrder();
-    const settled = await Promise.allSettled(sourceOrder.map(async source => ({
-      source,
-      response: await fetchJsonWithTimeout(endpoints[source], { timeoutMs: 8000 })
-    })));
-    const sourceData = new Map();
-    for (const result of settled) {
-      if (result.status !== "fulfilled") continue;
-      const rows = getLocationApiRows(result.value.response.data);
-      if (rows.length) sourceData.set(result.value.source, rows);
+    const sel=$("countrySelect");sel.disabled=true;sel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
+    let rows=[];try{const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/countries",{timeoutMs:9000});rows=getLocationApiRows(response.data);}
+    catch(error){state.countries=[];sel.innerHTML='<option value="" disabled selected>İmsakiyem konum listesi alınamadı</option>';$("status").textContent="İmsakiyem ülke listesi alınamadı: "+String(error?.message||error);return [];}
+    const unique=new Map();
+    for(const item of rows){
+      const id=String(item?._id??item?.id??"").trim(),rawTr=String(item?.name_tr??item?.nameTr??item?.UlkeAdi??item?.name??"").trim();
+      const rawEn=String(item?.name_en??item?.nameEn??item?.UlkeAdiEn??item?.UlkeAdiEN??item?.english_name??rawTr).trim(),rawNl=String(item?.name_nl??item?.nameNl??rawEn).trim();
+      const code=String(item?.iso2??item?.iso_code??item?.country_code??item?.code??"").toUpperCase(),iso2=/^[A-Z]{2}$/.test(code)?code:(countryIso2FromName(rawEn)||countryIso2FromName(rawTr)||"");
+      if(!id||(!rawTr&&!rawEn)||isNonAdministrativeLocationName(rawTr,rawEn,rawNl))continue;
+      const identity=iso2?"iso-"+iso2:"name-"+countryApiNameKey(rawEn||rawTr);if(unique.has(identity))continue;
+      unique.set(identity,{id,countryId:id,nameTr:rawTr||rawEn,nameEn:rawEn||rawTr,nameNl:rawNl||rawEn||rawTr,apiName:rawTr||rawEn,
+        nameAliases:[...new Set([rawTr,rawEn,rawNl,...collectApiLocationNameAliases(item)].filter(Boolean))],iso2,sourceIds:{imsakiyem:id},catalogSource:"imsakiyem",locationKind:"country",tz:item?.timezone||item?.tz||""});
     }
-
-    const primarySource = sourceOrder.find(source => sourceData.has(source));
-    const primaryRows = primarySource ? sourceData.get(primarySource) : [];
-    const countriesByIdentity = new Map();
-
-    const parseCountryRow = (item, source) => {
-      let id = "", rawTr = "", rawEn = "", rawNl = "";
-      if (source === "imsakiyem") {
-        id = String(item?._id ?? item?.id ?? "").trim();
-        rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.UlkeAdi ?? item?.name ?? "").trim();
-        rawEn = String(item?.name_en ?? item?.nameEn ?? item?.UlkeAdiEn ?? item?.UlkeAdiEN ?? item?.english_name ?? "").trim();
-        rawNl = String(item?.name_nl ?? item?.nameNl ?? "").trim();
-      } else {
-        id = String(item?.UlkeID ?? item?._id ?? item?.id ?? item?.country_id ?? "").trim();
-        rawTr = String(item?.UlkeAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? item?.country ?? "").trim();
-        rawEn = String(item?.UlkeAdiEn ?? item?.UlkeAdiEN ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "").trim();
-        rawNl = String(item?.UlkeAdiNl ?? item?.name_nl ?? item?.nameNl ?? "").trim();
-      }
-      const codeRaw = String(item?.iso2 ?? item?.iso_code ?? item?.country_code ?? item?.code ?? "").toUpperCase();
-      const iso2 = /^[A-Z]{2}$/.test(codeRaw) && COUNTRY_ISO_CODES.includes(codeRaw)
-        ? codeRaw
-        : (countryIso2FromName(rawEn) || countryIso2FromName(rawTr) || countryIso2FromName(rawNl));
-      const aliases = [...new Set([
-        rawTr, rawEn, rawNl, ...collectApiLocationNameAliases(item)
-      ].filter(Boolean))];
-      return { id, rawTr, rawEn, rawNl, iso2, aliases };
-    };
-
-    // The first complete catalogue controls visible country names and country records.
-    for (const item of primaryRows) {
-      const parsed = parseCountryRow(item, primarySource);
-      const { id, rawTr, rawEn, rawNl, iso2, aliases } = parsed;
-      if (!id || (!rawTr && !rawEn && !rawNl) || isNonAdministrativeLocationName(...aliases)) continue;
-      const displayName = rawTr || rawEn || rawNl;
-      const identityName = countryApiNameKey(rawEn || rawTr || rawNl);
-      const identity = iso2 ? "iso-" + iso2.toLowerCase() : "name-" + identityName;
-      if (!iso2 && !identityName) continue;
-
-      let record = countriesByIdentity.get(identity);
-      if (!record) {
-        record = {
-          id: "country-" + identity,
-          countryId: "",
-          nameTr: rawTr || rawEn || rawNl,
-          nameEn: rawEn || rawTr || rawNl,
-          nameNl: rawNl || rawEn || rawTr,
-          apiName: displayName,
-          nameAliases: [],
-          iso2,
-          sourceIds: {},
-          catalogSource: primarySource,
-          locationKind: "country"
-        };
-        countriesByIdentity.set(identity, record);
-      }
-      record.sourceIds[primarySource] = id;
-      record.nameAliases = [...new Set([...(record.nameAliases || []), ...aliases])].slice(0, 60);
-      if (!record.iso2 && iso2) record.iso2 = iso2;
-    }
-
-    const countries = [...countriesByIdentity.values()];
-    const aliasesFor = country => new Set([
-      country.nameTr, country.nameEn, country.nameNl, country.apiName,
-      ...(country.nameAliases || [])
-    ].map(countryApiNameKey).filter(Boolean));
-
-    // Secondary APIs only supply IDs for the already visible canonical countries.
-    for (const source of sourceOrder) {
-      if (source === primarySource || !sourceData.has(source)) continue;
-      for (const item of sourceData.get(source)) {
-        const parsed = parseCountryRow(item, source);
-        if (!parsed.id || (!parsed.rawTr && !parsed.rawEn && !parsed.rawNl)) continue;
-        const rowKeys = new Set(parsed.aliases.map(countryApiNameKey).filter(Boolean));
-        let match = parsed.iso2 ? countries.find(country => country.iso2 === parsed.iso2) || null : null;
-        if (!match && rowKeys.size) {
-          const candidates = countries.filter(country =>
-            [...aliasesFor(country)].some(key => rowKeys.has(key))
-          );
-          if (candidates.length === 1) match = candidates[0];
-        }
-        if (match) match.sourceIds[source] = parsed.id;
-      }
-    }
-
-    const cleanCountries = countries
-      .filter(country => !isNonAdministrativeLocationName(country.nameTr, country.nameEn, country.nameNl, country.apiName))
-      .sort((a, b) => getLocalizedLocationName(a, "country").localeCompare(
-        getLocalizedLocationName(b, "country"), I18N[state.lang].locale, { sensitivity: "base" }
-      ));
-
-    if (!cleanCountries.length) {
-      state.countries = [];
-      sel.disabled = true;
-      sel.innerHTML = '<option value="" disabled selected>Konum API verisi alınamadı</option>';
-      $("status").textContent = "Ülke listesi konum API kaynaklarından alınamadı.";
-      return [];
-    }
-
-    const previousCountry = state.selectedCountry;
-    state.countries = cleanCountries;
-    if (previousCountry) {
-      const previousIds = new Set([
-        previousCountry.id, ...Object.values(previousCountry.sourceIds || {})
-      ].map(value => String(value || "")).filter(Boolean));
-      const previousKeys = new Set([
-        previousCountry.nameTr, previousCountry.nameEn, previousCountry.nameNl,
-        previousCountry.apiName, ...(previousCountry.nameAliases || [])
-      ].map(countryApiNameKey).filter(Boolean));
-      state.selectedCountry = cleanCountries.find(country =>
-        (previousCountry.iso2 && country.iso2 === previousCountry.iso2) ||
-        [country.id, ...Object.values(country.sourceIds || {})]
-          .some(value => previousIds.has(String(value || ""))) ||
-        [...previousKeys].some(key => aliasesFor(country).has(key))
-      ) || null;
-    }
-    sel.disabled = false;
-    renderCountrySelect();
-    return cleanCountries;
+    const previous=state.selectedCountry;
+    state.countries=[...unique.values()].sort((a,b)=>getLocalizedLocationName(a,"country").localeCompare(getLocalizedLocationName(b,"country"),I18N[state.lang].locale,{sensitivity:"base"}));
+    if(previous)state.selectedCountry=state.countries.find(c=>(previous.iso2&&c.iso2===previous.iso2)||canonicalLocationNameKey(c.apiName)===canonicalLocationNameKey(previous.apiName||previous.nameEn||previous.nameTr))||null;
+    if(!state.countries.length){sel.disabled=true;sel.innerHTML='<option value="" disabled selected>İmsakiyem konum listesinde ülke bulunamadı</option>';return [];}
+    sel.disabled=false;renderCountrySelect();return state.countries;
   }
 
-  function renderCountrySelect() {
+    function renderCountrySelect() {
     const sel = $("countrySelect");
     const curId = state.selectedCountry?.id || "";
     const sorted = [...state.countries].sort((a, b) =>
@@ -2828,520 +2736,26 @@ function findMatchingLocationRecordInList(records, previous) {
     }
   }
 
-  function getParentStateChildrenPayload(payload) {
-    return getLocationApiRows(payload);
+    async function loadStatesForCountry(countryObj,preselectStateId=""){
+    const stateSel=$("stateSelect"),distSel=$("districtSelect");state.states=[];state.districts=[];state.selectedState=null;state.selectedDistrict=null;
+    stateSel.disabled=true;stateSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
+    distSel.disabled=true;distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';
+    const countryId=String(getLocationSourceId(countryObj,"imsakiyem")||countryObj?.id||"");if(!countryId)throw new Error("İmsakiyem ülke kimliği bulunamadı.");
+    let rows=[];try{const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/states?countryId="+encodeURIComponent(countryId),{timeoutMs:9000});rows=getLocationApiRows(response.data);}
+    catch(error){$("status").textContent="İmsakiyem eyalet/il listesi alınamadı: "+String(error?.message||error);renderStateSelect();return [];}
+    const parsed=rows.map(item=>normalizeImsakiyemLocation(item,countryId,"state")).filter(Boolean);
+    if(isTurkeyCountry(countryObj)){
+      state.states=[{id:"imsakiyem-turkey-root",countryId,nameTr:countryObj.nameTr||"Türkiye",nameEn:countryObj.nameEn||"Turkey",nameNl:countryObj.nameNl||"Türkiye",apiName:countryObj.apiName||"Türkiye",sourceIds:{imsakiyem:countryId},catalogSource:"imsakiyem",fallbackDistricts:parsed.map(item=>({...item,countryId,isTurkishProvinceCity:true})),isTurkeyRoot:true}];
+      state.selectedState=state.states[0];
+    }else{
+      const parents=parsed.filter(item=>isCountryNameReturnedAsState(item.nameTr,item.nameEn,countryObj));state.states=parsed.filter(item=>!isCountryNameReturnedAsState(item.nameTr,item.nameEn,countryObj));
+      if(parents.length){const parent=parents[0];let children=[];try{const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/districts?stateId="+encodeURIComponent(parent.id),{timeoutMs:9000});children=getLocationApiRows(response.data).map(item=>normalizeImsakiyemLocation(item,countryId,"district")).filter(Boolean);}catch(_){}if(children.length)state.states.push({...parent,fallbackDistricts:children,isCountryLevelParent:true});}
+      if(preselectStateId)state.selectedState=state.states.find(item=>item.id===String(preselectStateId)||Object.values(item.sourceIds||{}).includes(String(preselectStateId)))||null;
+    }
+    renderStateSelect();return state.states;
   }
 
-  function buildParentStateChildRecord(item, source, countryId) {
-    const isImsakiyem = source === "imsakiyem";
-    const id = String(isImsakiyem
-      ? (item?._id || item?.id || "")
-      : (item?.IlceID || item?._id || item?.id || "")).trim();
-    const fallbackName = isImsakiyem ? (item?.name || "") : (item?.IlceAdi || "");
-    const rawTr = isImsakiyem
-      ? (item?.name_tr || item?.nameTr || fallbackName)
-      : (item?.IlceAdi || fallbackName);
-    const rawEn = isImsakiyem
-      ? (item?.name_en || item?.nameEn || fallbackName)
-      : (item?.IlceAdiEn || fallbackName);
-    const apiName = String(fallbackName || rawTr || rawEn || "").trim();
-    if (!id || (!String(rawTr || "").trim() && !String(rawEn || "").trim())) return null;
-    const cleanTr = String(countryId) === "2"
-      ? formatTurkishName(rawTr || rawEn)
-      : formatTurkishForeignLocationName(rawTr || rawEn);
-    const cleanEn = formatLatinName(rawEn || rawTr);
-    if (isNonAdministrativeLocationName(cleanTr, cleanEn)) return null;
-    return {
-      id,
-      countryId: String(countryId),
-      apiName: normalizeLocationApiLabel(apiName || cleanTr || cleanEn, countryId),
-      nameTr: cleanTr || cleanEn,
-      nameEn: cleanEn || cleanTr,
-      nameNl: formatLatinName(item?.name_nl || item?.nameNl || cleanEn || cleanTr),
-      nameAliases: [...new Set([cleanTr, cleanEn, ...collectApiLocationNameAliases(item)].filter(Boolean))],
-      ...getApiLocationCoordinates(item),
-      sourceIds: { [source]: id }
-    };
-  }
-
-  function addParentStateChildAsRegion(mapById, childRecord, countryObj) {
-    const matched = findMatchingLocationRecord(mapById, childRecord.nameTr, childRecord.nameEn);
-    if (matched?.conflict) return;
-
-    const regionKey = locationNameIdentityKey(childRecord.nameEn || childRecord.nameTr);
-    if (!regionKey) return;
-
-    let region;
-    if (matched?.record) {
-      region = matched.record;
-    } else {
-      const storageKey = `parent-region:${countryObj.id}:${regionKey}`;
-      region = mapById.get(storageKey);
-      if (!region) {
-        region = {
-          id: `region-${countryObj.id}-${regionKey}`,
-          countryId: String(countryObj.id),
-          apiName: childRecord.apiName,
-          nameTr: childRecord.nameTr,
-          nameEn: childRecord.nameEn,
-          nameNl: childRecord.nameNl || childRecord.nameEn,
-          nameAliases: childRecord.nameAliases || [],
-          fallbackDistricts: [],
-          synthetic: true
-        };
-        mapById.set(storageKey, region);
-      }
-    }
-
-    region.countryId = String(countryObj.id);
-    region.apiName = region.apiName || childRecord.apiName || childRecord.nameEn || childRecord.nameTr || "";
-    const districts = Array.isArray(region.fallbackDistricts) ? [...region.fallbackDistricts] : [];
-    const childKeys = new Set([
-      childRecord.nameTr,
-      childRecord.nameEn,
-      childRecord.nameNl,
-      ...(childRecord.nameAliases || [])
-    ].map(canonicalLocationNameKey).filter(Boolean));
-    const existingIndex = districts.findIndex(district =>
-      [
-        district.nameTr,
-        district.nameEn,
-        district.nameNl,
-        ...(Array.isArray(district.nameAliases) ? district.nameAliases : [])
-      ].map(canonicalLocationNameKey).some(key => childKeys.has(key))
-    );
-
-    if (existingIndex >= 0) {
-      const existing = districts[existingIndex];
-      districts[existingIndex] = {
-        ...existing,
-        apiName: existing.apiName || childRecord.apiName || "",
-        sourceIds: { ...(existing.sourceIds || {}), ...(childRecord.sourceIds || {}) },
-        nameAliases: [...new Set([
-          ...(existing.nameAliases || []),
-          ...(childRecord.nameAliases || [])
-        ])].slice(0, 12)
-      };
-    } else {
-      districts.push(childRecord);
-    }
-    region.fallbackDistricts = districts;
-  }
-
-  async function expandCountryLevelState(mapById, parentState, countryObj) {
-    const source = parentState.source;
-    const url = source === "imsakiyem"
-      ? `https://ezanvakti.imsakiyem.com/api/locations/districts?stateId=${encodeURIComponent(parentState.id)}`
-      : source === "mtopal"
-        ? `https://namazvakti.mtopal.dev/ilceler/${encodeURIComponent(parentState.id)}`
-        : `https://ezanvakti.emushaf.net/ilceler/${encodeURIComponent(parentState.id)}`;
-    try {
-      const response = await fetchJsonWithTimeout(url, { timeoutMs: 5500 });
-      const children = getParentStateChildrenPayload(response.data);
-      for (const item of children) {
-        const childRecord = buildParentStateChildRecord(item, source, countryObj.id);
-        if (childRecord) addParentStateChildAsRegion(mapById, childRecord, countryObj);
-      }
-    } catch (_) {
-      // Retain canonical fallback locations when an optional provider is offline.
-    }
-  }
-
-  function getLocationCountryIso2(countryObj) {
-    return String(countryObj?.iso2 || countryIso2FromName(countryObj?.nameEn || countryObj?.nameTr || countryObj?.nameNl || countryObj?.apiName || "") || (countryObj === state.selectedCountry ? getSelectedCountryIso2() : "") || "").toUpperCase();
-  }
-
-  async function fetchOverpassElements(query) {
-    const endpoints = [
-      "https://overpass-api.de/api/interpreter",
-      "https://overpass.kumi.systems/api/interpreter"
-    ];
-    let lastError = null;
-    for (const endpoint of endpoints) {
-      try {
-        const url = endpoint + "?data=" + encodeURIComponent(query);
-        const { data } = await fetchJsonWithTimeout(url, { timeoutMs: 16000 });
-        return Array.isArray(data?.elements) ? data.elements : [];
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    throw lastError || new Error("OpenStreetMap konum verisi alınamadı.");
-  }
-
-  function normalizeOsmLocationElement(element, countryObj, kind) {
-    const tags = element?.tags || {};
-    const rawName = String(tags.name || tags["name:en"] || tags["name:tr"] || "").trim();
-    if (!rawName) return null;
-    const rawEn = String(tags["name:en"] || rawName).trim();
-    const rawTr = String(tags["name:tr"] || rawName).trim();
-    if (isNonAdministrativeLocationName(rawTr, rawEn)) return null;
-
-    const record = {
-      id: "osm-" + String(element.type || "item") + "-" + String(element.id || ""),
-      countryId: String(countryObj?.id || ""),
-      nameTr: rawTr,
-      nameEn: rawEn,
-      nameNl: String(tags["name:nl"] || rawEn),
-      apiName: normalizeLocationApiLabel(rawName, countryObj?.id),
-      nameAliases: [...new Set([rawName, rawTr, rawEn].filter(Boolean))],
-      sourceIds: {},
-      locationKind: kind,
-      osmId: Number(element.id)
-    };
-    if (kind === "state" && element.type === "relation") {
-      record.osmAreaId = 3600000000 + Number(element.id);
-    }
-    return record;
-  }
-
-  async function fetchOsmAdminRegions(countryObj) {
-    const iso2 = getLocationCountryIso2(countryObj);
-    if (!iso2) return [];
-    const query = '[out:json][timeout:20];area["ISO3166-1"="' + iso2 + '"]->.country;' +
-      'relation["boundary"="administrative"]["admin_level"~"3|4|5"](area.country);out tags center;';
-    try {
-      const elements = await fetchOverpassElements(query);
-      return elements.map(element => normalizeOsmLocationElement(element, countryObj, "state"))
-        .filter(record => record?.osmAreaId)
-        .filter((record, index, list) => list.findIndex(item =>
-          canonicalLocationNameKey(item.apiName) === canonicalLocationNameKey(record.apiName)
-        ) === index);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  async function fetchOsmPlacesInArea(areaId, countryObj) {
-    const numericAreaId = Number(areaId);
-    if (!Number.isFinite(numericAreaId) || numericAreaId <= 0) return [];
-    const query = '[out:json][timeout:20];area(' + Math.trunc(numericAreaId) + ')->.selectedArea;' +
-      '(node["place"~"city|town|municipality"](area.selectedArea);' +
-      'relation["place"~"city|town|municipality"](area.selectedArea););out center tags;';
-    try {
-      const elements = await fetchOverpassElements(query);
-      return elements.map(element => normalizeOsmLocationElement(element, countryObj, "district")).filter(Boolean);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  async function fetchOsmPlacesForCountry(countryObj) {
-    const iso2 = getLocationCountryIso2(countryObj);
-    if (!iso2) return [];
-    const query = '[out:json][timeout:20];area["ISO3166-1"="' + iso2 + '"]->.selectedArea;' +
-      '(node["place"~"city|town|municipality"](area.selectedArea);' +
-      'relation["place"~"city|town|municipality"](area.selectedArea););out center tags;';
-    try {
-      const elements = await fetchOverpassElements(query);
-      return elements.map(element => normalizeOsmLocationElement(element, countryObj, "district")).filter(Boolean);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  async function fetchOsmPlacesForState(stateObj, countryObj) {
-    if (stateObj?.osmAreaId) return fetchOsmPlacesInArea(stateObj.osmAreaId, countryObj);
-    const iso2 = getLocationCountryIso2(countryObj);
-    const stateName = String(stateObj?.apiName || stateObj?.nameEn || stateObj?.nameTr || "").trim();
-    if (!iso2 || !stateName) return [];
-    const safeName = stateName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const lookup = '[out:json][timeout:15];area["ISO3166-1"="' + iso2 + '"]->.country;' +
-      'relation["boundary"="administrative"]["admin_level"~"3|4|5"]["name"="' + safeName + '"](area.country);out ids;';
-    try {
-      const matches = await fetchOverpassElements(lookup);
-      const relation = matches.find(item => item.type === "relation" && Number(item.id) > 0);
-      if (!relation) return [];
-      return fetchOsmPlacesInArea(3600000000 + Number(relation.id), countryObj);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function parseStateCatalogRow(item, source) {
-    const isImsakiyem = source === "imsakiyem";
-    const id = String(isImsakiyem
-      ? (item?._id ?? item?.id ?? item?.state_id ?? "")
-      : (item?.SehirID ?? item?._id ?? item?.id ?? item?.state_id ?? "")).trim();
-    const rawTr = String(isImsakiyem
-      ? (item?.name_tr ?? item?.nameTr ?? item?.SehirAdi ?? item?.name ?? "")
-      : (item?.SehirAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? "")).trim();
-    const rawEn = String(isImsakiyem
-      ? (item?.name_en ?? item?.nameEn ?? item?.SehirAdiEn ?? item?.english_name ?? item?.name ?? "")
-      : (item?.SehirAdiEn ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "")).trim();
-    const apiName = String(isImsakiyem
-      ? ((item?.name ?? item?.title ?? rawTr) || rawEn)
-      : (rawTr || rawEn)).trim();
-    const aliases = [...new Set([rawTr, rawEn, apiName, ...collectApiLocationNameAliases(item)].filter(Boolean))];
-    const keys = new Set(aliases.map(canonicalLocationNameKey).filter(Boolean));
-    return { id, rawTr: rawTr || rawEn, rawEn: rawEn || rawTr, apiName, aliases, keys };
-  }
-
-  async function attachAlternateStateSourceIds(stateRecords, countryObj, primarySource, sourceOrder) {
-    if (!Array.isArray(stateRecords) || !stateRecords.length || !primarySource) return;
-    const targets = stateRecords.flatMap(record => record?.isTurkeyRoot
-      ? (record.fallbackDistricts || [])
-      : [record]);
-    const alternateSources = sourceOrder.filter(source =>
-      source !== primarySource && getLocationSourceId(countryObj, source)
-    );
-    const endpoints = {
-      imsakiyem: id => IMSAKIYEM_LOCATION_API + "/states?countryId=" + encodeURIComponent(id),
-      emushaf: id => "https://ezanvakti.emushaf.net/sehirler/" + encodeURIComponent(id),
-      mtopal: id => "https://namazvakti.mtopal.dev/sehirler/" + encodeURIComponent(id)
-    };
-    await Promise.allSettled(alternateSources.map(async source => {
-      const countrySourceId = getLocationSourceId(countryObj, source);
-      const response = await fetchJsonWithTimeout(endpoints[source](countrySourceId), { timeoutMs: 8000 });
-      const rows = getLocationApiRows(response.data);
-      for (const item of rows) {
-        const candidate = parseStateCatalogRow(item, source);
-        if (!candidate.id || !candidate.keys.size ||
-          isCountryNameReturnedAsState(candidate.rawTr, candidate.rawEn, countryObj)) continue;
-        const matches = targets.filter(target => {
-          const keys = new Set([
-            target?.apiName, target?.nameTr, target?.nameEn, target?.nameNl,
-            ...(target?.nameAliases || [])
-          ].map(canonicalLocationNameKey).filter(Boolean));
-          return [...candidate.keys].some(key => keys.has(key));
-        });
-        if (matches.length === 1) {
-          const target = matches[0];
-          target.sourceIds = { ...(target.sourceIds || {}), [source]: candidate.id };
-        }
-      }
-    }));
-  }
-
-  async function loadStatesForCountry(countryObj, preselectStateId = "") {
-    const stateSel = $("stateSelect");
-    const distSel = $("districtSelect");
-    state.states = [];
-    state.districts = [];
-    state.selectedState = null;
-    state.selectedDistrict = null;
-    stateSel.disabled = true;
-    stateSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
-    distSel.disabled = true;
-    distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("selectDistrictOption")) + '</option>';
-
-    const countryId = String(countryObj?.id || "");
-    if (!countryId) throw new Error("Ülke kimliği bulunamadı.");
-
-    const endpoints = {
-      imsakiyem: id => IMSAKIYEM_LOCATION_API + "/states?countryId=" + encodeURIComponent(id),
-      emushaf: id => "https://ezanvakti.emushaf.net/sehirler/" + encodeURIComponent(id),
-      mtopal: id => "https://namazvakti.mtopal.dev/sehirler/" + encodeURIComponent(id)
-    };
-    const sourceOrder = getLocationCatalogSourceOrder();
-    let selectedSource = "";
-    let selectedRows = [];
-    for (const source of sourceOrder) {
-      const sourceId = getLocationSourceId(countryObj, source);
-      if (!sourceId) continue;
-      try {
-        const response = await fetchJsonWithTimeout(endpoints[source](sourceId), { timeoutMs: 8000 });
-        const rows = getLocationApiRows(response.data);
-        if (rows.length) {
-          selectedSource = source;
-          selectedRows = rows;
-          break;
-        }
-      } catch (_) {}
-    }
-    const sourceResults = selectedSource ? [{ source: selectedSource, rows: selectedRows }] : [];
-
-    const mapById = new Map();
-    const parentStateRecords = [];
-    const parentKeys = new Set();
-
-    for (const { source, rows } of sourceResults) {
-      for (const item of rows) {
-        const parsedRow = parseStateCatalogRow(item, source);
-        const { id, rawTr, rawEn, apiName } = parsedRow;
-        if (!id || (!rawTr && !rawEn)) continue;
-
-        if (isCountryNameReturnedAsState(rawTr, rawEn, countryObj)) {
-          const parentKey = source + ":" + id;
-          if (!parentKeys.has(parentKey)) {
-            parentKeys.add(parentKey);
-            parentStateRecords.push({ id, source });
-          }
-          continue;
-        }
-
-        mergeLocationRecord(mapById, id, rawTr, rawEn, {
-          countryId,
-          catalogSource: source,
-          apiName: apiName || rawTr || rawEn,
-          nameAliases: collectApiLocationNameAliases(item),
-          ...getApiLocationCoordinates(item)
-        }, source);
-      }
-    }
-
-    // Some live location catalogues expose a country as a single "state"
-    // and put all real cities in that record's district endpoint (for example,
-    // the United Kingdom). Keep those cities together under one country root;
-    // do not turn every city into a duplicate state with itself as its district.
-    const parentCityMap = new Map();
-    const parentSourceIds = {};
-    const parentEndpoints = {
-      imsakiyem: id => IMSAKIYEM_LOCATION_API + "/districts?stateId=" + encodeURIComponent(id),
-      emushaf: id => "https://ezanvakti.emushaf.net/ilceler/" + encodeURIComponent(id),
-      mtopal: id => "https://namazvakti.mtopal.dev/ilceler/" + encodeURIComponent(id)
-    };
-    const parentResults = await Promise.allSettled(parentStateRecords.map(async parent => {
-      parentSourceIds[parent.source] = parent.id;
-      const response = await fetchJsonWithTimeout(parentEndpoints[parent.source](parent.id), { timeoutMs: 8000 });
-      return { parent, rows: getParentStateChildrenPayload(response.data) };
-    }));
-    for (const result of parentResults) {
-      if (result.status !== "fulfilled") continue;
-      const { parent, rows } = result.value;
-      for (const item of rows) {
-        const child = buildParentStateChildRecord(item, parent.source, countryId);
-        if (!child) continue;
-        mergeLocationRecord(parentCityMap, child.id, child.nameTr, child.nameEn, {
-          ...child,
-          countryId,
-          apiName: child.apiName || child.nameTr || child.nameEn
-        }, parent.source);
-      }
-    }
-    const parentCityRecords = [...parentCityMap.values()];
-    const countryRootState = parentCityRecords.length ? {
-      id: "country-root-" + countryId,
-      countryId,
-      nameTr: countryObj.nameTr || countryObj.nameEn,
-      nameEn: countryObj.nameEn || countryObj.nameTr,
-      nameNl: countryObj.nameNl || countryObj.nameEn || countryObj.nameTr,
-      apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
-      sourceIds: parentSourceIds,
-      catalogSource: parentStateRecords[0]?.source || selectedSource,
-      fallbackDistricts: parentCityRecords,
-      isCountryLevelParent: true
-    } : null;
-
-    if (isTurkeyCountry(countryObj)) {
-      const provinces = [...mapById.values()]
-        .filter(item => item && !isCountryNameReturnedAsState(item.nameTr, item.nameEn, countryObj))
-        .map(item => ({ ...item, countryId, isTurkishProvinceCity: true }));
-
-      state.states = [{
-        id: "turkey-country-root",
-        countryId,
-        nameTr: "Türkiye",
-        nameEn: "Turkey",
-        nameNl: "Türkiye",
-        apiName: "Türkiye",
-        sourceIds: { ...(countryObj.sourceIds || {}) },
-        catalogSource: selectedSource,
-        fallbackDistricts: provinces,
-        isTurkeyRoot: true
-      }];
-      state.selectedState = state.states[0];
-    } else {
-      state.states = [...mapById.values()];
-      if (countryRootState) state.states.push(countryRootState);
-
-      if (preselectStateId) {
-        const requested = String(preselectStateId);
-        state.selectedState = state.states.find(item =>
-          item.id === requested ||
-          Object.values(item.sourceIds || {}).includes(requested) ||
-          (item.legacyDistrictIds || []).includes(requested)
-        ) || null;
-      }
-
-      const hasActualRegions = state.states.some(item =>
-        item.isTurkeyRoot
-          ? (item.fallbackDistricts || []).length > 0
-          : item.isCountryLevelParent
-            ? (item.fallbackDistricts || []).length > 0
-            : true
-      );
-      if (!hasActualRegions) {
-        const osmRegions = await fetchOsmAdminRegions(countryObj);
-        if (osmRegions.length) {
-          if (isTurkeyCountry(countryObj)) {
-            const root = state.states.find(item => item.isTurkeyRoot) || {
-              id: "turkey-country-root",
-              countryId,
-              nameTr: "Türkiye",
-              nameEn: "Turkey",
-              nameNl: "Türkiye",
-              apiName: "Türkiye",
-              sourceIds: { ...(countryObj.sourceIds || {}) },
-              catalogSource: "osm",
-              isTurkeyRoot: true
-            };
-            root.fallbackDistricts = osmRegions.map(item => ({
-              ...item,
-              countryId,
-              isTurkishProvinceCity: true
-            }));
-            state.states = [root];
-            state.selectedState = root;
-          } else {
-            state.states = osmRegions;
-            if (preselectStateId) {
-              const requested = String(preselectStateId);
-              state.selectedState = state.states.find(item => item.id === requested) || null;
-            }
-          }
-        } else {
-          const osmCities = await fetchOsmPlacesForCountry(countryObj);
-          if (osmCities.length) {
-            if (isTurkeyCountry(countryObj)) {
-              const root = state.states.find(item => item.isTurkeyRoot) || {
-                id: "turkey-country-root",
-                countryId,
-                nameTr: "Türkiye",
-                nameEn: "Turkey",
-                nameNl: "Türkiye",
-                apiName: "Türkiye",
-                sourceIds: { ...(countryObj.sourceIds || {}) },
-                isTurkeyRoot: true
-              };
-              root.fallbackDistricts = osmCities.map(item => ({
-                ...item,
-                countryId,
-                isTurkishProvinceCity: true
-              }));
-              state.states = [root];
-              state.selectedState = root;
-            } else {
-              state.states = [{
-                id: "osm-country-root-" + countryId,
-                countryId,
-                nameTr: countryObj.nameTr || countryObj.nameEn,
-                nameEn: countryObj.nameEn || countryObj.nameTr,
-                nameNl: countryObj.nameNl || countryObj.nameEn,
-                apiName: countryObj.apiName || countryObj.nameTr || countryObj.nameEn,
-                osmCountryIso: getLocationCountryIso2(countryObj),
-                catalogSource: "osm",
-                isCountryLevelParent: true,
-                fallbackDistricts: osmCities,
-                sourceIds: {}
-              }];
-              state.selectedState = state.states[0];
-            }
-          }
-        }
-      }
-    }
-
-    if (selectedSource) {
-      await attachAlternateStateSourceIds(
-        state.states, countryObj, selectedSource, sourceOrder
-      );
-    }
-    renderStateSelect();
-    return state.states;
-  }
-
-  function renderStateSelect() {
+    function renderStateSelect() {
     const sel = $("stateSelect");
     const curId = state.selectedState?.id || "";
     sel.disabled = state.states.length === 0;
@@ -3356,136 +2770,16 @@ function findMatchingLocationRecordInList(records, previous) {
     }
   }
 
-  async function loadDistrictsForState(stateObj, preselectDistrictId = "") {
-    const distSel = $("districtSelect");
-    state.districts = [];
-    state.selectedDistrict = null;
-    distSel.disabled = true;
-    distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("loadingList")) + '</option>';
-
-    if (!stateObj) {
-      distSel.innerHTML = '<option value="" disabled selected>' + escapeHtml(t("selectDistrictOption")) + '</option>';
-      return [];
-    }
-
-    if (stateObj.isTurkeyRoot) {
-      state.districts = [...(stateObj.fallbackDistricts || [])];
-      if (preselectDistrictId) {
-        const requested = String(preselectDistrictId);
-        state.selectedDistrict = state.districts.find(item =>
-          item.id === requested ||
-          (item.legacyDistrictIds || []).includes(requested) ||
-          Object.values(item.sourceIds || {}).includes(requested)
-        ) || null;
-      }
-      renderDistrictSelect();
-      return state.districts;
-    }
-
-    const countryId = String(stateObj.countryId || state.selectedCountry?.id || "");
-    const endpoints = {
-      imsakiyem: id => IMSAKIYEM_LOCATION_API + "/districts?stateId=" + encodeURIComponent(id),
-      emushaf: id => "https://ezanvakti.emushaf.net/ilceler/" + encodeURIComponent(id),
-      mtopal: id => "https://namazvakti.mtopal.dev/ilceler/" + encodeURIComponent(id)
-    };
-    const mapById = new Map();
-
-    for (const item of (stateObj.fallbackDistricts || [])) {
-      if (!item) continue;
-      mergeLocationRecord(mapById, item.id, item.nameTr || item.apiName, item.nameEn || item.apiName, {
-        ...item,
-        countryId,
-        apiName: item.apiName || item.nameTr || item.nameEn
-      });
-    }
-
-    const sourceOrder = getLocationCatalogSourceOrder();
-    let selectedSource = "";
-    let selectedRows = [];
-    for (const source of sourceOrder) {
-      const sourceId = getLocationSourceId(stateObj, source);
-      if (!sourceId) continue;
-      try {
-        const response = await fetchJsonWithTimeout(endpoints[source](sourceId), { timeoutMs: 8000 });
-        const rows = getLocationApiRows(response.data);
-        if (rows.length) {
-          selectedSource = source;
-          selectedRows = rows;
-          break;
-        }
-      } catch (_) {}
-    }
-
-    for (const { source, rows } of (selectedSource ? [{ source: selectedSource, rows: selectedRows }] : [])) {
-      for (const item of rows) {
-        let id = "";
-        let rawTr = "";
-        let rawEn = "";
-        let apiName = "";
-
-        if (source === "imsakiyem") {
-          id = String(item?._id ?? item?.id ?? item?.district_id ?? "").trim();
-          rawTr = String(item?.name_tr ?? item?.nameTr ?? item?.IlceAdi ?? item?.name ?? "").trim();
-          rawEn = String(item?.name_en ?? item?.nameEn ?? item?.IlceAdiEn ?? item?.english_name ?? item?.name ?? "").trim();
-          apiName = String(item?.name ?? item?.title ?? (rawTr || rawEn)).trim();
-        } else {
-          id = String(item?.IlceID ?? item?._id ?? item?.id ?? item?.district_id ?? "").trim();
-          rawTr = String(item?.IlceAdi ?? item?.name_tr ?? item?.nameTr ?? item?.name ?? "").trim();
-          rawEn = String(item?.IlceAdiEn ?? item?.name_en ?? item?.nameEn ?? item?.english_name ?? "").trim();
-          apiName = rawTr || rawEn;
-        }
-
-        if (!id || (!rawTr && !rawEn)) continue;
-        rawTr = rawTr || rawEn;
-        rawEn = rawEn || rawTr;
-        mergeLocationRecord(mapById, id, rawTr, rawEn, {
-          countryId,
-          catalogSource: source,
-          apiName: apiName || rawTr || rawEn,
-          nameAliases: collectApiLocationNameAliases(item),
-          ...getApiLocationCoordinates(item)
-        }, source);
-      }
-    }
-
-    if (mapById.size === 0) {
-      let osmPlaces = [];
-      if (stateObj.osmAreaId) {
-        osmPlaces = await fetchOsmPlacesInArea(stateObj.osmAreaId, state.selectedCountry);
-      } else if (stateObj.osmCountryIso || stateObj.isCountryLevelParent) {
-        osmPlaces = stateObj.fallbackDistricts?.length
-          ? [...stateObj.fallbackDistricts]
-          : await fetchOsmPlacesForCountry(state.selectedCountry);
-      } else {
-        osmPlaces = await fetchOsmPlacesForState(stateObj, state.selectedCountry);
-      }
-      for (const item of osmPlaces) {
-        mergeLocationRecord(mapById, item.id, item.nameTr, item.nameEn, {
-          ...item,
-          countryId,
-          apiName: item.apiName
-        });
-      }
-    }
-
-    state.districts = [...mapById.values()];
-    if (preselectDistrictId) {
-      const requested = String(preselectDistrictId);
-      state.selectedDistrict = state.districts.find(item =>
-        item.id === requested ||
-        Object.values(item.sourceIds || {}).includes(requested) ||
-        (item.legacyDistrictIds || []).includes(requested)
-      ) || null;
-    }
-
-    renderDistrictSelect();
-    if (!state.districts.length) {
-      $("status").textContent = "Bu eyalet/şehir için kullanılabilir ilçe veya şehir kaydı konum API kaynaklarında bulunamadı.";
-    }
-    return state.districts;
+  async function loadDistrictsForState(stateObj,preselectDistrictId=""){
+    const distSel=$("districtSelect");state.districts=[];state.selectedDistrict=null;distSel.disabled=true;distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
+    if(!stateObj){distSel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("selectDistrictOption"))+'</option>';return [];}
+    if(stateObj.isTurkeyRoot||stateObj.isCountryLevelParent)state.districts=[...(stateObj.fallbackDistricts||[])];
+    else{const stateId=String(getLocationSourceId(stateObj,"imsakiyem")||stateObj.id||"");if(stateId)try{const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/districts?stateId="+encodeURIComponent(stateId),{timeoutMs:9000});state.districts=getLocationApiRows(response.data).map(item=>normalizeImsakiyemLocation(item,stateObj.countryId||state.selectedCountry?.id,"district")).filter(Boolean);}catch(error){$("status").textContent="İmsakiyem şehir/ilçe listesi alınamadı: "+String(error?.message||error);}}
+    if(preselectDistrictId){const wanted=String(preselectDistrictId);state.selectedDistrict=state.districts.find(item=>item.id===wanted||Object.values(item.sourceIds||{}).includes(wanted))||null;}
+    renderDistrictSelect();if(!state.districts.length)$("status").textContent="İmsakiyem bu eyalet/il için şehir veya ilçe kaydı döndürmedi.";return state.districts;
   }
 
-  function renderDistrictSelect() {
+    function renderDistrictSelect() {
     const sel = $("districtSelect");
     const curId = state.selectedDistrict?.id || "";
     sel.disabled = state.districts.length === 0;
@@ -3528,161 +2822,13 @@ function findMatchingLocationRecordInList(records, previous) {
     return countryIso2FromName(country?.nameEn || country?.nameTr || country?.nameNl || country?.apiName || "");
   }
 
-  async function resolveCityCoords(districtObj, signal) {
-    const cachedLat = Number(districtObj?.lat);
-    const cachedLng = Number(districtObj?.lng);
-    if (Number.isFinite(cachedLat) && Number.isFinite(cachedLng)
-      && cachedLat >= -90 && cachedLat <= 90 && cachedLng >= -180 && cachedLng <= 180) {
-      if (districtObj?.tz) state.zone = districtObj.tz;
-      return { lat: cachedLat, lng: cachedLng };
-    }
-
-    const names = [...new Set([
-      districtObj?.nameEn, districtObj?.nameTr, districtObj?.nameNl,
-      ...(Array.isArray(districtObj?.nameAliases) ? districtObj.nameAliases : [])
-    ].map(value => String(value || "").trim()).filter(Boolean))];
-    const countryNames = [...new Set([
-      state.selectedCountry?.nameEn, state.selectedCountry?.nameTr, state.selectedCountry?.nameNl
-    ].map(value => String(value || "").trim()).filter(Boolean))];
-    const stateNames = [...new Set([
-      state.selectedState?.nameEn, state.selectedState?.nameTr, state.selectedState?.nameNl
-    ].map(value => String(value || "").trim()).filter(Boolean))];
-    if (!names.length) throw new Error("Seçili şehir için konum adı bulunamadı.");
-
-    const expectedIso = getSelectedCountryIso2();
-    const countryKeys = new Set(countryNames.map(asciiFoldKey).filter(Boolean));
-    const stateKeys = new Set(stateNames.map(asciiFoldKey).filter(Boolean));
-    const wantedCityKeys = new Set(names.map(asciiFoldKey).filter(Boolean));
-    const querySet = new Set();
-    for (const name of names.slice(0, 3)) {
-      querySet.add([name, ...stateNames.slice(0, 1), ...countryNames.slice(0, 1)].filter(Boolean).join(", "));
-      querySet.add([name, ...countryNames.slice(0, 1)].filter(Boolean).join(", "));
-    }
-    const queries = [...querySet];
-
-    const scoreCandidate = (hit, fields) => {
-      const code = String(fields.countryCode || "").toUpperCase();
-      const hitCountry = asciiFoldKey(fields.country || "");
-      const hitAdmin = asciiFoldKey(fields.admin || "");
-      const hitCity = asciiFoldKey(fields.city || "");
-      const hitName = asciiFoldKey(fields.name || "");
-      const sameCountry = (expectedIso && code === expectedIso) || (countryKeys.size && countryKeys.has(hitCountry));
-      if (!sameCountry) return null;
-      const sameCity = wantedCityKeys.has(hitCity) || wantedCityKeys.has(hitName);
-      const sameState = stateKeys.size && stateKeys.has(hitAdmin);
-      // A matching country alone is not enough: require a city/district name
-      // or a matching first-level administrative region.
-      if (!sameCity && !sameState) return null;
-      const score = 100 + (sameCity ? 45 : 0) + (sameState ? 25 : 0)
-        + (Number(fields.population) > 0 ? Math.min(5, Math.log10(Number(fields.population))) : 0);
-      const lat = Number(fields.lat);
-      const lng = Number(fields.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-      return { score, lat, lng, timezone: fields.timezone || "" };
-    };
-
-    let best = null;
-    const consider = candidate => {
-      if (candidate && (!best || candidate.score > best.score)) best = candidate;
-    };
-
-    // Primary keyless geocoder.
-    for (const query of queries) {
-      if (signal?.aborted) throw new Error("Aborted");
-      try {
-        const { data } = await fetchJsonWithTimeout(
-          "https://geocoding-api.open-meteo.com/v1/search?name=" +
-            encodeURIComponent(query) + "&count=10&language=en&format=json",
-          { signal, timeoutMs: 4800 }
-        );
-        const hits = Array.isArray(data?.results) ? data.results : [];
-        for (const hit of hits) {
-          consider(scoreCandidate(hit, {
-            countryCode: hit?.country_code,
-            country: hit?.country,
-            admin: hit?.admin1,
-            city: hit?.name,
-            name: hit?.name,
-            population: hit?.population,
-            lat: hit?.latitude,
-            lng: hit?.longitude,
-            timezone: hit?.timezone
-          }));
-        }
-        if (best?.score >= 145) break;
-      } catch (error) {
-        if (signal?.aborted) throw error;
-      }
-    }
-
-    // Photon is an additional public, keyless geocoder with CORS support.
-    if (!best) {
-      for (const query of queries) {
-        if (signal?.aborted) throw new Error("Aborted");
-        try {
-          const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(query) + "&limit=8&lang=en";
-          const { data } = await fetchJsonWithTimeout(url, { signal, timeoutMs: 5500 });
-          const features = Array.isArray(data?.features) ? data.features : [];
-          for (const feature of features) {
-            const props = feature?.properties || {};
-            const coordinates = feature?.geometry?.coordinates || [];
-            consider(scoreCandidate(feature, {
-              countryCode: props.countrycode || props.country_code,
-              country: props.country,
-              admin: props.state || props.county,
-              city: props.city || props.name,
-              name: props.name,
-              population: props.population,
-              lat: coordinates[1],
-              lng: coordinates[0]
-            }));
-          }
-          if (best) break;
-        } catch (error) {
-          if (signal?.aborted) throw error;
-        }
-      }
-    }
-
-    if (best) {
-      districtObj.lat = best.lat;
-      districtObj.lng = best.lng;
-      if (best.timezone) state.zone = best.timezone;
-      return { lat: best.lat, lng: best.lng };
-    }
-
-    // Nominatim last fallback: use one full address string rather than city alone.
-    try {
-      const params = new URLSearchParams({
-        format: "jsonv2",
-        q: [names[0], stateNames[0], countryNames[0]].filter(Boolean).join(", "),
-        limit: "5",
-        addressdetails: "1"
-      });
-      const { data } = await fetchJsonWithTimeout(
-        "https://nominatim.openstreetmap.org/search?" + params.toString(),
-        { signal, timeoutMs: 6000 }
-      );
-      const hits = Array.isArray(data) ? data : [];
-      const safe = hits.find(hit => {
-        const address = hit?.address || {};
-        const hitCountry = asciiFoldKey(address.country || "");
-        const code = String(address.country_code || "").toUpperCase();
-        return (expectedIso && code === expectedIso) || (countryKeys.size && countryKeys.has(hitCountry));
-      });
-      if (safe && Number.isFinite(Number(safe.lat)) && Number.isFinite(Number(safe.lon))) {
-        districtObj.lat = Number(safe.lat);
-        districtObj.lng = Number(safe.lon);
-        return { lat: districtObj.lat, lng: districtObj.lng };
-      }
-    } catch (error) {
-      if (signal?.aborted) throw error;
-    }
-
-    throw new Error("Bu konum için koordinat bulunamadı. Ülke ve şehir adını kontrol edin; ardından başka bir açık vakit kaynağı deneyin.");
+  async function resolveCityCoords(districtObj){
+    const lat=Number(districtObj?.lat),lng=Number(districtObj?.lng);
+    if(Number.isFinite(lat)&&lat>=-90&&lat<=90&&Number.isFinite(lng)&&lng>=-180&&lng<=180){if(districtObj?.tz)state.zone=districtObj.tz;return {lat,lng};}
+    throw new Error("Bu API koordinat istiyor. Seçili sağlayıcının konum alanından koordinat girin veya cihaz konumunu kullanın.");
   }
 
-  function validateMappedTimes(mapped) {
+    function validateMappedTimes(mapped) {
     if (Object.values(mapped).some(v => !/^\d{2}:\d{2}$/.test(v))) {
       throw new Error("Invalid time format");
     }
@@ -3812,6 +2958,76 @@ function findMatchingLocationRecordInList(records, previous) {
     return districtId;
   }
 
+
+function currentDeviceTimezone(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||DEFAULT_ZONE;}catch(_){return DEFAULT_ZONE;}}
+function validTimezone(value){const zone=String(value||"").trim();if(!zone)return "";try{new Intl.DateTimeFormat("en",{timeZone:zone}).format(new Date());return zone;}catch(_){return "";}}
+function updateLocationProviderUI(){
+const mode=state.selectedApiMode||"auto",hierarchy=mode==="auto"||mode==="imsakiyem";$("locationHierarchyRow").style.display=hierarchy?"":"none";$("providerLocationFields").style.display=hierarchy?"none":"grid";
+$("aladhanLocationFields").style.display=mode==="aladhan"?"":"none";$("ummahLocationFields").style.display=mode==="ummahapi"?"":"none";$("qasraLocationFields").style.display=mode==="qasra"?"":"none";
+const tr=state.lang==="tr",nl=state.lang==="nl";$("aladhanCountryLabel").textContent=tr?"Ülke:":nl?"Land:":"Country:";$("aladhanStateLabel").textContent=tr?"Eyalet / İl (isteğe bağlı):":nl?"Staat / provincie (optioneel):":"State / province (optional):";$("aladhanCityLabel").textContent=tr?"Şehir:":nl?"Stad:":"City:";
+$("aladhanApplyLocationBtn").textContent=tr?"Konumu uygula ve vakitleri getir":nl?"Locatie toepassen en tijden laden":"Apply location and load prayer times";$("ummahUseDeviceLocationBtn").textContent=tr?"Cihaz konumunu kullan":nl?"Apparaatlocatie gebruiken":"Use device location";$("ummahApplyCoordsBtn").textContent=tr?"Koordinatları uygula ve vakitleri getir":nl?"Coördinaten toepassen en tijden laden":"Apply coordinates and load times";
+$("qasraSearchBtn").textContent=tr?"Şehir ara":nl?"Stad zoeken":"Search city";$("qasraSearchLabel").textContent=tr?"Şehir ara (QASRA Geocoder):":nl?"Stad zoeken (QASRA Geocoder):":"Search city (QASRA Geocoder):";$("qasraResultsLabel").textContent=tr?"Arama sonuçları:":nl?"Zoekresultaten:":"Search results:";$("qasraTimezoneLabel").textContent=tr?"Saat dilimi (IANA):":nl?"Tijdzone (IANA):":"Time zone (IANA):";
+if(!$("ummahTimezoneInput").value)$("ummahTimezoneInput").value=currentDeviceTimezone();
+}
+function setCustomLocation(countryName,stateName,cityName,extra={}){
+const country=String(countryName||"").trim(),region=String(stateName||"").trim(),city=String(cityName||"").trim();
+state.selectedCountry=country?{id:"custom-country-"+asciiFoldKey(country).replace(/[^a-z0-9]+/g,"-"),nameTr:country,nameEn:country,nameNl:country,apiName:country,iso2:countryIso2FromName(country)||"",locationKind:"country"}:null;
+state.selectedState=region?{id:"custom-state-"+asciiFoldKey(region).replace(/[^a-z0-9]+/g,"-"),nameTr:region,nameEn:region,nameNl:region,apiName:region,locationKind:"state"}:null;
+state.selectedDistrict=city?{id:extra.id||("custom-city-"+asciiFoldKey(city).replace(/[^a-z0-9]+/g,"-")),nameTr:city,nameEn:city,nameNl:city,apiName:city,...(Number.isFinite(Number(extra.lat))?{lat:Number(extra.lat)}:{}),...(Number.isFinite(Number(extra.lng))?{lng:Number(extra.lng)}:{}),...(extra.tz?{tz:extra.tz}:{}),locationKind:"district"}:null;
+state.countries=state.selectedCountry?[state.selectedCountry]:[];state.states=state.selectedState?[state.selectedState]:[];state.districts=state.selectedDistrict?[state.selectedDistrict]:[];return state.selectedDistrict;
+}
+function applyAladhanLocation(shouldLoad=true){
+const country=$("aladhanCountryInput").value.trim(),region=$("aladhanStateInput").value.trim(),city=$("aladhanCityInput").value.trim();
+if(!country||!city){$("status").textContent=state.lang==="tr"?"AlAdhan için ülke ve şehir adını girin. Eyalet/il isteğe bağlıdır.":"Enter a country and city for AlAdhan. State or province is optional.";return false;}
+setCustomLocation(country,region,city);state.zone=detectTimezoneForCountry(state.selectedCountry);state.actualApiMode="";state.todayData=null;Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);if(shouldLoad)loadTimes({silentHourly:false});return true;
+}
+function applyUmmahCoordinates(cityLabel="GPS location"){
+const lat=Number($("ummahLatInput").value),lng=Number($("ummahLngInput").value),zone=validTimezone($("ummahTimezoneInput").value);
+if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180){$("status").textContent=state.lang==="tr"?"UmmahAPI için geçerli enlem ve boylam girin.":"Enter valid latitude and longitude for UmmahAPI.";return false;}
+if(!zone){$("status").textContent=state.lang==="tr"?"Geçerli bir IANA saat dilimi girin (ör. Europe/Amsterdam).":"Enter a valid IANA time zone (for example, Europe/Amsterdam).";return false;}
+setCustomLocation("","",cityLabel,{id:"ummah-coordinates",lat,lng,tz:zone});state.zone=zone;state.actualApiMode="";state.todayData=null;Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);loadTimes({silentHourly:false});return true;
+}
+function useUmmahDeviceLocation(){
+if(!navigator.geolocation){$("status").textContent=state.lang==="tr"?"Tarayıcı konum iznini desteklemiyor; koordinatları elle girebilirsiniz.":"Geolocation is unavailable; enter coordinates manually.";return;}
+$("status").textContent=state.lang==="tr"?"Cihaz konumu bekleniyor…":"Waiting for device location…";
+navigator.geolocation.getCurrentPosition(position=>{$("ummahLatInput").value=String(position.coords.latitude);$("ummahLngInput").value=String(position.coords.longitude);$("ummahTimezoneInput").value=currentDeviceTimezone();applyUmmahCoordinates(state.lang==="tr"?"Cihaz konumu (GPS)":state.lang==="nl"?"Apparaatlocatie (GPS)":"Device location (GPS)");},
+error=>{const reason=error?.code===1?"Konum izni verilmedi.":error?.code===2?"Cihaz konumu belirlenemedi.":"Konum isteği zaman aşımına uğradı.";$("status").textContent=state.lang==="tr"?reason+" Enlem ve boylamı elle girebilirsiniz.":reason+" You can enter coordinates manually.";},
+{enableHighAccuracy:false,timeout:15000,maximumAge:300000});
+}
+async function searchQasraPlaces(){
+const query=$("qasraSearchInput").value.trim();if(query.length<2){$("status").textContent=state.lang==="tr"?"Arama için en az iki karakter girin.":"Enter at least two characters to search.";return;}
+const button=$("qasraSearchBtn");button.disabled=true;button.textContent=state.lang==="tr"?"Aranıyor…":"Searching…";$("qasraResultsSelect").disabled=true;
+try{const url="https://geo.qasra.org/search?q="+encodeURIComponent(query);const {data}=await fetchJsonWithTimeout(url,{timeoutMs:9000});const rows=Array.isArray(data)?data:getLocationApiRows(data);
+state.qasraSearchResults=rows.filter(item=>{const lat=Number(item?.lat),lng=Number(item?.lng);return String(item?.name||item?.city||"").trim()&&Number.isFinite(lat)&&lat>=-90&&lat<=90&&Number.isFinite(lng)&&lng>=-180&&lng<=180;}).slice(0,10);
+$("qasraResultsSelect").innerHTML='<option value="">'+(state.lang==="tr"?"Bir konum seçin":"Select a location")+"</option>"+state.qasraSearchResults.map((item,index)=>'<option value="'+index+'">'+escapeHtml([item.name||item.city,item.state,item.country].filter(Boolean).join(" — "))+"</option>").join("");
+$("qasraResultsSelect").disabled=!state.qasraSearchResults.length;$("status").textContent=state.qasraSearchResults.length?(state.lang==="tr"?state.qasraSearchResults.length+" konum bulundu. Doğru şehri seçin.":state.qasraSearchResults.length+" places found. Select the correct city."):(state.lang==="tr"?"Eşleşen şehir bulunamadı.":"No matching places found.");
+}catch(error){$("status").textContent=(state.lang==="tr"?"QASRA konum araması başarısız: ":"QASRA place search failed: ")+String(error?.message||error);}
+finally{button.disabled=false;button.textContent=state.lang==="tr"?"Şehir ara":state.lang==="nl"?"Stad zoeken":"Search city";}
+}
+function selectQasraPlace(){
+const item=state.qasraSearchResults[Number($("qasraResultsSelect").value)];if(!item)return;const zone=validTimezone($("qasraTimezoneInput").value);
+if(!zone){$("status").textContent=state.lang==="tr"?"Şehir için geçerli bir IANA saat dilimi girin (ör. Asia/Kolkata).":"Enter a valid IANA time zone for this city (for example, Asia/Kolkata).";return;}
+const city=String(item.name||item.city).trim(),region=String(item.state||"").trim(),country=String(item.country||"").trim();
+setCustomLocation(country,region,city,{id:"qasra-"+asciiFoldKey(city+"-"+region+"-"+country).replace(/[^a-z0-9]+/g,"-"),lat:Number(item.lat),lng:Number(item.lng),tz:zone});
+state.zone=zone;state.actualApiMode="";state.todayData=null;Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);loadTimes({silentHourly:false});
+}
+function restoreCustomProviderLocation(saved){
+if(state.selectedApiMode==="aladhan"){$("aladhanCountryInput").value=saved?.aladhanCountryName||"";$("aladhanStateInput").value=saved?.aladhanStateName||"";$("aladhanCityInput").value=saved?.aladhanCityName||"";if($("aladhanCountryInput").value&&$("aladhanCityInput").value)applyAladhanLocation(false);return;}
+const lat=Number(saved?.providerLat),lng=Number(saved?.providerLng);if(!Number.isFinite(lat)||lat < -90||lat>90||!Number.isFinite(lng)||lng < -180||lng>180)return;
+const country=saved?.providerCountryName||"",region=saved?.providerStateName||"",city=saved?.providerCityName||(state.selectedApiMode==="ummahapi"?"GPS location":"");if(!city)return;
+const zone=validTimezone(saved?.providerTimezone)||currentDeviceTimezone();setCustomLocation(country,region,city,{id:state.selectedApiMode+"-saved-location",lat,lng,tz:zone});state.zone=zone;
+$("ummahLatInput").value=String(lat);$("ummahLngInput").value=String(lng);$("ummahTimezoneInput").value=zone;$("qasraTimezoneInput").value=zone;
+}
+async function switchPrayerApiMode(nextMode){
+const valid=["auto","aladhan","ummahapi","qasra","imsakiyem"],mode=valid.includes(nextMode)?nextMode:"auto",oldCountry=state.selectedCountry,oldState=state.selectedState,oldDistrict=state.selectedDistrict;
+state.selectedApiMode=mode;state.actualApiMode="";state.todayData=null;
+if(mode==="auto"||mode==="imsakiyem"){
+state.selectedCountry=oldCountry;state.selectedState=oldState;state.selectedDistrict=oldDistrict;populatePrayerMethodOptions();await loadCountries();
+if(state.selectedCountry){await loadStatesForCountry(state.selectedCountry,oldState?.id||"");const match=oldState?.isTurkeyRoot?state.states.find(x=>x.isTurkeyRoot):findMatchingLocationRecordInList(state.states,oldState);state.selectedState=match||state.selectedState||null;
+if(state.selectedState){await loadDistrictsForState(state.selectedState);state.selectedDistrict=findMatchingLocationRecordInList(state.districts,oldDistrict);renderDistrictSelect();}}
+}else{state.countries=[];state.states=[];state.districts=[];state.selectedCountry=null;state.selectedState=null;state.selectedDistrict=null;}
+populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs();updateCityHeaderAndFooter();renderEmptyPrayerPlaceholder(true);updateMissingSelectionStatus();
+}
   async function fetchFromImsakiyem(isoDate, districtObj, signal) {
     const locationId = await resolveTurkeyCityCentreId(districtObj, "imsakiyem", signal);
     const url = `https://ezanvakti.imsakiyem.com/api/prayer-times/${locationId}/daily?startDate=${isoDate}&endDate=${isoDate}`;
@@ -3847,6 +3063,7 @@ function findMatchingLocationRecordInList(records, previous) {
       country: getApiQueryEn(state.selectedCountry) || "Netherlands",
       school: state.prayerSchool === "hanafi" ? "1" : "0"
     });
+    if (state.selectedState?.apiName || state.selectedState?.nameEn) params.set("state", getApiQueryEn(state.selectedState));
     if (method.aladhan !== "" && method.aladhan !== undefined) params.set("method", String(method.aladhan));
     else params.set("method", isTurkeyCountry(state.selectedCountry) ? "13" : "3");
     if (state.prayerMethod === "moonsighting") params.set("shafaq", state.shafaqMode || "general");
@@ -3875,6 +3092,7 @@ function findMatchingLocationRecordInList(records, previous) {
     });
     const h = j.data.date?.hijri;
     const hijri = h ? (h.day + " " + (h.month?.tr || h.month?.en || "") + " " + h.year).trim() : "";
+    if (j.data.meta?.timezone) state.zone = j.data.meta.timezone;
     const methodLabel = method[state.lang] || method.en;
     return {
       mapped, hijri,
@@ -3897,7 +3115,8 @@ function findMatchingLocationRecordInList(records, previous) {
       lng: String(coords.lng),
       date: dateKey(p),
       timezone: state.zone || "UTC",
-      madhab: state.prayerSchool === "hanafi" ? "Hanafi" : "Shafi"
+      madhab: state.prayerSchool === "hanafi" ? "Hanafi" : "Shafi",
+      nearest_city: "true"
     });
     if (state.highLatitudeRule !== "recommended") params.set("highLatitudeRule", state.highLatitudeRule);
     if (method.ummah) params.set("method", method.ummah);
@@ -3998,9 +3217,7 @@ function findMatchingLocationRecordInList(records, previous) {
 
     const providerOrder = ["imsakiyem", "aladhan", "ummahapi", "qasra"];
     const requestedMode = state.selectedApiMode;
-    const attempts = requestedMode === "auto"
-      ? providerOrder
-      : [requestedMode, ...providerOrder.filter(mode => mode !== requestedMode)];
+    const attempts = requestedMode === "auto" ? providerOrder : [requestedMode];
     const failures = [];
     let res = null;
     let usedMode = "";
@@ -5512,6 +4729,7 @@ function findMatchingLocationRecordInList(records, previous) {
       ? (state.lang === "tr" ? "İl / Şehir:" : state.lang === "nl" ? "Stad / provincie:" : "City / province:")
       : t("districtSelectLabel");
     $("apiSelectLabel").textContent = t("apiSelectLabel");
+    updateLocationProviderUI();
 
     if (state.countries.length > 0) renderCountrySelect();
     if (state.states.length > 0) renderStateSelect();
@@ -5760,44 +4978,15 @@ function findMatchingLocationRecordInList(records, previous) {
       }
     });
 
-    $("apiSelect").addEventListener("change", async e => {
-      const previousState = state.selectedState;
-      const previousDistrict = state.selectedDistrict;
-      state.selectedApiMode = e.target.value;
-      state.actualApiMode = "";
-      populatePrayerMethodOptions();
+    $("apiSelect").addEventListener("change", async e => { await switchPrayerApiMode(e.target.value); });
+    $("aladhanApplyLocationBtn").addEventListener("click",()=>applyAladhanLocation(true));
+    $("ummahUseDeviceLocationBtn").addEventListener("click",useUmmahDeviceLocation);
+    $("ummahApplyCoordsBtn").addEventListener("click",()=>applyUmmahCoordinates(state.lang==="tr"?"Girilen koordinatlar":state.lang==="nl"?"Ingevoerde coördinaten":"Entered coordinates"));
+    $("qasraSearchBtn").addEventListener("click",searchQasraPlaces);
+    $("qasraSearchInput").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();searchQasraPlaces();}});
+    $("qasraResultsSelect").addEventListener("change",selectQasraPlace);
 
-      if (state.selectedCountry) {
-        await loadStatesForCountry(state.selectedCountry, previousState?.id || "");
-        let nextState = previousState?.isTurkeyRoot
-          ? state.states.find(item => item.isTurkeyRoot)
-          : findMatchingLocationRecordInList(state.states, previousState);
-        if (!nextState && !previousState && state.states.length === 1) {
-          nextState = state.states[0];
-        }
-        state.selectedState = nextState || null;
-
-        if (state.selectedState) {
-          await loadDistrictsForState(state.selectedState);
-          state.selectedDistrict = findMatchingLocationRecordInList(state.districts, previousDistrict);
-          renderDistrictSelect();
-        } else {
-          state.selectedDistrict = null;
-          renderEmptyPrayerPlaceholder(true);
-        }
-      }
-
-      Persistence.savePrefs();
-      updateCityHeaderAndFooter();
-      if (state.selectedDistrict && state.selectedApiMode) {
-        loadTimes({ silentHourly: false });
-      } else {
-        updateMissingSelectionStatus();
-        renderEmptyPrayerPlaceholder(true);
-      }
-    });
-
-    $("prayerMethodSelect").addEventListener("change", e => {
+        $("prayerMethodSelect").addEventListener("change", e => {
       state.prayerMethod = e.target.value || "auto";
       populatePrayerMethodOptions();
       Persistence.savePrefs();
@@ -5928,21 +5117,20 @@ function findMatchingLocationRecordInList(records, previous) {
   async function init() {
     bindEvents();
     const saved = Persistence.loadPrefs();
-    if (saved?.lang && I18N[saved.lang]) {
-      state.lang = saved.lang;
-    }
+    if (saved?.lang && I18N[saved.lang]) state.lang = saved.lang;
     state.contentLang = state.lang;
     if (["gregorian","hijri"].includes(saved?.calendarMode)) state.calendarMode = saved.calendarMode;
     if (PRAYER_METHODS.some(item => item.value === saved?.prayerMethod)) state.prayerMethod = saved.prayerMethod;
     if (["shafii","hanafi"].includes(saved?.prayerSchool)) state.prayerSchool = saved.prayerSchool;
     if (["recommended","MiddleOfNight","SeventhOfNight","TwilightAngle"].includes(saved?.highLatitudeRule)) state.highLatitudeRule = saved.highLatitudeRule;
-    if (Number.isFinite(Number(saved?.customFajrAngle))) state.customFajrAngle = Math.max(0, Math.min(30, Number(saved.customFajrAngle)));
+    if (Number.isFinite(Number(saved?.customFajrAngle))) state.customFajrAngle = Math.max(0,Math.min(30,Number(saved.customFajrAngle)));
     if (saved?.customMaghribSetting === "" || Number.isFinite(Number(saved?.customMaghribSetting))) state.customMaghribSetting = saved.customMaghribSetting;
-    if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0, Math.min(60, Number(saved.customIshaSetting)));
-    if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\d+(,-?\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
+    if (Number.isFinite(Number(saved?.customIshaSetting))) state.customIshaSetting = Math.max(0,Math.min(60,Number(saved.customIshaSetting)));
+    if (typeof saved?.prayerTune === "string" && (!saved.prayerTune || /^-?\\d+(,-?\\d+){8}$/.test(saved.prayerTune))) state.prayerTune = saved.prayerTune;
     if (["0","1"].includes(String(saved?.midnightMode))) state.midnightMode = String(saved.midnightMode);
     if (["general","ahmer","abyad"].includes(saved?.shafaqMode)) state.shafaqMode = saved.shafaqMode;
-    state.selectedApiMode = saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`) ? saved.apiMode : "auto";
+
+    state.selectedApiMode = ["auto","aladhan","ummahapi","qasra","imsakiyem"].includes(saved?.apiMode) ? saved.apiMode : "auto";
     $("apiSelect").value = state.selectedApiMode;
     loadZikrPrefs();
     if (typeof saved?.volume === "number") {
@@ -5953,27 +5141,32 @@ function findMatchingLocationRecordInList(records, previous) {
 
     await Persistence.restoreAllAudioTracks();
     applyLanguageUI(false);
-    renderEmptyPrayerPlaceholder(true);
-    await loadCountries();
-
-    // Restore saved location & API selections cleanly
-    state.selectedApiMode = saved?.apiMode && $("apiSelect").querySelector(`option[value="${saved.apiMode}"]`) ? saved.apiMode : "auto";
-    $("apiSelect").value = state.selectedApiMode;
     populatePrayerMethodOptions();
-    if (saved?.countryId) {
-      const cObj = state.countries.find(c => c.id === String(saved.countryId) || Object.values(c.sourceIds || {}).includes(String(saved.countryId)));
-      if (cObj) {
-        state.selectedCountry = cObj;
-        state.zone = detectTimezoneForCountry(cObj);
-        renderCountrySelect();
-        await loadStatesForCountry(cObj, saved.stateId || "");
-        if (state.selectedState) {
-          await loadDistrictsForState(state.selectedState, saved.districtId || "");
-          if (state.selectedDistrict?.tz) state.zone = state.selectedDistrict.tz;
+    updateLocationProviderUI();
+    renderEmptyPrayerPlaceholder(true);
+
+    if (state.selectedApiMode === "auto" || state.selectedApiMode === "imsakiyem") {
+      await loadCountries();
+      if (saved?.countryId) {
+        const restoredCountry = state.countries.find(item =>
+          item.id === String(saved.countryId) || Object.values(item.sourceIds || {}).includes(String(saved.countryId))
+        );
+        if (restoredCountry) {
+          state.selectedCountry = restoredCountry;
+          state.zone = detectTimezoneForCountry(restoredCountry);
+          renderCountrySelect();
+          await loadStatesForCountry(restoredCountry, saved.stateId || "");
+          if (state.selectedState) {
+            await loadDistrictsForState(state.selectedState, saved.districtId || "");
+            if (state.selectedDistrict?.tz) state.zone = state.selectedDistrict.tz;
+          }
         }
       }
+    } else {
+      restoreCustomProviderLocation(saved);
     }
 
+    updateLocationProviderUI();
     updateCityHeaderAndFooter();
     if (state.selectedDistrict && state.selectedApiMode) {
       loadTimes({ silentHourly: false });
@@ -5987,11 +5180,9 @@ function findMatchingLocationRecordInList(records, previous) {
     updateReligiousLanguageUI();
     loadRandomHadith();
     loadRandomQuran();
-
     tick();
     setInterval(tick, 250);
   }
-
   init();
 })();
 </script>
