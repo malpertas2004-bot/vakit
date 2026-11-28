@@ -3045,9 +3045,14 @@ const DIYANET_ALL_LOCATIONS = [];
         state._imsakiyemCountryDistrictCacheCountryId = countryId;
       }
 
-      state.states = regions
-        .map(region => normalizeImsakiyemAdminRegion(region, countryId))
-        .filter(Boolean);
+      const uniqueRegions = new Map();
+      for (const region of regions) {
+        const normalized = normalizeImsakiyemAdminRegion(region, countryId);
+        if (!normalized) continue;
+        const key = canonicalLocationNameKey(normalized.adminRegion || normalized.apiName);
+        if (key && !uniqueRegions.has(key)) uniqueRegions.set(key, normalized);
+      }
+      state.states = [...uniqueRegions.values()];
 
       if (preselectStateId) {
         const wanted = String(preselectStateId);
@@ -3472,7 +3477,17 @@ populatePrayerMethodOptions();updateLocationProviderUI();Persistence.savePrefs()
     if (!data || typeof data !== "object") return null;
     const times = data.times;
     if (Array.isArray(times)) {
-      return times.find(item => String(item?.date || item?.gregorian_date || "") === isoDate) || times[0] || data;
+      const datedRecord = times.find(item =>
+        String(item?.date || item?.gregorian_date || "") === isoDate
+      );
+      if (datedRecord) return datedRecord;
+      const isPrayerEntryList = times.some(item =>
+        item && typeof item === "object" &&
+        (item.key || item.name || item.prayer || item.prayer_name || item.vakit || item.slug)
+      );
+      // Keep the parent wrapper when "times" is a list of individual prayers.
+      if (isPrayerEntryList) return data;
+      return times[0] || data;
     }
     return data;
   }
