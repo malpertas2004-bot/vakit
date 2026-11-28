@@ -2746,8 +2746,24 @@ const DIYANET_ALL_LOCATIONS = [];
 
   async function loadCountries() {
     const sel=$("countrySelect");sel.disabled=true;sel.innerHTML='<option value="" disabled selected>'+escapeHtml(t("loadingList"))+'</option>';
-    let rows=[];try{const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/countries",{timeoutMs:9000});rows=getLocationApiRows(response.data);}
-    catch(error){state.countries=[];sel.innerHTML='<option value="" disabled selected>İmsakiyem konum listesi alınamadı</option>';$("status").textContent="İmsakiyem ülke listesi alınamadı: "+String(error?.message||error);return [];}
+    let rows=[],countryLoadError=null;
+    // The legacy v1 country catalogue contains only Türkiye and KKTC.
+    // Use the current v2 global country catalogue first, as the official site does.
+    try{
+      const response=await fetchJsonWithTimeout("https://ezanvakti.imsakiyem.com/api/v2/locations/countries",{timeoutMs:12000});
+      rows=getLocationApiRows(response.data);
+    }catch(error){countryLoadError=error;}
+    if(!rows.length){
+      try{
+        const response=await fetchJsonWithTimeout(IMSAKIYEM_LOCATION_API+"/countries",{timeoutMs:9000});
+        rows=getLocationApiRows(response.data);
+      }catch(error){countryLoadError=error;}
+    }
+    if(!rows.length){
+      state.countries=[];sel.innerHTML='<option value="" disabled selected>İmsakiyem ülke listesi alınamadı</option>';
+      $("status").textContent="İmsakiyem dünya ülke listesi alınamadı: "+String(countryLoadError?.message||"API boş liste döndürdü");
+      return [];
+    }
     const unique=new Map();
     for(const item of rows){
       const id=String(item?._id??item?.id??"").trim(),rawTr=String(item?.name_tr??item?.nameTr??item?.UlkeAdi??item?.name??"").trim();
